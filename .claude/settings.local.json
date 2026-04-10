@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find '/Users/Mordred5687/Dev Projects/PM Assistant Agent' -type f -name .*)",
+      "Bash(pip3 show:*)",
+      "Bash(pkill -f \"uvicorn main:app\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8000/)",
+      "Bash(pip3 install:*)",
+      "Bash(curl -s -X POST http://localhost:8000/api/auth/register -H \"Content-Type: application/json\" -d '{\"\"username\"\":\"\"alice\"\",\"\"password\"\":\"\"securepass123\"\"}')",
+      "Bash(railway --version)"
+    ]
+  }
+}
