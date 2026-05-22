@@ -1,0 +1,550 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — PM Tracker{% endblock %}
+
+{% block content %}
+<div class="detail-header">
+  <div class="detail-header-inner">
+    <div class="detail-breadcrumb">
+      <a href="/projects"><i class="bi bi-arrow-left me-1"></i>All Projects</a>
+    </div>
+    <div class="detail-title-row">
+      <div>
+        <h1 class="detail-title">{{ project.name }}</h1>
+        <div class="detail-meta-row">
+          {% if project.brand %}<span class="meta-brand">{{ project.brand }}</span>{% endif %}
+          {% if project.sku %}<span class="meta-sku">{{ project.sku }}</span>{% endif %}
+          {% if project.product_type %}<span class="meta-type">{{ project.product_type }}</span>{% endif %}
+          <span class="status-badge status-{{ project.status }} ms-1">{{ project.status }}</span>
+        </div>
+      </div>
+      <div class="detail-actions">
+        {% if can_edit %}
+        <a href="/projects/{{ project.id }}/edit" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-pencil me-1"></i>Edit
+        </a>
+        <form method="post" action="/projects/{{ project.id }}/archive" class="d-inline" onsubmit="return confirm('Archive this project?')">
+          <button class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-archive me-1"></i>Archive
+          </button>
+        </form>
+        {% endif %}
+        {% if current_user and current_user.role == 'admin' %}
+        <form method="post" action="/projects/{{ project.id }}/delete" class="d-inline" onsubmit="return confirm('Permanently delete this project? This cannot be undone.')">
+          <button class="btn btn-sm btn-outline-danger">
+            <i class="bi bi-trash me-1"></i>Delete
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if delay %}
+    <div class="alert-banner alert-delayed">
+      <i class="bi bi-alarm-fill me-2"></i>
+      <strong>{{ delay.days_late }} days late</strong> — {{ delay.blocking_phase }} is overdue.
+      {% if delay.estimated_launch %}
+      Estimated launch moved to <strong>{{ delay.estimated_launch.strftime('%b %d, %Y') }}</strong>.
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if health.needs_info %}
+    <div class="alert-banner alert-needs-info">
+      <i class="bi bi-exclamation-circle-fill me-2"></i>
+      <strong>{{ health.critical_count }} critical field{% if health.critical_count != 1 %}s{% endif %} missing:</strong>
+      {{ health.critical_missing | join(', ') | replace('_', ' ') }}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="detail-layout">
+  <!-- Sidebar -->
+  <aside class="detail-sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Product Manager</div>
+      <div class="sidebar-value">{{ project.product_manager or "—" }}</div>
+    </div>
+    {% if can_sensitive %}
+    <div class="sidebar-section">
+      <div class="sidebar-label">Engineer</div>
+      <div class="sidebar-value">{{ project.engineer or "—" }}</div>
+    </div>
+    {% endif %}
+    {% if project.project_owner %}
+    <div class="sidebar-section">
+      <div class="sidebar-label">Owner</div>
+      <div class="sidebar-value">{{ project.project_owner }}</div>
+    </div>
+    {% endif %}
+    {% if can_sensitive %}
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Factory</div>
+      <div class="sidebar-value">{{ project.factory or "—" }}</div>
+    </div>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Target Factory Cost</div>
+      <div class="sidebar-value">
+        {% if project.target_factory_cost %}<strong>${{ "%.2f"|format(project.target_factory_cost) }}</strong>{% else %}—{% endif %}
+      </div>
+    </div>
+    {% endif %}
+    <div class="sidebar-section">
+      <div class="sidebar-label">Target MSRP</div>
+      <div class="sidebar-value">
+        {% if project.target_msrp %}<strong>${{ "%.2f"|format(project.target_msrp) }}</strong>{% else %}—{% endif %}
+      </div>
+    </div>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Planned Launch</div>
+      <div class="sidebar-value">
+        {% if project.planned_launch_date %}{{ project.planned_launch_date.strftime('%b %d, %Y') }}{% else %}—{% endif %}
+      </div>
+    </div>
+    {% if project.estimated_launch_date and delay %}
+    <div class="sidebar-section">
+      <div class="sidebar-label text-danger">Est. Launch (delayed)</div>
+      <div class="sidebar-value text-danger fw-semibold">{{ project.estimated_launch_date.strftime('%b %d, %Y') }}</div>
+    </div>
+    {% endif %}
+    <div class="sidebar-section">
+      <div class="sidebar-label">Current Stage</div>
+      <div class="sidebar-value">
+        {% if project.current_stage %}<span class="stage-pill">{{ project.current_stage }}</span>{% else %}—{% endif %}
+      </div>
+    </div>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Created</div>
+      <div class="sidebar-value text-muted small">{{ project.created_at.strftime('%b %d, %Y') }}</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Updated</div>
+      <div class="sidebar-value text-muted small">{{ project.updated_at.strftime('%b %d, %Y') }}</div>
+    </div>
+
+    {% if health.recommended_missing %}
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section">
+      <div class="sidebar-label text-warning">Recommended to add</div>
+      <div class="sidebar-value small text-muted">{{ health.recommended_missing | join(', ') | replace('_', ' ') }}</div>
+    </div>
+    {% endif %}
+  </aside>
+
+  <!-- Main Content -->
+  <div class="detail-main">
+
+    <!-- 1. Product Thesis -->
+    <section class="detail-section">
+      <div class="section-header">
+        <h2 class="section-title"><i class="bi bi-lightbulb me-2"></i>Product Thesis</h2>
+        <a href="/projects/{{ project.id }}/edit#thesis" class="btn btn-sm btn-ghost">
+          <i class="bi bi-pencil me-1"></i>Edit
+        </a>
+      </div>
+      {% if project.project_thesis and project.project_thesis|length >= 80 %}
+      <div class="thesis-box">
+        <div class="thesis-guide">
+          <span>Why this product exists · Who it's for · What makes it different · Brand fit · Price logic · Risks</span>
+        </div>
+        <p class="thesis-text">{{ project.project_thesis }}</p>
+      </div>
+      {% else %}
+      <div class="thesis-empty">
+        <i class="bi bi-exclamation-circle text-danger me-2"></i>
+        <span>Product Thesis is missing or too short. </span>
+        <a href="/projects/{{ project.id }}/edit#thesis">Add it now</a> — it's the most important field.
+      </div>
+      {% endif %}
+    </section>
+
+    <!-- 2. Timeline -->
+    <section class="detail-section" id="timeline">
+      <div class="section-header">
+        <h2 class="section-title"><i class="bi bi-calendar-range me-2"></i>Timeline</h2>
+      </div>
+
+      {% if delay %}
+      <div class="delay-summary">
+        <i class="bi bi-alarm-fill me-2 text-danger"></i>
+        <strong>{{ delay.blocking_phase }}</strong> is {{ delay.days_late }} day{{ 's' if delay.days_late != 1 else '' }} overdue.
+        {% if delay.estimated_launch %}
+        Estimated launch: <strong>{{ delay.estimated_launch.strftime('%b %d, %Y') }}</strong>
+        (was {{ project.planned_launch_date.strftime('%b %d, %Y') if project.planned_launch_date else '—' }}).
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {% if phases %}
+      <div class="timeline-table-wrap">
+        <table class="timeline-table" id="phaseTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Phase</th>
+              <th>Status</th>
+              <th>Planned Start</th>
+              <th>Planned End</th>
+              <th>Actual End</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for phase in phases %}
+            <tr class="phase-row phase-{{ phase.status }}">
+              <td class="phase-order">{{ phase.phase_order }}</td>
+              <td>
+                <span class="phase-name">{{ phase.phase_name }}</span>
+                {% if phase.owner %}<br><small class="text-muted">{{ phase.owner }}</small>{% endif %}
+                {% if phase.notes %}<br><small class="text-muted fst-italic">{{ phase.notes[:60] }}{% if phase.notes|length > 60 %}…{% endif %}</small>{% endif %}
+              </td>
+              <td><span class="phase-status-badge phase-status-{{ phase.status }}">{{ phase.status | replace('_', ' ') }}</span></td>
+              <td class="date-cell">{{ phase.planned_start_date.strftime('%b %d, %Y') if phase.planned_start_date else "—" }}</td>
+              <td class="date-cell {% if phase.planned_end_date and phase.planned_end_date < today and phase.status not in ('done','skipped') %}text-danger fw-semibold{% endif %}">
+                {{ phase.planned_end_date.strftime('%b %d, %Y') if phase.planned_end_date else "—" }}
+              </td>
+              <td class="date-cell">{{ phase.actual_end_date.strftime('%b %d, %Y') if phase.actual_end_date else "—" }}</td>
+              <td class="phase-actions">
+                <button class="btn-phase-edit"
+                        data-bs-toggle="modal" data-bs-target="#phaseModal"
+                        data-phase-id="{{ phase.id }}"
+                        data-phase-name="{{ phase.phase_name }}"
+                        data-phase-type="{{ phase.phase_type or '' }}"
+                        data-status="{{ phase.status }}"
+                        data-planned-start="{{ phase.planned_start_date.isoformat() if phase.planned_start_date else '' }}"
+                        data-planned-end="{{ phase.planned_end_date.isoformat() if phase.planned_end_date else '' }}"
+                        data-actual-start="{{ phase.actual_start_date.isoformat() if phase.actual_start_date else '' }}"
+                        data-actual-end="{{ phase.actual_end_date.isoformat() if phase.actual_end_date else '' }}"
+                        data-owner="{{ phase.owner or '' }}"
+                        data-notes="{{ phase.notes or '' }}"
+                        title="Edit phase">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <form method="post" action="/projects/{{ project.id }}/phases/{{ phase.id }}/delete"
+                      class="d-inline" onsubmit="return confirm('Delete phase \'{{ phase.phase_name }}\'?')">
+                  <button class="btn-phase-delete" title="Delete phase">
+                    <i class="bi bi-x"></i>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="placeholder-section">
+        <i class="bi bi-calendar3 me-2"></i>No timeline phases yet.
+      </div>
+      {% endif %}
+
+      <!-- Add Phase -->
+      <div class="add-phase-row">
+        <button class="btn-add-phase" id="addPhaseToggle" onclick="toggleAddPhase()">
+          <i class="bi bi-plus me-1"></i>Add Phase
+        </button>
+        <form id="addPhaseForm" method="post" action="/projects/{{ project.id }}/phases" class="add-phase-form d-none">
+          <input type="text" name="phase_name" placeholder="Phase name…" class="form-control form-control-sm" required style="width:200px">
+          <select name="phase_type" class="form-select form-select-sm" style="width:140px">
+            <option value="">Type (optional)</option>
+            <option value="design">Design</option>
+            <option value="engineering">Engineering</option>
+            <option value="prototype">Prototype</option>
+            <option value="review">Review</option>
+            <option value="production">Production</option>
+            <option value="launch">Launch</option>
+          </select>
+          <input type="date" name="planned_end_date" class="form-control form-control-sm" style="width:160px" title="Planned end date">
+          <button type="submit" class="btn btn-sm btn-primary">Add</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleAddPhase()">Cancel</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Phase Edit Modal -->
+    <div class="modal fade" id="phaseModal" tabindex="-1" aria-labelledby="phaseModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <form id="phaseEditForm" method="post" action="">
+            <div class="modal-header">
+              <h5 class="modal-title" id="phaseModalLabel">Edit Phase</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <div class="row g-3">
+                <div class="col-md-8">
+                  <label class="form-label fw-semibold">Phase Name</label>
+                  <input type="text" name="phase_name" id="modalPhaseName" class="form-control" required>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label fw-semibold">Type</label>
+                  <select name="phase_type" id="modalPhaseType" class="form-select">
+                    <option value="">—</option>
+                    <option value="design">Design</option>
+                    <option value="engineering">Engineering</option>
+                    <option value="prototype">Prototype</option>
+                    <option value="review">Review</option>
+                    <option value="production">Production</option>
+                    <option value="launch">Launch</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label fw-semibold">Status</label>
+                  <select name="status" id="modalStatus" class="form-select">
+                    <option value="not_started">Not Started</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="done">Done</option>
+                    <option value="delayed">Delayed</option>
+                    <option value="skipped">Skipped</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label fw-semibold">Owner</label>
+                  <input type="text" name="owner" id="modalOwner" class="form-control" placeholder="Name">
+                </div>
+                <div class="col-12"><hr class="my-1"></div>
+                <div class="col-md-3">
+                  <label class="form-label fw-semibold">Planned Start</label>
+                  <input type="date" name="planned_start_date" id="modalPlannedStart" class="form-control">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-semibold">Planned End</label>
+                  <input type="date" name="planned_end_date" id="modalPlannedEnd" class="form-control">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-semibold">Actual Start</label>
+                  <input type="date" name="actual_start_date" id="modalActualStart" class="form-control">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label fw-semibold">Actual End</label>
+                  <input type="date" name="actual_end_date" id="modalActualEnd" class="form-control">
+                </div>
+                <div class="col-12">
+                  <label class="form-label fw-semibold">Notes</label>
+                  <textarea name="notes" id="modalNotes" class="form-control" rows="2" placeholder="Any notes about this phase…"></textarea>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Files & Renderings -->
+    <section class="detail-section" id="files">
+      <div class="section-header">
+        <h2 class="section-title"><i class="bi bi-images me-2"></i>Files & Renderings</h2>
+        <span class="text-muted small">{{ files|length }} file{% if files|length != 1 %}s{% endif %}</span>
+      </div>
+
+      {% if files %}
+      {# Build per-category counts for filter tabs #}
+      {% set cats = {} %}
+      {% for f in files %}
+        {% if f.file_category not in cats %}{% set _ = cats.update({f.file_category: 0}) %}{% endif %}
+        {% set _ = cats.update({f.file_category: cats[f.file_category] + 1}) %}
+      {% endfor %}
+
+      <!-- Category filter tabs -->
+      <div class="file-filter-tabs mb-3">
+        <button class="file-filter-btn active" data-cat="all" onclick="filterFiles('all')">
+          All ({{ files|length }})
+        </button>
+        {% for cat, count in cats.items() %}
+        <button class="file-filter-btn" data-cat="{{ cat }}" onclick="filterFiles('{{ cat }}')">
+          {{ cat | replace('_', ' ') | title }} ({{ count }})
+        </button>
+        {% endfor %}
+      </div>
+
+      <!-- Image gallery -->
+      {% set images = files | selectattr("file_type", "equalto", "image") | list %}
+      {% if images %}
+      <div class="files-gallery mb-3" id="filesGallery">
+        {% for f in files %}
+        {% if f.file_type == 'image' %}
+        <div class="file-item gallery-item" data-category="{{ f.file_category }}">
+          <div class="file-thumb-wrap"
+               onclick="openLightbox({{ loop.index0 }})"
+               style="cursor:pointer">
+            <img src="/uploads/{{ f.filename }}"
+                 class="file-thumb gallery-img"
+                 data-index="{{ loop.index0 }}"
+                 data-full="/uploads/{{ f.filename }}"
+                 data-name="{{ f.original_filename }}"
+                 alt="{{ f.original_filename }}">
+            <div class="file-thumb-overlay">
+              <span class="file-cat-tag">{{ f.file_category | replace('_', ' ') }}</span>
+              <form method="post" action="/projects/{{ project.id }}/files/{{ f.id }}/delete"
+                    class="d-inline" onsubmit="return confirm('Delete \'{{ f.original_filename }}\'?')"
+                    onclick="event.stopPropagation()">
+                <button class="file-delete-btn" title="Delete"><i class="bi bi-trash3"></i></button>
+              </form>
+            </div>
+          </div>
+          {% if f.source_note %}
+          <div class="file-note">{{ f.source_note }}</div>
+          {% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Non-image files list -->
+      {% set docs = files | rejectattr("file_type", "equalto", "image") | list %}
+      {% if docs %}
+      <div class="file-docs-list" id="fileDocsList">
+        {% for f in files %}
+        {% if f.file_type != 'image' %}
+        <div class="file-doc-row file-item" data-category="{{ f.file_category }}">
+          <div class="file-doc-icon">
+            {% if f.file_type == 'pdf' %}<i class="bi bi-file-earmark-pdf text-danger"></i>
+            {% elif f.file_type == 'word' %}<i class="bi bi-file-earmark-word text-primary"></i>
+            {% elif f.file_type == 'excel' %}<i class="bi bi-file-earmark-spreadsheet text-success"></i>
+            {% else %}<i class="bi bi-file-earmark text-muted"></i>{% endif %}
+          </div>
+          <div class="file-doc-info">
+            <a href="/uploads/{{ f.filename }}" target="_blank" class="file-doc-name">{{ f.original_filename }}</a>
+            <span class="file-cat-tag">{{ f.file_category | replace('_', ' ') }}</span>
+            {% if f.source_note %}<span class="file-doc-note">{{ f.source_note }}</span>{% endif %}
+            {% if f.file_size %}<span class="file-size">{{ (f.file_size / 1024) | round(1) }} KB</span>{% endif %}
+          </div>
+          <form method="post" action="/projects/{{ project.id }}/files/{{ f.id }}/delete"
+                class="d-inline" onsubmit="return confirm('Delete \'{{ f.original_filename }}\'?')">
+            <button class="btn-phase-delete" title="Delete"><i class="bi bi-trash3"></i></button>
+          </form>
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% else %}
+      <div class="placeholder-section mb-3">
+        <i class="bi bi-images me-2"></i>No files yet — upload a rendering, quotation, or reference below.
+      </div>
+      {% endif %}
+
+      <!-- Upload zone -->
+      <form method="post" action="/projects/{{ project.id }}/files"
+            enctype="multipart/form-data" id="uploadForm">
+        <div class="upload-zone" id="uploadDropArea">
+          <i class="bi bi-cloud-arrow-up upload-icon"></i>
+          <p class="upload-label">Drop file here or <span class="upload-link">click to browse</span></p>
+          <p class="upload-name" id="fileNamePreview">No file selected</p>
+          <input type="file" name="file" id="fileInput" style="display:none" required>
+        </div>
+        <div class="upload-meta">
+          <select name="file_category" class="form-select form-select-sm" style="width:160px">
+            <option value="rendering">Rendering</option>
+            <option value="reference">Reference</option>
+            <option value="quotation">Quotation</option>
+            <option value="thesis">Thesis doc</option>
+            <option value="factory_feedback">Factory feedback</option>
+            <option value="packaging">Packaging</option>
+            <option value="other" selected>Other</option>
+          </select>
+          <input type="text" name="source_note" class="form-control form-control-sm"
+                 placeholder="Note (optional)" style="flex:1">
+          <button type="submit" class="btn btn-sm btn-primary" id="uploadSubmitBtn" disabled>
+            <i class="bi bi-upload me-1"></i>Upload
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- 4. Change Log -->
+    <section id="changes" class="detail-section">
+      <div class="section-header">
+        <h2 class="section-title"><i class="bi bi-clock-history me-2"></i>Change Log{% if changes %} ({{ changes|length }}){% endif %}</h2>
+      </div>
+      {% if changes %}
+      <div class="change-log">
+        {% set sensitive_fields = ['factory', 'engineer', 'target_factory_cost'] %}
+        {% for c in changes %}
+        {# Hide sensitive field changes from viewers #}
+        {% if c.change_type == 'field_update' and c.field_name in sensitive_fields and not can_sensitive %}
+        {% else %}
+        <div class="change-entry change-{{ c.change_type }}">
+          <div class="change-time">{{ c.changed_at.strftime('%b %d, %Y %H:%M') }}</div>
+          <div class="change-body">
+            {% if c.change_type == 'field_update' and c.field_name %}
+            <span class="change-field">{{ c.field_name | replace('_', ' ') | title }}</span>:
+            {% if c.old_value %}
+            <span class="change-old">{{ c.old_value }}</span> → <span class="change-new">{{ c.new_value or '(cleared)' }}</span>
+            {% else %}
+            set to <span class="change-new">{{ c.new_value }}</span>
+            {% endif %}
+            {% elif c.summary %}
+            {{ c.summary }}
+            {% endif %}
+          </div>
+          <div class="change-by">{{ c.changed_by }}</div>
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="placeholder-section text-muted">No changes recorded yet.</div>
+      {% endif %}
+    </section>
+
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div id="lightbox" class="lightbox-overlay" onclick="closeLightbox()" style="display:none">
+  <img id="lightboxImg" class="lightbox-img" src="" alt="" onclick="event.stopPropagation()">
+  <button class="lightbox-close" onclick="closeLightbox()"><i class="bi bi-x-lg"></i></button>
+  <button class="lightbox-prev" onclick="event.stopPropagation(); lightboxNav(-1)" id="lightboxPrev" style="display:none"><i class="bi bi-chevron-left"></i></button>
+  <button class="lightbox-next" onclick="event.stopPropagation(); lightboxNav(1)" id="lightboxNext" style="display:none"><i class="bi bi-chevron-right"></i></button>
+  <div class="lightbox-caption" id="lightboxCaption"></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+var projectId = {{ project.id }};
+
+// Populate phase edit modal from data-* attributes
+document.getElementById('phaseModal').addEventListener('show.bs.modal', function (event) {
+  var btn = event.relatedTarget;
+  var phaseId = btn.getAttribute('data-phase-id');
+
+  document.getElementById('phaseEditForm').action =
+    '/projects/' + projectId + '/phases/' + phaseId + '/edit';
+
+  document.getElementById('modalPhaseName').value  = btn.getAttribute('data-phase-name') || '';
+  document.getElementById('modalPhaseType').value  = btn.getAttribute('data-phase-type') || '';
+  document.getElementById('modalStatus').value     = btn.getAttribute('data-status') || 'not_started';
+  document.getElementById('modalOwner').value      = btn.getAttribute('data-owner') || '';
+  document.getElementById('modalPlannedStart').value = btn.getAttribute('data-planned-start') || '';
+  document.getElementById('modalPlannedEnd').value   = btn.getAttribute('data-planned-end') || '';
+  document.getElementById('modalActualStart').value  = btn.getAttribute('data-actual-start') || '';
+  document.getElementById('modalActualEnd').value    = btn.getAttribute('data-actual-end') || '';
+  document.getElementById('modalNotes').value = btn.getAttribute('data-notes') || '';
+});
+
+function toggleAddPhase() {
+  var form = document.getElementById('addPhaseForm');
+  var btn  = document.getElementById('addPhaseToggle');
+  if (form.classList.contains('d-none')) {
+    form.classList.remove('d-none');
+    btn.style.display = 'none';
+    form.querySelector('input[name="phase_name"]').focus();
+  } else {
+    form.classList.add('d-none');
+    btn.style.display = '';
+  }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}User Management — PM Tracker{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3">
+    <a href="/admin/database" class="btn-back"><i class="bi bi-arrow-left"></i></a>
+    <div>
+      <h1 class="page-title"><i class="bi bi-people me-2"></i>User Management</h1>
+      <p class="page-subtitle">Manage team access and generate invite PINs</p>
+    </div>
+  </div>
+</div>
+
+{% if new_pin %}
+<div class="alert alert-success mb-4" style="border-left:4px solid var(--color-success)">
+  <div class="d-flex align-items-center gap-3 flex-wrap">
+    <div>
+      <i class="bi bi-key-fill me-2"></i>
+      <strong>{{ new_pin_role | upper }} PIN generated:</strong>
+    </div>
+    <code id="newPinValue" style="font-size:1.3rem;letter-spacing:0.15em;background:#fff;padding:6px 14px;border-radius:6px;border:1px solid var(--color-border)">{{ new_pin }}</code>
+    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="navigator.clipboard.writeText('{{ new_pin }}').then(()=>{this.innerHTML='<i class=&quot;bi bi-check&quot;></i> Copied';setTimeout(()=>this.innerHTML='<i class=&quot;bi bi-clipboard&quot;></i> Copy',2000)})">
+      <i class="bi bi-clipboard"></i> Copy
+    </button>
+  </div>
+  <p class="mb-0 mt-2 text-muted small">
+    Share this PIN with the new team member (e.g. via Slack/email). They use it at <code>/auth/register</code>. The PIN can only be used <strong>once</strong> and is invalidated after registration.
+  </p>
+</div>
+{% endif %}
+
+<div class="row g-4">
+
+  <!-- Generate PIN -->
+  <div class="col-lg-4">
+    <div class="detail-section">
+      <div class="section-header">
+        <h2 class="section-title"><i class="bi bi-key me-2"></i>Generate Invite PIN</h2>
+      </div>
+      <p class="text-muted small mb-3">Select the role this PIN will grant. Share the PIN with the new team member — they'll use it once to register at <code>/auth/register</code>.</p>
+      <form method="post" action="/admin/users/generate-pin">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Role</label>
+          <select name="role" class="form-select">
+            <option value="pm">PM — Can create and edit own projects, see factory/engineer</option>
+            <option value="viewer">Viewer — Read-only, no sensitive fields</option>
+          </select>
+          <div class="form-text">
+            PM PINs look like <code>PM-XXXXXX</code> · Viewer PINs look like <code>VW-XXXXXX</code>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-key me-2"></i>Generate PIN
+        </button>
+      </form>
+
+      {% if unused_pins %}
+      <hr class="my-4">
+      <p class="fw-semibold small mb-2">Unused PINs</p>
+      {% for pin in unused_pins %}
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <code style="letter-spacing:0.15em">{{ pin.pin }}</code>
+        <span class="badge {% if pin.role == 'pm' %}bg-primary{% else %}bg-secondary{% endif %}">{{ pin.role }}</span>
+        <span class="text-muted small ms-auto">{{ pin.created_at.strftime('%b %d') }}</span>
+      </div>
+      {% endfor %}
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- User list -->
+  <div class="col-lg-8">
+    <div class="detail-section">
+      <div class="section-header">
+        <h2 class="section-title"><i class="bi bi-people me-2"></i>Team Members ({{ users|length }})</h2>
+      </div>
+      <div class="table-responsive">
+        <table class="table admin-table">
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Display Name</th>
+              <th>Role</th>
+              <th>Joined</th>
+              <th>Last Login</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in users %}
+            <tr>
+              <td><strong>{{ u.username }}</strong></td>
+              <td>{{ u.display_name or '—' }}</td>
+              <td>
+                <span class="badge {% if u.role == 'admin' %}bg-danger{% elif u.role == 'pm' %}bg-primary{% else %}bg-secondary{% endif %}">
+                  {{ u.role }}
+                </span>
+              </td>
+              <td class="text-muted small">{{ u.created_at.strftime('%Y-%m-%d') }}</td>
+              <td class="text-muted small">{{ u.last_login.strftime('%Y-%m-%d') if u.last_login else '—' }}</td>
+              <td>
+                {% if u.id != current_user.id %}
+                <form method="post" action="/admin/users/{{ u.id }}/deactivate"
+                      onsubmit="return confirm('Remove {{ u.username }}? This cannot be undone.')">
+                  <button class="btn btn-outline-danger btn-sm">Remove</button>
+                </form>
+                {% else %}
+                <span class="text-muted small">You</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

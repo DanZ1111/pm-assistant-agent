@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Database Inspector — PM Tracker{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title"><i class="bi bi-database me-2"></i>Database Inspector</h1>
+  <p class="page-subtitle">Read-only view of database health and field usage. Refresh the page to update.</p>
+</div>
+
+<div class="px-4">
+
+  <!-- Table Overview -->
+  <div class="admin-section">
+    <h2 class="admin-section-title">Table Overview</h2>
+    <div class="admin-grid-4">
+      {% for table_name, stat in table_stats.items() %}
+      <div class="admin-stat-card">
+        <div class="admin-stat-value">{{ stat.count }}</div>
+        <div class="admin-stat-label">{{ table_name | replace('_', ' ') }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Field Usage Report -->
+  <div class="admin-section">
+    <h2 class="admin-section-title">Field Usage — <code>projects</code> table</h2>
+    {% if field_usage %}
+    <div class="table-responsive">
+      <table class="table admin-table">
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>Non-empty</th>
+            <th>Empty</th>
+            <th>Usage %</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for field, stat in field_usage.items() %}
+          <tr>
+            <td><code>{{ field }}</code></td>
+            <td>{{ stat.non_empty }} / {{ stat.total }}</td>
+            <td class="{% if stat.empty > 0 %}text-warning{% endif %}">{{ stat.empty }}</td>
+            <td>
+              <div class="usage-bar-wrap">
+                <div class="usage-bar" style="width:{{ stat.pct }}%; background: {% if stat.pct >= 70 %}#22c55e{% elif stat.pct >= 30 %}#f59e0b{% else %}#ef4444{% endif %}"></div>
+              </div>
+            </td>
+            <td class="{% if stat.pct >= 70 %}text-success{% elif stat.pct >= 30 %}text-warning{% else %}text-danger{% endif %} fw-semibold">
+              {{ stat.pct }}%
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted">No projects in database yet.</p>
+    {% endif %}
+  </div>
+
+  <!-- Missing Critical Fields -->
+  <div class="admin-section">
+    <h2 class="admin-section-title">Missing Critical Fields — Active Projects</h2>
+    {% if missing_critical %}
+    <div class="table-responsive">
+      <table class="table admin-table">
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>Missing in</th>
+            <th>Projects</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for field, project_names in missing_critical.items() %}
+          <tr class="{% if project_names %}table-warning{% endif %}">
+            <td><code>{{ field | replace('_', ' ') }}</code></td>
+            <td>
+              {% if project_names %}
+              <span class="text-danger fw-semibold">{{ project_names|length }} project{% if project_names|length != 1 %}s{% endif %}</span>
+              {% else %}
+              <span class="text-success">All complete ✓</span>
+              {% endif %}
+            </td>
+            <td class="text-muted small">{{ project_names | join(', ') if project_names else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted">No active projects yet.</p>
+    {% endif %}
+  </div>
+
+  <!-- Recent Changes -->
+  <div class="admin-section">
+    <h2 class="admin-section-title">Recent Changes Feed</h2>
+    {% if recent_changes %}
+    <div class="table-responsive">
+      <table class="table admin-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Project</th>
+            <th>Type</th>
+            <th>Field</th>
+            <th>Change</th>
+            <th>By</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in recent_changes %}
+          {% set c = row.change %}
+          <tr>
+            <td class="text-muted small">{{ c.changed_at.strftime('%b %d %H:%M') }}</td>
+            <td><a href="/projects/{{ c.project_id }}">{{ row.project_name }}</a></td>
+            <td><span class="badge bg-secondary">{{ c.change_type | replace('_', ' ') }}</span></td>
+            <td class="text-muted small">{{ c.field_name or '—' }}</td>
+            <td class="small">
+              {% if c.summary %}{{ c.summary }}
+              {% elif c.old_value and c.new_value %}
+              <span class="text-muted">{{ c.old_value[:30] }}</span> → <strong>{{ c.new_value[:30] }}</strong>
+              {% endif %}
+            </td>
+            <td class="text-muted small">{{ c.changed_by }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted">No changes recorded yet. Changes will appear here as you create and edit projects.</p>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

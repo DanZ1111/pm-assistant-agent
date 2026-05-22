@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% block title %}{% if is_edit %}Edit {{ project.name }}{% else %}New Project{% endif %} — PM Tracker{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3">
+    <a href="{% if is_edit %}/projects/{{ project.id }}{% else %}/projects{% endif %}" class="btn-back">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+      <h1 class="page-title">{% if is_edit %}Edit Project{% else %}New Project{% endif %}</h1>
+      {% if is_edit %}<p class="page-subtitle">{{ project.name }}</p>{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="form-page">
+  {% if error %}
+  <div class="alert alert-danger mb-4"><i class="bi bi-exclamation-circle me-2"></i>{{ error }}</div>
+  {% endif %}
+
+  <form method="post" action="{% if is_edit %}/projects/{{ project.id }}/edit{% else %}/projects/new{% endif %}">
+
+    <!-- Project Identity -->
+    <div class="form-section">
+      <h3 class="form-section-title">Project Identity</h3>
+      <div class="form-grid">
+        <div class="form-group-full">
+          <label class="form-label">
+            Project Name <span class="badge-required">Required</span>
+          </label>
+          <input type="text" name="name" class="form-control form-control-lg"
+                 value="{{ project.name if project else '' }}"
+                 placeholder="e.g. Damascus Chef Knife, KlikTac Balisong, 8-bit EDC..."
+                 required autofocus>
+        </div>
+        <div>
+          <label class="form-label">
+            Brand <span class="badge-critical">Critical</span>
+          </label>
+          <input type="text" name="brand" class="form-control"
+                 value="{{ project.brand or '' if project else '' }}"
+                 placeholder="e.g. Rblack, Ferrum Forge...">
+        </div>
+        <div>
+          <label class="form-label">
+            SKU <span class="badge-recommended">Recommended</span>
+          </label>
+          <input type="text" name="sku" class="form-control"
+                 value="{{ project.sku or '' if project else '' }}"
+                 placeholder="e.g. RB-2024-001">
+        </div>
+        <div>
+          <label class="form-label">Product Type</label>
+          <input type="text" name="product_type" class="form-control"
+                 value="{{ project.product_type or '' if project else '' }}"
+                 placeholder="e.g. folding knife, EDC tool, balisong...">
+        </div>
+        {% if is_edit %}
+        <div>
+          <label class="form-label">Status</label>
+          <select name="status" class="form-select">
+            {% for s in ['active', 'completed', 'paused', 'cancelled', 'archived'] %}
+            <option value="{{ s }}" {% if project.status == s %}selected{% endif %}>{{ s | title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Team -->
+    <div class="form-section">
+      <h3 class="form-section-title">Team</h3>
+      <div class="form-grid">
+        <div>
+          <label class="form-label">
+            Product Manager <span class="badge-critical">Critical</span>
+          </label>
+          <input type="text" name="product_manager" class="form-control"
+                 value="{{ project.product_manager or '' if project else '' }}"
+                 placeholder="Name">
+        </div>
+        <div>
+          <label class="form-label">
+            Engineer <span class="badge-critical">Critical</span>
+          </label>
+          <input type="text" name="engineer" class="form-control"
+                 value="{{ project.engineer or '' if project else '' }}"
+                 placeholder="Name">
+        </div>
+        <div>
+          <label class="form-label">Project Owner</label>
+          <input type="text" name="project_owner" class="form-control"
+                 value="{{ project.project_owner or '' if project else '' }}"
+                 placeholder="Name (if different from PM)">
+        </div>
+      </div>
+    </div>
+
+    <!-- Supply Chain -->
+    <div class="form-section">
+      <h3 class="form-section-title">Supply Chain & Pricing</h3>
+      <div class="form-grid">
+        <div>
+          <label class="form-label">
+            Factory <span class="badge-critical">Critical</span>
+          </label>
+          <input type="text" name="factory" class="form-control"
+                 value="{{ project.factory or '' if project else '' }}"
+                 placeholder="Factory name or location">
+        </div>
+        <div>
+          <label class="form-label">
+            Target Factory Cost (USD) <span class="badge-critical">Critical</span>
+          </label>
+          <input type="number" name="target_factory_cost" class="form-control"
+                 step="0.01" min="0"
+                 value="{{ project.target_factory_cost or '' if project else '' }}"
+                 placeholder="e.g. 18.50">
+        </div>
+        <div>
+          <label class="form-label">
+            Target MSRP (USD) <span class="badge-critical">Critical</span>
+          </label>
+          <input type="number" name="target_msrp" class="form-control"
+                 step="0.01" min="0"
+                 value="{{ project.target_msrp or '' if project else '' }}"
+                 placeholder="e.g. 59.99">
+        </div>
+      </div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="form-section">
+      <h3 class="form-section-title">Timeline</h3>
+      <div class="form-grid">
+        <div>
+          <label class="form-label">
+            Planned Launch Date <span class="badge-critical">Critical</span>
+          </label>
+          <input type="date" name="planned_launch_date" class="form-control"
+                 value="{{ project.planned_launch_date.isoformat() if project and project.planned_launch_date else '' }}">
+        </div>
+        {% if not is_edit %}
+        <div>
+          <label class="form-label">Prototype Rounds</label>
+          <div class="prototype-toggle">
+            <label class="prototype-option">
+              <input type="radio" name="prototype_rounds" value="single" checked>
+              <span class="prototype-label">
+                <strong>Single prototype</strong>
+                <small>8 phases — standard flow</small>
+              </span>
+            </label>
+            <label class="prototype-option">
+              <input type="radio" name="prototype_rounds" value="double">
+              <span class="prototype-label">
+                <strong>Double prototype</strong>
+                <small>10 phases — two rounds of sampling</small>
+              </span>
+            </label>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Product Thesis -->
+    <div class="form-section" id="thesis">
+      <h3 class="form-section-title">
+        Product Thesis <span class="badge-critical">Critical</span>
+        <span class="thesis-hint">Needs at least 80 characters</span>
+      </h3>
+      <p class="form-help-text">
+        This is the soul of the product. Answer: why does this product exist? Who is it for? What's the core problem? What makes it different? Why does it fit this brand? What's the target price logic? What are the main risks or unknowns?
+      </p>
+      <textarea name="project_thesis" class="form-control thesis-textarea" rows="8"
+                id="thesisField"
+                placeholder="Why does this product exist? Who is it for and what problem does it solve?&#10;What makes it different from existing products in this category?&#10;Why does this belong to this brand specifically?&#10;What's our target price logic — why will customers see value at $X?&#10;What are the main risks or unknowns we need to watch?">{{ project.project_thesis or '' if project else '' }}</textarea>
+      <div class="thesis-counter" id="thesisCounter">
+        <span id="thesisCount">0</span> characters
+        <span id="thesisStatus" class="ms-2"></span>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <a href="{% if is_edit %}/projects/{{ project.id }}{% else %}/projects{% endif %}" class="btn btn-outline-secondary btn-lg">
+        Cancel
+      </a>
+      <button type="submit" class="btn btn-primary btn-lg">
+        {% if is_edit %}Save Changes{% else %}Create Project{% endif %}
+      </button>
+    </div>
+
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  var textarea = document.getElementById('thesisField');
+  var counter = document.getElementById('thesisCount');
+  var status = document.getElementById('thesisStatus');
+
+  function updateThesisCounter() {
+    var len = textarea.value.length;
+    counter.textContent = len;
+    if (len >= 80) {
+      status.textContent = '✓ Good';
+      status.className = 'ms-2 text-success';
+    } else if (len > 0) {
+      status.textContent = (80 - len) + ' more to go';
+      status.className = 'ms-2 text-warning';
+    } else {
+      status.textContent = '';
+    }
+  }
+
+  if (textarea) {
+    textarea.addEventListener('input', updateThesisCounter);
+    updateThesisCounter();
+  }
+</script>
+{% endblock %}

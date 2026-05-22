@@ -1,0 +1,330 @@
+{% extends "base.html" %}
+{% block title %}AI Intake — PM Tracker{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3">
+    <a href="/projects" class="btn-back"><i class="bi bi-arrow-left"></i></a>
+    <div>
+      <h1 class="page-title"><i class="bi bi-robot me-2"></i>AI Intake</h1>
+      <p class="page-subtitle">Paste messy product notes — AI extracts the fields for you to review and confirm.</p>
+    </div>
+  </div>
+</div>
+
+{% if error %}
+<div class="alert alert-danger mb-4"><i class="bi bi-exclamation-circle me-2"></i>{{ error }}</div>
+{% endif %}
+
+{% if proposed is none %}
+{# ── State 1: Text input ── #}
+<div class="form-page" style="max-width:760px">
+
+  {# Option A: Paste text #}
+  <form method="post" action="/ai/intake/extract">
+    <div class="form-section">
+      <h3 class="form-section-title"><i class="bi bi-chat-left-text me-2"></i>Paste Your Notes</h3>
+      <p class="text-muted small mb-3">Paste any raw notes, emails, WhatsApp messages, or meeting notes about the product. AI will pull out what it can.</p>
+      <textarea name="raw_text" class="form-control" rows="10" autofocus
+                placeholder="e.g. Hey, so we're working on a new chef knife for the Rblack line. Factory is Guangzhou Blade Co. Sarah Chen is PM, Mike Torres is on engineering. Target cost around $18, MSRP $129.99. Aiming for Q4 2026 launch. This knife is for home cooks who want a pro-feel blade without spending $300..."
+      >{{ raw_text }}</textarea>
+    </div>
+    <div class="d-flex gap-3 mt-3">
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-magic me-2"></i>Extract Fields
+      </button>
+      <a href="/projects/new" class="btn btn-outline-secondary">Manual Entry</a>
+    </div>
+  </form>
+
+  {# Divider #}
+  <div class="d-flex align-items-center gap-3 my-4">
+    <hr style="flex:1;border-color:var(--color-border)">
+    <span class="text-muted small fw-semibold">OR</span>
+    <hr style="flex:1;border-color:var(--color-border)">
+  </div>
+
+  {# Option B: Upload file #}
+  <form method="post" action="/ai/intake/extract-file" enctype="multipart/form-data">
+    <div class="form-section">
+      <h3 class="form-section-title"><i class="bi bi-file-earmark-arrow-up me-2"></i>Upload a File</h3>
+      <p class="text-muted small mb-3">Upload a PDF (spec sheet, quotation, email export) or an image of the product. AI will extract fields and generate a summary.</p>
+      <div class="row g-3 align-items-end">
+        <div class="col-sm-8">
+          <label class="form-label">File <small class="text-muted">(PDF or image)</small></label>
+          <input type="file" name="file" id="intakeFileInput" class="form-control"
+                 accept=".pdf,.png,.jpg,.jpeg,.webp,.gif">
+        </div>
+        <div class="col-sm-4">
+          <label class="form-label">Category</label>
+          <select name="file_category" class="form-select">
+            <option value="rendering">Rendering</option>
+            <option value="reference" selected>Reference</option>
+            <option value="quotation">Quotation</option>
+            <option value="factory_feedback">Factory Feedback</option>
+            <option value="thesis">Thesis Doc</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="mt-3">
+      <button type="submit" class="btn btn-primary" id="intakeFileSubmit" disabled>
+        <i class="bi bi-magic me-2"></i>Analyze File
+      </button>
+    </div>
+  </form>
+
+</div>
+
+{% else %}
+{# ── State 2: Review & Confirm ── #}
+<div class="row g-4">
+
+  {# Left column: original text / AI summary reference #}
+  <div class="col-lg-4">
+    <div class="detail-section" style="position:sticky;top:80px">
+      <div class="section-header">
+        <h2 class="section-title" style="font-size:1rem">
+          {% if uploaded_filename %}
+          <i class="bi bi-file-earmark me-2"></i>{{ uploaded_original_filename }}
+          {% else %}
+          <i class="bi bi-chat-left-text me-2"></i>Your Notes
+          {% endif %}
+        </h2>
+      </div>
+      {% if uploaded_ai_summary %}
+      <p class="text-muted small mb-2" style="font-weight:600">AI Summary</p>
+      <p style="font-size:0.85rem;color:var(--color-text)">{{ uploaded_ai_summary }}</p>
+      {% if raw_text %}
+      <p class="text-muted small mt-3 mb-1" style="font-weight:600">Extracted Text</p>
+      <pre style="white-space:pre-wrap;font-size:0.75rem;color:var(--color-text-muted);max-height:30vh;overflow-y:auto;margin:0">{{ raw_text }}</pre>
+      {% endif %}
+      {% else %}
+      <pre style="white-space:pre-wrap;font-size:0.8rem;color:var(--color-text-muted);max-height:60vh;overflow-y:auto;margin:0">{{ raw_text }}</pre>
+      {% endif %}
+    </div>
+  </div>
+
+  {# Right column: proposed fields + confirm form #}
+  <div class="col-lg-8">
+
+    {# Match banner #}
+    {% if matched_project %}
+    <div class="alert alert-info mb-4" style="font-size:0.875rem">
+      <i class="bi bi-search me-2"></i>
+      <strong>Similar project found:</strong>
+      {{ matched_project.name }}{% if matched_project.brand %} · {{ matched_project.brand }}{% endif %}
+      <span class="badge bg-info text-dark ms-2">{{ (match_score * 100) | int }}% match</span>
+      <p class="mb-0 mt-1 text-muted small">You can <strong>update this project</strong> with the extracted fields, or <strong>create a new one</strong> below.</p>
+    </div>
+    {% endif %}
+
+    {# Health check preview #}
+    {% if health %}
+    {% if health.critical_missing %}
+    <div class="alert alert-warning mb-4" style="font-size:0.875rem">
+      <i class="bi bi-exclamation-triangle me-2"></i>
+      <strong>Missing critical fields:</strong>
+      {{ health.critical_missing | join(', ') | replace('_', ' ') }}
+      — fill them in below or add later.
+    </div>
+    {% endif %}
+    {% if not health.critical_missing %}
+    <div class="alert alert-success mb-4" style="font-size:0.875rem">
+      <i class="bi bi-check-circle me-2"></i>All critical fields extracted — looking good.
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <div class="detail-section mb-3">
+      <div class="section-header">
+        <h2 class="section-title" style="font-size:1rem"><i class="bi bi-pencil-square me-2"></i>Proposed Fields — Review &amp; Edit</h2>
+      </div>
+      <p class="text-muted small mb-4">Review what AI extracted. Edit any field before confirming. Nothing is saved until you click "Confirm &amp; Create".</p>
+
+      <form method="post" action="/ai/intake/confirm">
+        <input type="hidden" name="raw_text" value="{{ raw_text | e }}">
+        <input type="hidden" name="uploaded_filename" value="{{ uploaded_filename | e }}">
+        <input type="hidden" name="uploaded_original_filename" value="{{ uploaded_original_filename | e }}">
+        <input type="hidden" name="uploaded_file_type" value="{{ uploaded_file_type | e }}">
+        <input type="hidden" name="uploaded_file_category" value="{{ uploaded_file_category | e }}">
+        <input type="hidden" name="uploaded_ai_summary" value="{{ uploaded_ai_summary | e }}">
+        <input type="hidden" name="project_id" value="{{ matched_project.id if matched_project else '' }}">
+
+        <!-- Identity -->
+        <div class="form-section">
+          <h3 class="form-section-title">Project Identity</h3>
+          <div class="form-grid">
+            <div class="form-group-full">
+              <label class="form-label">Project Name <span class="badge-required">Required</span></label>
+              <input type="text" name="name" class="form-control form-control-lg"
+                     value="{{ proposed.get('name', '') or '' }}"
+                     placeholder="Product or project name" required autofocus>
+            </div>
+            <div>
+              <label class="form-label">Brand <span class="badge-critical">Critical</span></label>
+              <input type="text" name="brand" class="form-control"
+                     value="{{ proposed.get('brand', '') or '' }}"
+                     placeholder="e.g. Rblack">
+            </div>
+            <div>
+              <label class="form-label">SKU <span class="badge-recommended">Recommended</span></label>
+              <input type="text" name="sku" class="form-control"
+                     value="{{ proposed.get('sku', '') or '' }}"
+                     placeholder="e.g. RB-2024-001">
+            </div>
+            <div>
+              <label class="form-label">Product Type</label>
+              <input type="text" name="product_type" class="form-control"
+                     value="{{ proposed.get('product_type', '') or '' }}"
+                     placeholder="e.g. chef's knife, folding knife">
+            </div>
+          </div>
+        </div>
+
+        <!-- Team -->
+        <div class="form-section">
+          <h3 class="form-section-title">Team</h3>
+          <div class="form-grid">
+            <div>
+              <label class="form-label">Product Manager <span class="badge-critical">Critical</span></label>
+              <input type="text" name="product_manager" class="form-control"
+                     value="{{ proposed.get('product_manager', '') or '' }}"
+                     placeholder="Name">
+            </div>
+            <div>
+              <label class="form-label">Engineer <span class="badge-critical">Critical</span></label>
+              <input type="text" name="engineer" class="form-control"
+                     value="{{ proposed.get('engineer', '') or '' }}"
+                     placeholder="Name">
+            </div>
+          </div>
+        </div>
+
+        <!-- Supply Chain & Pricing -->
+        <div class="form-section">
+          <h3 class="form-section-title">Supply Chain &amp; Pricing</h3>
+          <div class="form-grid">
+            <div>
+              <label class="form-label">Factory <span class="badge-critical">Critical</span></label>
+              <input type="text" name="factory" class="form-control"
+                     value="{{ proposed.get('factory', '') or '' }}"
+                     placeholder="Supplier / factory name">
+            </div>
+            <div>
+              <label class="form-label">Target Factory Cost <span class="badge-critical">Critical</span></label>
+              <div class="input-group">
+                <span class="input-group-text">USD</span>
+                <input type="number" name="target_factory_cost" class="form-control"
+                       value="{{ proposed.get('target_factory_cost', '') or '' }}"
+                       step="0.01" min="0" placeholder="0.00">
+              </div>
+            </div>
+            <div>
+              <label class="form-label">Target MSRP <span class="badge-critical">Critical</span></label>
+              <div class="input-group">
+                <span class="input-group-text">USD</span>
+                <input type="number" name="target_msrp" class="form-control"
+                       value="{{ proposed.get('target_msrp', '') or '' }}"
+                       step="0.01" min="0" placeholder="0.00">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Timeline -->
+        <div class="form-section">
+          <h3 class="form-section-title">Timeline</h3>
+          <div class="form-grid">
+            <div>
+              <label class="form-label">Planned Launch Date <span class="badge-critical">Critical</span></label>
+              <input type="date" name="planned_launch_date" class="form-control"
+                     value="{{ proposed.get('planned_launch_date', '') or '' }}">
+            </div>
+            <div>
+              <label class="form-label">Prototype Rounds</label>
+              <div class="d-flex gap-3 pt-2">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="prototype_rounds" id="pr_single" value="single" checked>
+                  <label class="form-check-label" for="pr_single">Single (8 phases)</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="prototype_rounds" id="pr_double" value="double">
+                  <label class="form-check-label" for="pr_double">Double (10 phases)</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Product Thesis -->
+        <div class="form-section">
+          <h3 class="form-section-title">Product Thesis</h3>
+          <div class="form-group-full">
+            <label class="form-label">Thesis <span class="badge-critical">Critical</span>
+              <small class="text-muted ms-2">(≥ 80 characters)</small>
+            </label>
+            <textarea name="project_thesis" class="form-control" rows="5"
+                      id="thesisInput"
+                      placeholder="Why does this product exist? Who is it for? What problem does it solve?">{{ proposed.get('project_thesis', '') or '' }}</textarea>
+            <div class="thesis-counter mt-1" id="thesisCounter"></div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="d-flex gap-3 mt-4 mb-2">
+          <button type="submit" class="btn btn-primary btn-lg">
+            <i class="bi bi-check-lg me-2"></i>Confirm &amp; Create Project
+          </button>
+          {% if matched_project %}
+          <button type="submit" name="action" value="update" class="btn btn-warning btn-lg">
+            <i class="bi bi-arrow-repeat me-2"></i>Update "{{ matched_project.name }}"
+          </button>
+          {% endif %}
+          <a href="/ai/intake" class="btn btn-outline-secondary btn-lg">Start Over</a>
+        </div>
+        <p class="text-muted small">
+          {% if matched_project %}
+          "Confirm &amp; Create" creates a new project. "Update" applies extracted fields to the existing match (only non-empty fields are changed).
+          {% else %}
+          Project will be created with a single-prototype phase template. You can adjust phases on the project detail page.
+          {% endif %}
+        </p>
+
+      </form>
+    </div>
+
+  </div>
+</div>
+{% endif %}
+
+<script>
+(function () {
+  // Enable file upload submit button only when a file is selected
+  var fileInput = document.getElementById('intakeFileInput');
+  var fileSubmit = document.getElementById('intakeFileSubmit');
+  if (fileInput && fileSubmit) {
+    fileInput.addEventListener('change', function () {
+      fileSubmit.disabled = fileInput.files.length === 0;
+    });
+  }
+
+  // Thesis character counter
+  var ta = document.getElementById('thesisInput');
+  var counter = document.getElementById('thesisCounter');
+  if (!ta || !counter) return;
+  function updateCounter() {
+    var len = ta.value.length;
+    if (len >= 80) {
+      counter.innerHTML = '<span style="color:var(--color-success)"><i class="bi bi-check-circle me-1"></i>Good (' + len + ' chars)</span>';
+    } else {
+      counter.innerHTML = '<span style="color:var(--color-warning)">' + (80 - len) + ' more characters to go</span>';
+    }
+  }
+  ta.addEventListener('input', updateCounter);
+  updateCounter();
+})();
+</script>
+
+{% endblock %}

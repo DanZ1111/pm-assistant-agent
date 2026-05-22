@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Login — PM Tracker{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-center align-items-center" style="min-height:80vh">
+  <div style="width:100%;max-width:400px">
+    <div class="text-center mb-4">
+      <i class="bi bi-grid-3x3-gap" style="font-size:2rem;color:var(--color-primary)"></i>
+      <h1 class="h4 fw-bold mt-2">PM Product Tracker</h1>
+      <p class="text-muted small">Sign in to your account</p>
+    </div>
+
+    {% if request.query_params.get('registered') %}
+    <div class="alert alert-success mb-4">
+      <i class="bi bi-check-circle me-2"></i>Account created. Please sign in.
+    </div>
+    {% endif %}
+
+    {% if error %}
+    <div class="alert alert-danger mb-4">
+      <i class="bi bi-exclamation-circle me-2"></i>{{ error }}
+    </div>
+    {% endif %}
+
+    <div class="card border" style="border-radius:12px">
+      <div class="card-body p-4">
+        <form method="post" action="/auth/login">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Username</label>
+            <input type="text" name="username" class="form-control" autofocus autocomplete="username"
+                   placeholder="your username">
+          </div>
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Password</label>
+            <input type="password" name="password" class="form-control" autocomplete="current-password"
+                   placeholder="••••••••">
+          </div>
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <p class="text-center text-muted small mt-3">
+      New team member?
+      <a href="/auth/register">Register with an invite PIN</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

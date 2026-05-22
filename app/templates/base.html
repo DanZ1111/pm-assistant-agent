@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}PM Tracker{% endblock %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/static/css/styles.css" rel="stylesheet">
+</head>
+<body>
+
+<nav class="navbar navbar-dark navbar-main">
+  <div class="container-fluid px-4">
+    <a class="navbar-brand fw-bold" href="/projects">
+      <i class="bi bi-grid-3x3-gap me-2"></i>PM Tracker
+    </a>
+    <div class="navbar-nav flex-row gap-1 align-items-center">
+      <a class="nav-link px-3 {% if request.url.path.startswith('/projects') %}active{% endif %}" href="/projects">
+        <i class="bi bi-folder2 me-1"></i>Projects
+      </a>
+      {% if current_user and current_user.role in ('admin', 'pm') %}
+      <a class="nav-link px-3 {% if request.url.path.startswith('/ai') %}active{% endif %}" href="/ai/intake">
+        <i class="bi bi-robot me-1"></i>AI Intake
+      </a>
+      {% endif %}
+      {% if current_user and current_user.role == 'admin' %}
+      <a class="nav-link px-3 {% if request.url.path == '/admin/database' %}active{% endif %}" href="/admin/database">
+        <i class="bi bi-database me-1"></i>Database
+      </a>
+      <a class="nav-link px-3 {% if request.url.path.startswith('/admin/users') %}active{% endif %}" href="/admin/users">
+        <i class="bi bi-people me-1"></i>Users
+      </a>
+      {% endif %}
+      <button class="btn btn-sm nav-help-btn ms-1" data-bs-toggle="modal" data-bs-target="#helpModal">
+        <i class="bi bi-question-circle me-1"></i>v0.8 Help
+      </button>
+      {% if current_user %}
+      <span class="nav-link px-2 text-white-50 small" style="cursor:default">
+        <i class="bi bi-person-circle me-1"></i>{{ current_user.display_name or current_user.username }}
+        <span class="badge {% if current_user.role == 'admin' %}bg-danger{% elif current_user.role == 'pm' %}bg-primary{% else %}bg-secondary{% endif %} ms-1" style="font-size:0.65rem">{{ current_user.role }}</span>
+      </span>
+      <form method="post" action="/auth/logout" class="d-inline">
+        <button type="submit" class="btn btn-sm nav-help-btn">
+          <i class="bi bi-box-arrow-right me-1"></i>Sign Out
+        </button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</nav>
+
+<!-- Help / Version Modal -->
+<div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="helpModalLabel">
+          <i class="bi bi-grid-3x3-gap me-2"></i>PM Product Tracker
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0">
+        <!-- Tabs -->
+        <ul class="nav nav-tabs px-3 pt-2" id="helpTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tab-version" data-bs-toggle="tab" data-bs-target="#pane-version" type="button">
+              <i class="bi bi-info-circle me-1"></i>Current Version
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-changelog" data-bs-toggle="tab" data-bs-target="#pane-changelog" type="button">
+              <i class="bi bi-clock-history me-1"></i>Changelog
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-guide" data-bs-toggle="tab" data-bs-target="#pane-guide" type="button">
+              <i class="bi bi-book me-1"></i>How to Use
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-ai" data-bs-toggle="tab" data-bs-target="#pane-ai" type="button">
+              <i class="bi bi-robot me-1"></i>Ask AI
+            </button>
+          </li>
+        </ul>
+
+        <div class="tab-content p-4">
+
+          <!-- Current Version -->
+          <div class="tab-pane fade show active" id="pane-version" role="tabpanel">
+            <div class="d-flex align-items-start gap-4 mb-4">
+              <div>
+                <div class="help-version-badge">v0.6.0</div>
+              </div>
+              <div>
+                <h6 class="mb-1 fw-bold">PM Product Tracker</h6>
+                <p class="text-muted small mb-0">Build 6 — AI File/Image Intake</p>
+                <p class="text-muted small">Last updated: 2026-05-21</p>
+              </div>
+            </div>
+            <p class="mb-3">This version supports:</p>
+            <ul class="help-feature-list">
+              <li><i class="bi bi-check-circle-fill text-success me-2"></i>Create, view, edit, and archive product projects</li>
+              <li><i class="bi bi-check-circle-fill text-success me-2"></i>Timeline with phase tracking and automatic delay detection</li>
+              <li><i class="bi bi-check-circle-fill text-success me-2"></i>File uploads — image gallery with lightbox, PDF/doc downloads</li>
+              <li><i class="bi bi-check-circle-fill text-success me-2"></i>Full change log with old → new field history and AI attribution</li>
+              <li><i class="bi bi-check-circle-fill text-success me-2"></i>AI text intake — paste notes, AI extracts fields, you confirm</li>
+              <li><i class="bi bi-check-circle-fill text-success me-2"></i>AI file intake — upload PDF or product image, AI analyzes and extracts</li>
+              <li><i class="bi bi-check-circle-fill text-success me-2"></i>Database inspector at /admin/database</li>
+            </ul>
+            <div class="alert alert-light border mt-4 mb-0" style="font-size:0.85rem">
+              <strong>Coming next (v0.7.0):</strong> AI Update Existing Project — describe a project change and let AI find and update the right project with your confirmation.
+            </div>
+          </div>
+
+          <!-- Changelog -->
+          <div class="tab-pane fade" id="pane-changelog" role="tabpanel">
+            <div class="help-changelog">
+              <div class="help-cl-entry">
+                <div class="help-cl-version">v0.6.0</div>
+                <div class="help-cl-name">AI File/Image Intake</div>
+                <ul>
+                  <li>Upload PDF → text extracted → fields proposed</li>
+                  <li>Upload image → GPT-5.4 Vision generates summary + extracts fields</li>
+                  <li>Uploaded file auto-attached to project on confirm</li>
+                  <li><code>ai_summary</code> stored in project_files table</li>
+                </ul>
+              </div>
+              <div class="help-cl-entry">
+                <div class="help-cl-version">v0.5.0</div>
+                <div class="help-cl-name">AI Text Intake</div>
+                <ul>
+                  <li>Paste messy notes → AI extracts structured fields</li>
+                  <li>Health check preview before confirming</li>
+                  <li>AI never silently saves — user must confirm</li>
+                  <li>Change log records AI attribution</li>
+                </ul>
+              </div>
+              <div class="help-cl-entry">
+                <div class="help-cl-version">v0.4.0</div>
+                <div class="help-cl-name">Change Log</div>
+                <ul>
+                  <li>Every field edit recorded with old → new value</li>
+                  <li>Phase updates, file uploads, archive events all logged</li>
+                  <li>AI vs. user attribution on each entry</li>
+                </ul>
+              </div>
+              <div class="help-cl-entry">
+                <div class="help-cl-version">v0.3.0</div>
+                <div class="help-cl-name">File Uploads + Gallery</div>
+                <ul>
+                  <li>Drag-drop upload zone with category selector</li>
+                  <li>Image gallery with category filter tabs</li>
+                  <li>Full-resolution lightbox with keyboard navigation</li>
+                  <li>PDF/doc downloads in document list</li>
+                </ul>
+              </div>
+              <div class="help-cl-entry">
+                <div class="help-cl-version">v0.2.0</div>
+                <div class="help-cl-name">Timeline + Delay</div>
+                <ul>
+                  <li>Auto-created phase templates (8 or 10 phases)</li>
+                  <li>Phase edit modal</li>
+                  <li>Automatic delay detection and badge</li>
+                  <li>Estimated launch date recalculated from delays</li>
+                </ul>
+              </div>
+              <div class="help-cl-entry">
+                <div class="help-cl-version">v0.1.5</div>
+                <div class="help-cl-name">Database Inspector</div>
+                <ul>
+                  <li>Read-only admin view at /admin/database</li>
+                  <li>Field usage % per project</li>
+                  <li>Health summary: which projects are missing what</li>
+                </ul>
+              </div>
+              <div class="help-cl-entry">
+                <div class="help-cl-version">v0.1.0</div>
+                <div class="help-cl-name">Project CRUD Skeleton</div>
+                <ul>
+                  <li>Create, view, edit, archive projects</li>
+                  <li>Product Thesis as first-class section</li>
+                  <li>Needs Info badge + Needs Attention section</li>
+                  <li>Card + table view toggle</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- How to Use -->
+          <div class="tab-pane fade" id="pane-guide" role="tabpanel">
+            <h6 class="fw-bold mb-3">Quick Start</h6>
+            <div class="help-guide-section">
+              <p class="fw-semibold mb-1">Creating a project</p>
+              <ol class="small text-muted">
+                <li>Click <strong>New Project</strong> in the navbar</li>
+                <li>Enter a Project Name (only required field)</li>
+                <li>Fill in Brand, PM, Engineer, Factory, Target Cost, MSRP, Launch Date, and Thesis if available</li>
+                <li>Select prototype rounds: Single (8 phases) or Double (10 phases)</li>
+                <li>Click Create Project</li>
+              </ol>
+              <p class="small text-muted">Tip: Use <strong>AI Intake</strong> if you have product notes or a spec sheet — AI can extract all fields automatically.</p>
+            </div>
+            <div class="help-guide-section">
+              <p class="fw-semibold mb-1">What does "Needs Info" mean?</p>
+              <p class="small text-muted mb-0">The project is missing one or more <strong>critical fields</strong>: brand, PM, engineer, factory, target cost, MSRP, launch date, or Product Thesis. It doesn't block the project — it's a reminder that the project isn't fully filled in yet.</p>
+            </div>
+            <div class="help-guide-section">
+              <p class="fw-semibold mb-1">What does "Delayed" mean?</p>
+              <p class="small text-muted mb-0">At least one phase has a planned end date in the past and isn't marked Done or Skipped. Delay is calculated automatically — you can't manually set it. To clear a delay: mark the phase Done, or update its planned end date.</p>
+            </div>
+            <div class="help-guide-section">
+              <p class="fw-semibold mb-1">What should a Product Thesis include?</p>
+              <ul class="small text-muted mb-0">
+                <li>Why this product exists</li>
+                <li>Who it is for and what problem it solves</li>
+                <li>What makes it different from existing options</li>
+                <li>Why it belongs to this brand</li>
+                <li>Target price logic</li>
+                <li>Main risks or unknowns</li>
+              </ul>
+              <p class="small text-muted mt-1">Minimum 80 characters — shorter entries are treated as incomplete.</p>
+            </div>
+            <div class="help-guide-section">
+              <p class="fw-semibold mb-1">How to use AI Intake</p>
+              <p class="small text-muted mb-1">Option A — Paste text: Go to AI Intake → paste notes/emails/messages → Extract Fields → review and edit → Confirm &amp; Create.</p>
+              <p class="small text-muted mb-0">Option B — Upload file: Go to AI Intake → upload a PDF or image → Analyze File → review proposed fields and AI summary → Confirm &amp; Create. The file is automatically attached to the project.</p>
+            </div>
+            <div class="help-guide-section">
+              <p class="fw-semibold mb-1">File categories</p>
+              <p class="small text-muted mb-0">Rendering · Reference · Quotation · Factory Feedback · Thesis · Packaging · Other. Use the category tabs in the gallery to filter.</p>
+            </div>
+          </div>
+
+          <!-- Ask AI -->
+          <div class="tab-pane fade" id="pane-ai" role="tabpanel">
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <i class="bi bi-robot" style="font-size:1.25rem;color:var(--color-primary)"></i>
+              <span class="fw-semibold">Ask the AI</span>
+              <span class="text-muted small ms-1">— answers based on the user guide &amp; changelog</span>
+            </div>
+            <div class="mb-3">
+              <textarea id="helpAskTextarea" class="form-control" rows="3"
+                placeholder="e.g. How do I create a project? What does Needs Info mean? How do I use AI Intake?"></textarea>
+            </div>
+            <div class="d-flex gap-2 mb-3">
+              <button id="helpAskBtn" class="btn btn-primary">
+                <i class="bi bi-send me-2"></i>Ask
+              </button>
+              <button id="helpAskClear" class="btn btn-outline-secondary" style="display:none">
+                Clear
+              </button>
+            </div>
+            <div id="helpAskResponse" class="help-ask-response" style="display:none"></div>
+          </div>
+
+        </div><!-- /tab-content -->
+      </div><!-- /modal-body -->
+      <div class="modal-footer">
+        <span class="text-muted small me-auto">PM Product Tracker v0.6.0</span>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main class="main-content">
+  {% block content %}{% endblock %}
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/main.js"></script>
+{% block extra_js %}{% endblock %}
+<script>
+(function () {
+  var askBtn    = document.getElementById('helpAskBtn');
+  var clearBtn  = document.getElementById('helpAskClear');
+  var textarea  = document.getElementById('helpAskTextarea');
+  var responseDiv = document.getElementById('helpAskResponse');
+  if (!askBtn || !textarea || !responseDiv) return;
+
+  askBtn.addEventListener('click', async function () {
+    var question = textarea.value.trim();
+    if (!question) return;
+
+    askBtn.disabled = true;
+    askBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Thinking…';
+    responseDiv.style.display = 'none';
+    clearBtn.style.display = 'none';
+
+    try {
+      var res = await fetch('/ai/help/ask', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({question: question}),
+      });
+      var data = await res.json();
+      var text = data.answer || data.error || 'No response received.';
+      responseDiv.innerHTML = text.replace(/\n/g, '<br>');
+      responseDiv.style.display = 'block';
+      clearBtn.style.display = '';
+    } catch (e) {
+      responseDiv.innerHTML = 'Request failed: ' + e.message;
+      responseDiv.style.display = 'block';
+    }
+
+    askBtn.disabled = false;
+    askBtn.innerHTML = '<i class="bi bi-send me-2"></i>Ask';
+  });
+
+  clearBtn.addEventListener('click', function () {
+    textarea.value = '';
+    responseDiv.style.display = 'none';
+    clearBtn.style.display = 'none';
+    textarea.focus();
+  });
+
+  textarea.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) askBtn.click();
+  });
+})();
+</script>
+</body>
+</html>

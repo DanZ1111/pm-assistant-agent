@@ -1,5 +1,9 @@
 .env
 __pycache__/
+app/uploads/*
+!app/uploads/.gitkeep
+*.db
+*.db-journal
 *.pyc
 *.pyo
 *.pyd

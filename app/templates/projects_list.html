@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% block title %}All Projects — PM Tracker{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+    <div>
+      <h1 class="page-title">Projects</h1>
+      <p class="page-subtitle">{{ counts.all }} total &mdash; {{ counts.active }} active</p>
+    </div>
+    {% if current_user and current_user.role in ('admin', 'pm') %}
+    <a href="/projects/new" class="btn btn-primary btn-lg">
+      <i class="bi bi-plus-lg me-1"></i>New Project
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+{% if needs_attention or phases_due %}
+<div class="px-4 mb-4">
+  <div class="attention-section">
+    <div class="attention-header">
+      <i class="bi bi-exclamation-triangle-fill me-2"></i>Needs Attention
+    </div>
+    <div class="attention-list">
+      {% for e in needs_attention %}
+      <a href="/projects/{{ e.project.id }}" class="attention-item">
+        <span class="attention-name">{{ e.project.name }}</span>
+        <span class="attention-badges">
+          {% if e.delay %}
+          <span class="badge badge-delayed">{{ e.delay.days_late }}d late</span>
+          {% endif %}
+          {% if e.health.needs_info %}
+          <span class="badge badge-needs-info">{{ e.health.critical_count }} missing</span>
+          {% endif %}
+        </span>
+      </a>
+      {% endfor %}
+      {% for row in phases_due %}
+      <a href="/projects/{{ row.project.id }}#timeline" class="attention-item">
+        <span class="attention-name">{{ row.project.name }}</span>
+        <span class="attention-badges">
+          <span class="badge badge-due-soon">
+            <i class="bi bi-clock me-1"></i>{{ row.phase.phase_name }} due {{ row.phase.planned_end_date.strftime('%b %d') }}
+          </span>
+        </span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="px-4">
+  <!-- Filters -->
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+    <div class="filter-tabs">
+      <a href="/projects?status=all" class="filter-tab {% if current_filter == 'all' %}active{% endif %}">
+        All <span class="filter-count">{{ counts.all }}</span>
+      </a>
+      <a href="/projects?status=active" class="filter-tab {% if current_filter == 'active' %}active{% endif %}">
+        Active <span class="filter-count">{{ counts.active }}</span>
+      </a>
+      <a href="/projects?status=active&delayed=1" class="filter-tab {% if current_filter == 'delayed' %}active{% endif %}">
+        Delayed <span class="filter-count text-danger">{{ counts.delayed }}</span>
+      </a>
+      <a href="/projects?status=active&needs_info=1" class="filter-tab {% if current_filter == 'needs_info' %}active{% endif %}">
+        Needs Info <span class="filter-count text-warning">{{ counts.needs_info }}</span>
+      </a>
+      <a href="/projects?status=completed" class="filter-tab {% if current_filter == 'completed' %}active{% endif %}">
+        Completed <span class="filter-count">{{ counts.completed }}</span>
+      </a>
+      <a href="/projects?status=archived" class="filter-tab {% if current_filter == 'archived' %}active{% endif %}">
+        Archived <span class="filter-count">{{ counts.archived }}</span>
+      </a>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+      <form method="get" action="/projects" class="d-flex gap-2">
+        <input type="hidden" name="status" value="{{ current_status }}">
+        {% if current_filter == 'delayed' %}<input type="hidden" name="delayed" value="1">{% endif %}
+        {% if current_filter == 'needs_info' %}<input type="hidden" name="needs_info" value="1">{% endif %}
+        <select name="brand" class="form-select form-select-sm" onchange="this.form.submit()" style="width:auto">
+          <option value="">All brands</option>
+          {% for b in brands %}
+          <option value="{{ b }}" {% if current_brand == b %}selected{% endif %}>{{ b }}</option>
+          {% endfor %}
+        </select>
+        <input type="text" name="search" value="{{ search }}" placeholder="Search..." class="form-control form-control-sm" style="width:160px">
+        <button type="submit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-search"></i></button>
+      </form>
+      <div class="view-toggle">
+        <button class="view-btn active" id="cardViewBtn" onclick="setView('card')" title="Card view">
+          <i class="bi bi-grid-3x3-gap"></i>
+        </button>
+        <button class="view-btn" id="tableViewBtn" onclick="setView('table')" title="Table view">
+          <i class="bi bi-list-ul"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  {% if enriched %}
+
+  <!-- Card View -->
+  <div id="cardView" class="project-grid">
+    {% for e in enriched %}
+    {% set p = e.project %}
+    {% set delay = e.delay %}
+    {% set health = e.health %}
+    <a href="/projects/{{ p.id }}" class="project-card {% if delay %}card-delayed{% elif health.needs_info %}card-needs-info{% endif %}">
+      <div class="card-top">
+        <div class="card-title-row">
+          <h3 class="card-project-name">{{ p.name }}</h3>
+          <span class="status-badge status-{{ p.status }}">{{ p.status }}</span>
+        </div>
+        <div class="card-meta">
+          {% if p.brand %}<span class="meta-brand">{{ p.brand }}</span>{% endif %}
+          {% if p.sku %}<span class="meta-sku">{{ p.sku }}</span>{% endif %}
+          {% if p.product_type %}<span class="meta-type">{{ p.product_type }}</span>{% endif %}
+        </div>
+      </div>
+      <div class="card-body-info">
+        <div class="info-row">
+          <span class="info-icon"><i class="bi bi-person"></i></span>
+          <span class="info-val">{{ p.product_manager or "—" }}</span>
+          <span class="info-sep">·</span>
+          <span class="info-icon"><i class="bi bi-building"></i></span>
+          <span class="info-val">{{ p.factory or "—" }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-icon"><i class="bi bi-tag"></i></span>
+          <span class="info-val">
+            {% if p.target_factory_cost %}${{ "%.2f"|format(p.target_factory_cost) }} cost{% else %}Cost: —{% endif %}
+          </span>
+          <span class="info-sep">·</span>
+          <span class="info-val">
+            {% if p.target_msrp %}${{ "%.2f"|format(p.target_msrp) }} MSRP{% else %}MSRP: —{% endif %}
+          </span>
+        </div>
+        <div class="info-row">
+          <span class="info-icon"><i class="bi bi-calendar3"></i></span>
+          <span class="info-val">
+            {% if p.planned_launch_date %}{{ p.planned_launch_date.strftime('%b %d, %Y') }}{% else %}No launch date{% endif %}
+          </span>
+          {% if p.current_stage %}
+          <span class="info-sep">·</span>
+          <span class="stage-pill">{{ p.current_stage }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="card-badges">
+        {% if delay %}
+        <span class="badge badge-delayed"><i class="bi bi-alarm me-1"></i>{{ delay.days_late }} days late</span>
+        {% endif %}
+        {% if health.needs_info %}
+        <span class="badge badge-needs-info"><i class="bi bi-exclamation-circle me-1"></i>{{ health.critical_count }} missing</span>
+        {% endif %}
+        {% if not delay and not health.needs_info %}
+        <span class="badge badge-ok"><i class="bi bi-check-circle me-1"></i>On track</span>
+        {% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- Table View -->
+  <div id="tableView" class="d-none">
+    <div class="table-responsive">
+      <table class="table table-hover project-table">
+        <thead>
+          <tr>
+            <th>Project</th>
+            <th>Brand</th>
+            <th>Stage</th>
+            <th>PM</th>
+            <th>Factory</th>
+            <th>Cost</th>
+            <th>MSRP</th>
+            <th>Launch</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in enriched %}
+          {% set p = e.project %}
+          {% set delay = e.delay %}
+          {% set health = e.health %}
+          <tr onclick="window.location='/projects/{{ p.id }}'" style="cursor:pointer">
+            <td>
+              <strong>{{ p.name }}</strong>
+              {% if p.sku %}<br><small class="text-muted">{{ p.sku }}</small>{% endif %}
+              {% if delay %}<br><span class="badge badge-delayed badge-sm">{{ delay.days_late }}d late</span>{% endif %}
+              {% if health.needs_info and not delay %}<br><span class="badge badge-needs-info badge-sm">{{ health.critical_count }} missing</span>{% endif %}
+            </td>
+            <td>{{ p.brand or "—" }}</td>
+            <td><span class="stage-pill-sm">{{ p.current_stage or "—" }}</span></td>
+            <td>{{ p.product_manager or "—" }}</td>
+            <td>{{ p.factory or "—" }}</td>
+            <td>{% if p.target_factory_cost %}${{ "%.2f"|format(p.target_factory_cost) }}{% else %}—{% endif %}</td>
+            <td>{% if p.target_msrp %}${{ "%.2f"|format(p.target_msrp) }}{% else %}—{% endif %}</td>
+            <td>
+              {% if p.planned_launch_date %}{{ p.planned_launch_date.strftime('%b %d, %Y') }}{% else %}—{% endif %}
+            </td>
+            <td><span class="status-badge status-{{ p.status }}">{{ p.status }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-folder2-open"></i>
+    <p>No projects yet.</p>
+    <a href="/projects/new" class="btn btn-primary">Create your first project</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
