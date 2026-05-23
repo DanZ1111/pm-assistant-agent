@@ -562,3 +562,77 @@ def save_ai_message(
     db.add(msg)
     db.commit()
     return msg
+
+
+# ---------------------------------------------------------------------------
+# Calendar — planned vs actual launches per month
+# ---------------------------------------------------------------------------
+
+def get_actual_launch_date(project: Project) -> date | None:
+    """Derive the actual launch date from the project's 'Launch' phase.
+    Returns the Launch phase's actual_end_date if it's marked done; falls
+    back to the highest-order done phase's actual_end_date if the project
+    is marked completed. Returns None otherwise.
+    """
+    if not project.phases:
+        return None
+    launch_done = [
+        p for p in project.phases
+        if (p.phase_name or "").strip().lower() == "launch"
+        and p.status == "done"
+        and p.actual_end_date
+    ]
+    if launch_done:
+        return max(p.actual_end_date for p in launch_done)
+    if project.status == "completed":
+        ended = [p for p in project.phases if p.status == "done" and p.actual_end_date]
+        if ended:
+            return max(ended, key=lambda p: p.phase_order).actual_end_date
+    return None
+
+
+def get_calendar_data(db: Session, year: int) -> dict:
+    """Returns {1..12: {'planned': [...], 'actual': [...]}} for the given year.
+    Only non-archived projects are included. Each entry is a plain dict so the
+    template doesn't accidentally access raw model attributes.
+    """
+    months = {m: {"planned": [], "actual": []} for m in range(1, 13)}
+    projects = db.query(Project).filter(Project.status != "archived").all()
+
+    for p in projects:
+        actual = get_actual_launch_date(p)
+        entry = {
+            "id": p.id,
+            "name": p.name,
+            "sku": p.sku,
+            "brand": p.brand,
+            "status": p.status,
+            "current_stage": p.current_stage,
+            "planned_launch_date": p.planned_launch_date,
+            "actual_launch_date": actual,
+        }
+        if p.planned_launch_date and p.planned_launch_date.year == year:
+            months[p.planned_launch_date.month]["planned"].append(entry)
+        if actual and actual.year == year:
+            months[actual.month]["actual"].append(entry)
+
+    # Sort each month's lists by date for consistent display
+    for m in months.values():
+        m["planned"].sort(key=lambda e: e["planned_launch_date"] or date.max)
+        m["actual"].sort(key=lambda e: e["actual_launch_date"] or date.max)
+
+    return months
+
+
+def get_calendar_year_range(db: Session) -> tuple[int, int]:
+    """Returns (min_year, max_year) across all planned + actual launch dates.
+    Falls back to current year if no data."""
+    today = date.today()
+    years = {today.year}
+    for p in db.query(Project).filter(Project.status != "archived").all():
+        if p.planned_launch_date:
+            years.add(p.planned_launch_date.year)
+        actual = get_actual_launch_date(p)
+        if actual:
+            years.add(actual.year)
+    return min(years), max(years)

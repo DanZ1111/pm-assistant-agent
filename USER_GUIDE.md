@@ -201,6 +201,38 @@ AI only fills in fields it's confident about. It never invents information not p
 
 ---
 
+## Calendar
+
+The **Calendar** tab (visible to everyone who can log in) shows a month-by-month view of your project launches.
+
+### Layout
+- **Left column:** list of months in the selected year, each with a count of planned and actually-launched projects
+- **Right column:** the selected month's roster, split into two sections — Planned and Actually Launched
+
+### Year navigation
+Use the `◀ 2026 ▶` arrows at the top right. The **Today** button jumps back to the current year and month.
+
+### What counts as "Planned"
+A project shows up in a month's **Planned** list if its `planned_launch_date` falls in that month and the project is not archived.
+
+### What counts as "Actually Launched"
+A project shows up in a month's **Actually Launched** list if its **Launch phase** is marked **Done** and has an `actual_end_date` set, and that date falls in the month.
+
+To record an actual launch:
+1. Open the project detail page
+2. In the Timeline section, find the **Launch** phase
+3. Click **Edit** → set Status to **Done** → set **Actual End Date** to the day it shipped → Save
+
+### Variance display
+For each actually-launched project, the calendar shows the variance versus its planned date:
+- "5 days late" (in red) — shipped after the planned date
+- "3 days early" (in green) — shipped before the planned date
+- "on time" (in green) — exact match
+
+This makes it easy to see at a glance which projects slipped and by how much.
+
+---
+
 ## Admin — Database Inspector
 
 Available at `/admin/database`. Read-only view showing:

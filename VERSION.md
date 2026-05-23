@@ -1,9 +1,18 @@
 # PM Product Tracker — Version
 
-**Current Version:** v0.8.0
-**Current Build:** Build 9 — Railway Deploy
+**Current Version:** v0.9.0
+**Current Build:** Build 10 — Calendar + Admin Nav Hardening
 **Status:** Ready for production deploy
-**Last Updated:** 2026-05-22
+**Last Updated:** 2026-05-23
+
+## What's in v0.9.0
+
+- Everything from v0.8.0 (see below)
+- **Calendar view** at `/calendar` — month-by-month roster of planned vs. actually-launched projects
+- "Actual launch" derived from the Launch phase's `actual_end_date` (no schema change)
+- Year navigation, click-to-select month
+- Calendar nav link visible to all authenticated users (no sensitive fields shown)
+- Verified: Database + Users nav links are admin-only (regression-locked in test_build8.py)
 
 ## What's in v0.8.0
 
@@ -33,3 +42,4 @@
 | v0.6.0 | Build 6 | AI File/Image Intake |
 | v0.7.0 | Build 7 | AI Update Existing Project + Help AI Assistant |
 | v0.8.0 | Build 8 + 9 | Multi-Role Auth + Railway Deploy |
+| v0.9.0 | Build 10 | Calendar + Admin Nav Hardening |

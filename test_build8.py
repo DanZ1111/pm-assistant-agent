@@ -230,11 +230,31 @@ def run_tests():
         else:
             fail("Viewer hides AI Intake", "AI Intake nav link visible for viewer")
 
-        # Viewer does NOT see Admin nav link
+        # Viewer does NOT see Database or Users nav links (admin-only)
         if not page.locator("a[href='/admin/database']").is_visible():
-            ok("Viewer does not see Admin nav link")
+            ok("Viewer does not see Database nav link")
         else:
-            fail("Viewer hides Admin link", "Admin nav link visible for viewer")
+            fail("Viewer hides Database link", "Database nav link visible for viewer")
+
+        if not page.locator("a[href='/admin/users']").is_visible():
+            ok("Viewer does not see Users nav link")
+        else:
+            fail("Viewer hides Users link", "Users nav visible for viewer")
+
+        # Viewer DOES see Calendar nav link (calendar is for everyone)
+        if page.locator("a[href='/calendar']").is_visible():
+            ok("Viewer sees Calendar nav link (all roles allowed)")
+        else:
+            fail("Viewer Calendar link", "Calendar nav not visible to viewer")
+
+        # Viewer can access /calendar
+        viewer_cal = login_session(VIEWER_USER, VIEWER_PASS)
+        if viewer_cal:
+            r_cal = viewer_cal.get(f"{BASE}/calendar")
+            if r_cal.status_code == 200 and "Calendar" in r_cal.text:
+                ok("Viewer can GET /calendar (200, page renders)")
+            else:
+                fail("Viewer /calendar access", f"status {r_cal.status_code}")
 
         # Viewer can view project detail (but no factory/engineer)
         if test_pid:
@@ -294,11 +314,25 @@ def run_tests():
             else:
                 fail("PM AI Intake link", "not visible")
 
-            # PM does NOT see Admin nav link
+            # PM does NOT see Database or Users nav links (admin-only)
             if not page.locator("a[href='/admin/database']").is_visible():
-                ok("PM does not see Admin nav link")
+                ok("PM does not see Database nav link")
             else:
-                fail("PM hides Admin link", "Admin nav visible for PM")
+                fail("PM hides Database link", "Database nav visible for PM")
+
+            if not page.locator("a[href='/admin/users']").is_visible():
+                ok("PM does not see Users nav link")
+            else:
+                fail("PM hides Users link", "Users nav visible for PM")
+
+            # PM is also blocked from /admin/users even if they navigate directly
+            pm_s2 = login_session(PM_USER, PM_PASS)
+            if pm_s2:
+                r_users = pm_s2.get(f"{BASE}/admin/users", allow_redirects=False)
+                if r_users.status_code in (302, 303):
+                    ok("PM blocked from /admin/users (direct URL)")
+                else:
+                    fail("PM blocked from /admin/users", f"status {r_users.status_code}")
 
             # PM CANNOT edit a project they don't own
             if test_pid:

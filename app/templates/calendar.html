@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Calendar — PM Tracker{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3 flex-wrap">
+    <div>
+      <h1 class="page-title"><i class="bi bi-calendar3 me-2"></i>Calendar</h1>
+      <p class="page-subtitle">Planned vs. actual project launches, by month</p>
+    </div>
+    <div class="ms-auto d-flex align-items-center gap-2">
+      <a href="/calendar?year={{ year - 1 }}&month={{ selected_month }}"
+         class="btn btn-sm btn-outline-secondary" title="Previous year">
+        <i class="bi bi-chevron-left"></i>
+      </a>
+      <span class="fw-bold" style="font-size:1.15rem;min-width:64px;text-align:center">{{ year }}</span>
+      <a href="/calendar?year={{ year + 1 }}&month={{ selected_month }}"
+         class="btn btn-sm btn-outline-secondary" title="Next year">
+        <i class="bi bi-chevron-right"></i>
+      </a>
+      <a href="/calendar?year={{ today.year }}&month={{ today.month }}"
+         class="btn btn-sm btn-outline-secondary ms-2">Today</a>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+
+  <!-- ── Month list ────────────────────────────────────────────────────── -->
+  <div class="col-lg-4">
+    <div class="detail-section">
+      <div class="section-header">
+        <h2 class="section-title" style="font-size:0.95rem"><i class="bi bi-list me-2"></i>Months in {{ year }}</h2>
+      </div>
+      <div class="calendar-month-list">
+        {% for m in range(1, 13) %}
+        {% set planned_count = months_data[m]['planned']|length %}
+        {% set actual_count  = months_data[m]['actual']|length %}
+        {% set is_selected   = (m == selected_month) %}
+        <a href="/calendar?year={{ year }}&month={{ m }}"
+           class="calendar-month-row {% if is_selected %}selected{% endif %}
+                  {% if year == today.year and m == today.month %}current{% endif %}">
+          <span class="cal-month-name">{{ month_names[m-1] }} {{ year }}</span>
+          <span class="cal-month-counts">
+            {% if planned_count %}
+            <span class="badge bg-primary">{{ planned_count }} planned</span>
+            {% endif %}
+            {% if actual_count %}
+            <span class="badge bg-success">{{ actual_count }} launched</span>
+            {% endif %}
+            {% if not planned_count and not actual_count %}
+            <span class="text-muted small">—</span>
+            {% endif %}
+          </span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Selected month details ────────────────────────────────────────── -->
+  <div class="col-lg-8">
+    <div class="detail-section">
+      <div class="section-header">
+        <h2 class="section-title" style="font-size:1.05rem">
+          <i class="bi bi-calendar-event me-2"></i>{{ month_names[selected_month-1] }} {{ year }}
+        </h2>
+      </div>
+
+      {# ── Planned ── #}
+      <h3 class="cal-section-heading">
+        <span class="badge bg-primary me-2">{{ months_data[selected_month]['planned']|length }}</span>
+        Planned Launches
+      </h3>
+      {% if months_data[selected_month]['planned'] %}
+        {% for p in months_data[selected_month]['planned'] %}
+        <a href="/projects/{{ p.id }}" class="cal-project-row">
+          <div class="cal-project-head">
+            <span class="cal-project-sku">{{ p.sku or '(no SKU)' }}</span>
+            <span class="cal-project-name">{{ p.name }}</span>
+            {% if p.brand %}<span class="cal-project-brand">· {{ p.brand }}</span>{% endif %}
+          </div>
+          <div class="cal-project-meta">
+            <span><i class="bi bi-calendar me-1"></i>Planned: {{ p.planned_launch_date.strftime('%b %d, %Y') }}</span>
+            {% if p.current_stage %}<span class="ms-3"><i class="bi bi-flag me-1"></i>Stage: {{ p.current_stage }}</span>{% endif %}
+            <span class="ms-3">
+              <span class="badge {% if p.status == 'active' %}bg-info text-dark{% elif p.status == 'completed' %}bg-success{% elif p.status == 'paused' %}bg-warning text-dark{% elif p.status == 'cancelled' %}bg-secondary{% else %}bg-secondary{% endif %}">{{ p.status }}</span>
+            </span>
+            {% if p.actual_launch_date %}
+            <span class="ms-3"><i class="bi bi-check-circle me-1"></i>Actually launched {{ p.actual_launch_date.strftime('%b %d, %Y') }}</span>
+            {% endif %}
+          </div>
+        </a>
+        {% endfor %}
+      {% else %}
+      <p class="text-muted small mb-4">No projects planned to launch in {{ month_names[selected_month-1] }} {{ year }}.</p>
+      {% endif %}
+
+      <hr class="my-4">
+
+      {# ── Actually launched ── #}
+      <h3 class="cal-section-heading">
+        <span class="badge bg-success me-2">{{ months_data[selected_month]['actual']|length }}</span>
+        Actually Launched
+      </h3>
+      {% if months_data[selected_month]['actual'] %}
+        {% for p in months_data[selected_month]['actual'] %}
+        {% set variance_days = (p.actual_launch_date - p.planned_launch_date).days if p.planned_launch_date else None %}
+        <a href="/projects/{{ p.id }}" class="cal-project-row">
+          <div class="cal-project-head">
+            <span class="cal-project-sku">{{ p.sku or '(no SKU)' }}</span>
+            <span class="cal-project-name">{{ p.name }}</span>
+            {% if p.brand %}<span class="cal-project-brand">· {{ p.brand }}</span>{% endif %}
+          </div>
+          <div class="cal-project-meta">
+            {% if p.planned_launch_date %}
+            <span><i class="bi bi-calendar me-1"></i>Planned: {{ p.planned_launch_date.strftime('%b %d, %Y') }}</span>
+            {% endif %}
+            <span class="ms-3"><i class="bi bi-check-circle me-1"></i>Actual: {{ p.actual_launch_date.strftime('%b %d, %Y') }}</span>
+            {% if variance_days is not none %}
+              {% if variance_days > 0 %}
+              <span class="ms-3 text-danger small"><i class="bi bi-clock me-1"></i>{{ variance_days }} day{{ 's' if variance_days != 1 else '' }} late</span>
+              {% elif variance_days < 0 %}
+              <span class="ms-3 text-success small"><i class="bi bi-lightning me-1"></i>{{ -variance_days }} day{{ 's' if variance_days != -1 else '' }} early</span>
+              {% else %}
+              <span class="ms-3 text-success small"><i class="bi bi-check2 me-1"></i>on time</span>
+              {% endif %}
+            {% endif %}
+          </div>
+        </a>
+        {% endfor %}
+      {% else %}
+      <p class="text-muted small">No projects actually launched in {{ month_names[selected_month-1] }} {{ year }}.</p>
+      {% endif %}
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}

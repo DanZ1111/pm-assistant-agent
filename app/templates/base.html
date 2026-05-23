@@ -19,6 +19,11 @@
       <a class="nav-link px-3 {% if request.url.path.startswith('/projects') %}active{% endif %}" href="/projects">
         <i class="bi bi-folder2 me-1"></i>Projects
       </a>
+      {% if current_user %}
+      <a class="nav-link px-3 {% if request.url.path.startswith('/calendar') %}active{% endif %}" href="/calendar">
+        <i class="bi bi-calendar3 me-1"></i>Calendar
+      </a>
+      {% endif %}
       {% if current_user and current_user.role in ('admin', 'pm') %}
       <a class="nav-link px-3 {% if request.url.path.startswith('/ai') %}active{% endif %}" href="/ai/intake">
         <i class="bi bi-robot me-1"></i>AI Intake
@@ -33,7 +38,7 @@
       </a>
       {% endif %}
       <button class="btn btn-sm nav-help-btn ms-1" data-bs-toggle="modal" data-bs-target="#helpModal">
-        <i class="bi bi-question-circle me-1"></i>v0.8 Help
+        <i class="bi bi-question-circle me-1"></i>v0.9 Help
       </button>
       {% if current_user %}
       <span class="nav-link px-2 text-white-50 small" style="cursor:default">
@@ -91,12 +96,12 @@
           <div class="tab-pane fade show active" id="pane-version" role="tabpanel">
             <div class="d-flex align-items-start gap-4 mb-4">
               <div>
-                <div class="help-version-badge">v0.6.0</div>
+                <div class="help-version-badge">v0.9.0</div>
               </div>
               <div>
                 <h6 class="mb-1 fw-bold">PM Product Tracker</h6>
-                <p class="text-muted small mb-0">Build 6 — AI File/Image Intake</p>
-                <p class="text-muted small">Last updated: 2026-05-21</p>
+                <p class="text-muted small mb-0">Build 10 — Calendar + Admin Nav Hardening</p>
+                <p class="text-muted small">Last updated: 2026-05-23</p>
               </div>
             </div>
             <p class="mb-3">This version supports:</p>
@@ -105,18 +110,47 @@
               <li><i class="bi bi-check-circle-fill text-success me-2"></i>Timeline with phase tracking and automatic delay detection</li>
               <li><i class="bi bi-check-circle-fill text-success me-2"></i>File uploads — image gallery with lightbox, PDF/doc downloads</li>
               <li><i class="bi bi-check-circle-fill text-success me-2"></i>Full change log with old → new field history and AI attribution</li>
-              <li><i class="bi bi-check-circle-fill text-success me-2"></i>AI text intake — paste notes, AI extracts fields, you confirm</li>
-              <li><i class="bi bi-check-circle-fill text-success me-2"></i>AI file intake — upload PDF or product image, AI analyzes and extracts</li>
-              <li><i class="bi bi-check-circle-fill text-success me-2"></i>Database inspector at /admin/database</li>
+              <li><i class="bi bi-check-circle-fill text-success me-2"></i>AI text intake, file intake, and existing-project update with fuzzy match</li>
+              <li><i class="bi bi-check-circle-fill text-success me-2"></i>Help/Ask AI modal (role-aware, grounded in the user guide)</li>
+              <li><i class="bi bi-check-circle-fill text-success me-2"></i>Multi-role auth (admin/pm/viewer) with invite-PIN registration</li>
+              <li><i class="bi bi-check-circle-fill text-success me-2"></i>Calendar — see planned vs. actually-launched projects by month</li>
+              <li><i class="bi bi-check-circle-fill text-success me-2"></i>Railway-ready deploy with one-time admin bootstrap + emergency reset</li>
             </ul>
-            <div class="alert alert-light border mt-4 mb-0" style="font-size:0.85rem">
-              <strong>Coming next (v0.7.0):</strong> AI Update Existing Project — describe a project change and let AI find and update the right project with your confirmation.
-            </div>
           </div>
 
           <!-- Changelog -->
           <div class="tab-pane fade" id="pane-changelog" role="tabpanel">
             <div class="help-changelog">
+              <div class="help-cl-entry">
+                <div class="help-cl-version">v0.9.0</div>
+                <div class="help-cl-name">Calendar + Admin Nav Hardening</div>
+                <ul>
+                  <li>New /calendar — planned vs actually-launched projects per month</li>
+                  <li>Year navigation; click a month to see its project roster</li>
+                  <li>"Actual launch" derived from the Launch phase's actual_end_date</li>
+                  <li>Database and Users nav locked down to admin-only (verified by test)</li>
+                </ul>
+              </div>
+              <div class="help-cl-entry">
+                <div class="help-cl-version">v0.8.0</div>
+                <div class="help-cl-name">Multi-Role Auth + Railway Deploy</div>
+                <ul>
+                  <li>Login/logout/register with invite PINs (PM-XXXXXX, VW-XXXXXX)</li>
+                  <li>Three roles: admin, pm, viewer with field-level permissions</li>
+                  <li>AI Permission Guard — AI cannot reveal sensitive fields or system internals</li>
+                  <li>Railway-ready: env-driven DB, /healthz, one-time admin bootstrap</li>
+                  <li>Emergency admin reset via /auth/emergency-reset (env-token gated)</li>
+                </ul>
+              </div>
+              <div class="help-cl-entry">
+                <div class="help-cl-version">v0.7.0</div>
+                <div class="help-cl-name">AI Update Existing Project + Help AI</div>
+                <ul>
+                  <li>AI intake now detects existing project matches by fuzzy name search</li>
+                  <li>Update an existing project instead of creating duplicates</li>
+                  <li>Help/Ask AI modal — answers questions grounded in the user guide</li>
+                </ul>
+              </div>
               <div class="help-cl-entry">
                 <div class="help-cl-version">v0.6.0</div>
                 <div class="help-cl-name">AI File/Image Intake</div>

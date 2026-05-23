@@ -1,5 +1,16 @@
 # PM Product Tracker — Changelog
 
+## v0.9.0 — Calendar + Admin Nav Hardening (Build 10)
+_2026-05-23_
+
+- New `/calendar` route showing planned vs. actually-launched projects by month
+- Year navigation; click a month in the left list to view its project roster on the right
+- "Planned" = projects with `planned_launch_date` in the selected month
+- "Actually launched" = projects whose Launch phase is marked done with `actual_end_date` in the selected month (no schema change — derived from existing phase data)
+- Each project row shows SKU, name, brand, status, planned date, actual date, and variance ("5 days late" / "on time")
+- Calendar visible to all authenticated users (admin/pm/viewer) — only non-sensitive fields shown
+- Verified Database and Users nav links are admin-only (lock-in test added to test_build8.py)
+
 ## v0.8.0 — Multi-Role Auth + Railway Deploy (Build 8 + 9)
 _2026-05-22_
 

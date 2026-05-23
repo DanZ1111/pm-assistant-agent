@@ -1261,3 +1261,70 @@ body {
   color: var(--color-text);
   white-space: normal;
 }
+
+/* =========================================================
+   Calendar
+   ========================================================= */
+.calendar-month-list { display: flex; flex-direction: column; gap: 2px; }
+.calendar-month-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 12px; border-radius: 8px;
+  text-decoration: none; color: var(--color-text);
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+}
+.calendar-month-row:hover { background: var(--color-surface); color: var(--color-text); }
+.calendar-month-row.selected {
+  background: var(--color-surface);
+  border-color: var(--color-primary);
+  font-weight: 600;
+}
+.calendar-month-row.current .cal-month-name::after {
+  content: " · today";
+  font-size: 0.7rem;
+  color: var(--color-primary);
+  font-weight: 600;
+  margin-left: 4px;
+}
+.cal-month-name { font-size: 0.9rem; }
+.cal-month-counts { display: flex; gap: 6px; align-items: center; }
+.cal-month-counts .badge { font-size: 0.7rem; font-weight: 500; }
+
+.cal-section-heading {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+}
+
+.cal-project-row {
+  display: block;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--color-text);
+  transition: background 0.15s, border-color 0.15s;
+}
+.cal-project-row:hover {
+  background: var(--color-surface);
+  border-color: var(--color-primary);
+  color: var(--color-text);
+}
+.cal-project-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.cal-project-sku {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+.cal-project-name { font-weight: 600; }
+.cal-project-brand { color: var(--color-text-muted); font-size: 0.85rem; }
+.cal-project-meta { font-size: 0.8rem; color: var(--color-text-muted); }
