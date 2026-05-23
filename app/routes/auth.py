@@ -1,7 +1,8 @@
+import os
 import secrets
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from passlib.context import CryptContext
@@ -145,3 +146,84 @@ def register_submit(
     db.commit()
 
     return RedirectResponse(url="/auth/login?registered=1", status_code=303)
+
+
+# ── Emergency admin reset ──────────────────────────────────────────────────
+# Enabled only when EMERGENCY_RESET_TOKEN env var is set.
+# Without the env var the route returns 404 (looks like it doesn't exist).
+# Use this when you're locked out of the admin account and can't access the
+# Railway shell. Set EMERGENCY_RESET_TOKEN to a long random string, visit
+# /auth/emergency-reset, paste the token, and choose new credentials.
+# REMOVE the env var after recovery for security.
+
+def _emergency_token() -> str | None:
+    tok = os.environ.get("EMERGENCY_RESET_TOKEN")
+    return tok.strip() if tok and tok.strip() else None
+
+
+@router.get("/auth/emergency-reset", response_class=HTMLResponse)
+def emergency_reset_form(request: Request):
+    if _emergency_token() is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    return templates.TemplateResponse(request, "auth/emergency_reset.html", {
+        "error": None,
+    })
+
+
+@router.post("/auth/emergency-reset")
+def emergency_reset_submit(
+    request: Request,
+    reset_token: str = Form(""),
+    new_username: str = Form(""),
+    new_password: str = Form(""),
+    confirm_password: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    expected = _emergency_token()
+    if expected is None:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    def err(msg: str):
+        return templates.TemplateResponse(request, "auth/emergency_reset.html", {
+            "error": msg,
+        })
+
+    # Constant-time token comparison
+    if not secrets.compare_digest(reset_token.strip(), expected):
+        return err("Invalid reset token.")
+
+    new_username = new_username.strip().lower()
+    if len(new_username) < 3:
+        return err("Username must be at least 3 characters.")
+    if len(new_password) < 8:
+        return err("Password must be at least 8 characters.")
+    if new_password != confirm_password:
+        return err("Passwords do not match.")
+
+    # If the desired username is taken by a non-admin user, refuse — let the
+    # operator pick a different username rather than silently demoting someone.
+    existing = db.query(User).filter(User.username == new_username).first()
+    if existing and existing.role != "admin":
+        return err(f"Username '{new_username}' is already taken by a non-admin user. Pick a different username.")
+
+    # Find any existing admin and update it; otherwise create one
+    admin = db.query(User).filter(User.role == "admin").first()
+    if admin:
+        admin.username = new_username
+        admin.display_name = admin.display_name or new_username
+        admin.hashed_password = pwd_ctx.hash(new_password)
+    else:
+        admin = User(
+            username=new_username,
+            display_name=new_username,
+            hashed_password=pwd_ctx.hash(new_password),
+            role="admin",
+        )
+        db.add(admin)
+        db.flush()
+
+    # Invalidate any existing sessions for this user — forces fresh login
+    db.query(UserSession).filter(UserSession.user_id == admin.id).delete()
+    db.commit()
+
+    return RedirectResponse(url="/auth/login?reset=1", status_code=303)

@@ -294,4 +294,22 @@ This section is for the person who runs the deploy. End users just visit the URL
 - **DB connection error:** confirm `DATABASE_URL` is present and the PostgreSQL plugin is healthy
 - **Files disappear after redeploy:** you forgot the volume — go back to step 4
 - **Can't log in after deploy:** check service logs for the `[bootstrap]` line; if it didn't run, your env vars weren't set in time
-- **Need to reset admin password:** open Railway's database query tool or use the local password reset snippet from the Build 8 notes
+- **Need to reset admin password:** see "Emergency admin reset" below
+
+### Emergency admin reset
+
+If you're locked out of the admin account (forgot the password, env-var bootstrap was misconfigured, etc.) and you can't reach the Railway shell:
+
+1. In Railway → service → Variables → add:
+   - **Key:** `EMERGENCY_RESET_TOKEN`
+   - **Value:** a long random string (44+ chars). Generate one locally:
+     ```
+     python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+     ```
+2. Wait ~30 seconds for the service to redeploy automatically
+3. Visit `https://your-app.up.railway.app/auth/emergency-reset` in your browser
+4. Paste the token + pick a new username and password (entered twice)
+5. Submit → you'll be redirected to the login page → log in with the new credentials
+6. **Delete the `EMERGENCY_RESET_TOKEN` env var from Railway immediately.** Leaving it set is a permanent backdoor to your admin account.
+
+Without `EMERGENCY_RESET_TOKEN` set, the `/auth/emergency-reset` route returns 404 — it doesn't exist as far as the outside world can tell.

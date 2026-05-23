@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Emergency Admin Reset — PM Tracker{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-center align-items-center" style="min-height:80vh">
+  <div style="width:100%;max-width:520px">
+    <div class="text-center mb-4">
+      <i class="bi bi-shield-lock" style="font-size:2rem;color:var(--color-danger,#dc3545)"></i>
+      <h1 class="h4 fw-bold mt-2">Emergency Admin Reset</h1>
+      <p class="text-muted small mb-0">
+        For use when the admin account is inaccessible. This route is only available
+        because <code>EMERGENCY_RESET_TOKEN</code> is set on the server.
+      </p>
+      <p class="text-muted small">
+        <strong>Delete the env var</strong> once you have recovered access.
+      </p>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-danger mb-4">
+      <i class="bi bi-exclamation-circle me-2"></i>{{ error }}
+    </div>
+    {% endif %}
+
+    <div class="card border" style="border-radius:12px;border-color:#dc3545 !important">
+      <div class="card-body p-4">
+        <form method="post" action="/auth/emergency-reset">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Reset Token</label>
+            <input type="password" name="reset_token" class="form-control"
+                   autocomplete="off" autofocus
+                   placeholder="Paste the EMERGENCY_RESET_TOKEN value" required
+                   style="font-family:monospace">
+            <div class="form-text">Must exactly match the env var set on the server.</div>
+          </div>
+
+          <hr class="my-3">
+          <p class="text-muted small fw-semibold mb-2">New admin credentials</p>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">New Username</label>
+            <input type="text" name="new_username" class="form-control"
+                   autocomplete="off" placeholder="e.g. admin"
+                   minlength="3" required>
+            <div class="form-text">Lowercased. If an admin already exists, they'll be renamed and re-keyed.</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">New Password</label>
+            <input type="password" name="new_password" class="form-control"
+                   autocomplete="new-password" placeholder="Min 8 characters"
+                   minlength="8" required>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Confirm New Password</label>
+            <input type="password" name="confirm_password" class="form-control"
+                   autocomplete="new-password" placeholder="••••••••"
+                   minlength="8" required>
+          </div>
+
+          <button type="submit" class="btn btn-danger w-100">
+            <i class="bi bi-shield-lock me-2"></i>Reset Admin Account
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <p class="text-center mt-3">
+      <a href="/auth/login" class="text-muted small">← Back to login</a>
+    </p>
+  </div>
+</div>
+{% endblock %}
