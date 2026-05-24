@@ -162,6 +162,88 @@
       {% endif %}
     </section>
 
+    <!-- 1b. Inspired By (linked ideas) -->
+    <section class="detail-section" id="inspired-by">
+      <div class="section-header">
+        <h2 class="section-title"><i class="bi bi-lightbulb me-2"></i>Inspired By
+          {% if linked_ideas %}<span class="text-muted small ms-2">({{ linked_ideas|length }})</span>{% endif %}
+        </h2>
+        {% if can_edit and available_ideas %}
+        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#linkIdeaModal">
+          <i class="bi bi-link-45deg me-1"></i>Link Idea
+        </button>
+        {% endif %}
+      </div>
+
+      {% if linked_ideas %}
+      <div class="inspired-by-list">
+        {% for li in linked_ideas %}
+        <div class="inspired-by-row">
+          <span class="ib-serial">{{ li.idea.serial_number }}</span>
+          <span class="ib-type">{{ li.idea.idea_type }}</span>
+          <a href="/ideas?highlight={{ li.idea.id }}" class="ib-name text-decoration-none">{{ li.idea.name }}</a>
+          {% if li.note %}<span class="text-muted small">· "{{ li.note }}"</span>{% endif %}
+          {% if li.linked_by_user %}
+          <span class="ib-by">by {{ li.linked_by_user.display_name or li.linked_by_user.username }}</span>
+          {% endif %}
+          {% if can_edit %}
+          <form method="post" action="/projects/{{ project.id }}/ideas/{{ li.idea.id }}/unlink" class="ms-auto"
+                onsubmit="return confirm('Unlink {{ li.idea.serial_number }} from this project?')">
+            <button class="btn btn-sm btn-link text-muted p-0" title="Unlink"><i class="bi bi-x-lg"></i></button>
+          </form>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-muted small mb-0">
+        No linked ideas yet.
+        {% if can_edit %}
+          {% if available_ideas %}Click "Link Idea" above to connect this project to inspirations from the <a href="/ideas">Good Ideas board</a>.
+          {% else %}Add ideas at the <a href="/ideas">Good Ideas board</a> first, then link them here.
+          {% endif %}
+        {% endif %}
+      </p>
+      {% endif %}
+    </section>
+
+    {# ── Link Idea modal ── #}
+    {% if can_edit and available_ideas %}
+    <div class="modal fade" id="linkIdeaModal" tabindex="-1">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <form method="post" action="/projects/{{ project.id }}/ideas/link">
+            <div class="modal-header">
+              <h5 class="modal-title"><i class="bi bi-lightbulb me-2"></i>Link an Idea</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Pick an idea</label>
+                <select name="idea_id" class="form-select" required>
+                  {% for i in available_ideas %}
+                  <option value="{{ i.id }}">
+                    {{ i.serial_number }} · {{ i.idea_type | title }} · {{ i.name }}{% if i.source_detail %} ({{ i.source_detail }}){% endif %}
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="mb-2">
+                <label class="form-label fw-semibold">Note <span class="text-muted small">(optional)</span></label>
+                <input type="text" name="note" class="form-control"
+                       placeholder="How is this idea being used in this project?">
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary"><i class="bi bi-link-45deg me-1"></i>Link Idea</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
     <!-- 2. Timeline -->
     <section class="detail-section" id="timeline">
       <div class="section-header">

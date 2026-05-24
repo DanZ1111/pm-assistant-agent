@@ -201,6 +201,49 @@ AI only fills in fields it's confident about. It never invents information not p
 
 ---
 
+## Good Ideas 💡
+
+The **Good Ideas** tab is a collaborative brainstorming board for raw inspirations that aren't products yet. Materials, structures, features, aesthetics, manufacturing techniques — log them here so the team can later combine ideas across categories into new products.
+
+### Layout
+Six columns by idea type:
+- **Material** — new metal alloys, woods, plastics, fabrics
+- **Structure** — mechanisms, fold patterns, locks, joints
+- **Feature** — functional capabilities (magnetic close, auto-lock, vibration alert)
+- **Aesthetic** — visual/design language (carbon look, two-tone, gradient)
+- **Manufacturing** — production technique, finishing method
+- **Other** — anything that doesn't fit above
+
+Each idea card shows its serial number (`IDEA-001`), name, source-tinted badge, contributor, and project usage count.
+
+### Adding an idea
+Click **+ New Idea** on the board. Fill in:
+- **Name** — short label
+- **Description** — longer detail (why is this cool? how might we use it?)
+- **Type** — pick a column
+- **Source** — factory / tradeshow / internet / customer / team / competitor / other
+- **Source Detail** — specific factory name, URL, tradeshow, etc.
+- **Contributor** — defaults to your name; change if logging for someone else
+
+### Permissions
+- **Everyone** (admin, PM, viewer) can **view and create** ideas
+- **PMs and admins** can **edit** any idea
+- **Only admins** can **delete**
+
+### Linking ideas to projects
+On any project detail page, scroll to the **Inspired By** section. Click **Link Idea** to pick from open ideas, optionally with a note describing how the idea is being used in this project.
+
+When you link an idea to a project, its status becomes `in_use`. When all projects unlink it, it goes back to `open` and is available for new combinations.
+
+### AI dual-mode intake
+Paste any text into AI Intake — the AI now detects whether you're logging an idea or a project:
+- *"We're working on a new Damascus Chef Knife for Rblack, MSRP $129.99"* → **project**
+- *"Found a cool tri-fold mechanism on Amazon, we could use it later"* → **idea**
+
+If the AI gets it wrong, the confirmation page has a toggle link to switch modes.
+
+---
+
 ## Calendar
 
 The **Calendar** tab (visible to everyone who can log in) shows a month-by-month view of your project launches.

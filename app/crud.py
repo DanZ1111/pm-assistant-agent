@@ -636,3 +636,170 @@ def get_calendar_year_range(db: Session) -> tuple[int, int]:
         if actual:
             years.add(actual.year)
     return min(years), max(years)
+
+
+# ---------------------------------------------------------------------------
+# Ideas (Good Ideas board)
+# ---------------------------------------------------------------------------
+
+from app.models import Idea, ProjectIdea, User  # local import to keep top of file unchanged
+
+IDEA_TYPES = ["material", "structure", "feature", "aesthetic", "manufacturing", "other"]
+IDEA_SOURCES = ["factory", "tradeshow", "internet", "customer", "team", "competitor", "other"]
+
+
+def create_idea(db: Session, data: dict, contributor_user_id: int | None = None) -> Idea:
+    """Create a new idea. `data` keys: name, description, idea_type, source,
+    source_detail, contributor, notes."""
+    idea_type = data.get("idea_type") or "other"
+    if idea_type not in IDEA_TYPES:
+        idea_type = "other"
+    source = data.get("source") or "other"
+    if source not in IDEA_SOURCES:
+        source = "other"
+
+    idea = Idea(
+        name=(data.get("name") or "").strip() or "(untitled)",
+        description=(data.get("description") or "").strip() or None,
+        idea_type=idea_type,
+        source=source,
+        source_detail=(data.get("source_detail") or "").strip() or None,
+        contributor=(data.get("contributor") or "").strip() or None,
+        contributor_user_id=contributor_user_id,
+        status="open",
+        notes=(data.get("notes") or "").strip() or None,
+    )
+    db.add(idea)
+    db.commit()
+    db.refresh(idea)
+    return idea
+
+
+def update_idea(db: Session, idea_id: int, data: dict) -> Idea | None:
+    idea = db.query(Idea).filter(Idea.id == idea_id).first()
+    if not idea:
+        return None
+    for field in ("name", "description", "source_detail", "contributor", "notes"):
+        if field in data:
+            val = (data.get(field) or "").strip()
+            setattr(idea, field, val or None)
+    if "idea_type" in data:
+        t = data["idea_type"]
+        idea.idea_type = t if t in IDEA_TYPES else "other"
+    if "source" in data:
+        s = data["source"]
+        idea.source = s if s in IDEA_SOURCES else "other"
+    if "status" in data and data["status"] in ("open", "in_use", "archived"):
+        idea.status = data["status"]
+    idea.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(idea)
+    return idea
+
+
+def delete_idea(db: Session, idea_id: int) -> bool:
+    idea = db.query(Idea).filter(Idea.id == idea_id).first()
+    if not idea:
+        return False
+    db.delete(idea)
+    db.commit()
+    return True
+
+
+def get_idea(db: Session, idea_id: int) -> Idea | None:
+    return db.query(Idea).filter(Idea.id == idea_id).first()
+
+
+def get_ideas_grouped(db: Session, source_filter: str | None = None) -> dict:
+    """Returns {idea_type: [Idea, ...]} for all non-archived ideas.
+    Each list is sorted by created_at descending."""
+    q = db.query(Idea).filter(Idea.status != "archived")
+    if source_filter and source_filter in IDEA_SOURCES:
+        q = q.filter(Idea.source == source_filter)
+    ideas = q.order_by(Idea.created_at.desc()).all()
+    grouped = {t: [] for t in IDEA_TYPES}
+    for i in ideas:
+        bucket = i.idea_type if i.idea_type in grouped else "other"
+        grouped[bucket].append(i)
+    return grouped
+
+
+def get_all_open_ideas(db: Session) -> list[Idea]:
+    """Used by the 'link existing idea' picker on project detail."""
+    return (
+        db.query(Idea)
+        .filter(Idea.status != "archived")
+        .order_by(Idea.created_at.desc())
+        .all()
+    )
+
+
+def link_idea_to_project(
+    db: Session,
+    project_id: int,
+    idea_id: int,
+    linked_by_user_id: int | None = None,
+    note: str | None = None,
+) -> ProjectIdea | None:
+    """Idempotent: returns existing link if already linked, otherwise creates one."""
+    existing = (
+        db.query(ProjectIdea)
+        .filter(ProjectIdea.project_id == project_id, ProjectIdea.idea_id == idea_id)
+        .first()
+    )
+    if existing:
+        return existing
+    link = ProjectIdea(
+        project_id=project_id,
+        idea_id=idea_id,
+        linked_by_user_id=linked_by_user_id,
+        note=(note or "").strip() or None,
+    )
+    db.add(link)
+    # Mark idea as in_use if it was open
+    idea = db.query(Idea).filter(Idea.id == idea_id).first()
+    if idea and idea.status == "open":
+        idea.status = "in_use"
+    db.commit()
+    db.refresh(link)
+    return link
+
+
+def unlink_idea_from_project(db: Session, project_id: int, idea_id: int) -> bool:
+    link = (
+        db.query(ProjectIdea)
+        .filter(ProjectIdea.project_id == project_id, ProjectIdea.idea_id == idea_id)
+        .first()
+    )
+    if not link:
+        return False
+    db.delete(link)
+    # If no other projects link to this idea, set status back to open
+    remaining = (
+        db.query(ProjectIdea).filter(ProjectIdea.idea_id == idea_id).count()
+    )
+    if remaining == 1:  # this one being deleted
+        idea = db.query(Idea).filter(Idea.id == idea_id).first()
+        if idea and idea.status == "in_use":
+            idea.status = "open"
+    db.commit()
+    return True
+
+
+def get_ideas_for_project(db: Session, project_id: int) -> list[dict]:
+    """Returns linked ideas with metadata (link info + idea info)."""
+    links = (
+        db.query(ProjectIdea)
+        .filter(ProjectIdea.project_id == project_id)
+        .order_by(ProjectIdea.linked_at.desc())
+        .all()
+    )
+    result = []
+    for link in links:
+        result.append({
+            "idea": link.idea,
+            "linked_at": link.linked_at,
+            "linked_by_user": link.linked_by_user,
+            "note": link.note,
+        })
+    return result

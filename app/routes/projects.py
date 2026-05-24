@@ -193,6 +193,9 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
     changes = sorted(project.changes, key=lambda c: c.changed_at, reverse=True)[:30]
     can_edit = can_edit_project(current_user, project)
     can_sensitive = can_view_sensitive_fields(current_user)
+    linked_ideas = crud.get_ideas_for_project(db, project_id)
+    linked_idea_ids = {li["idea"].id for li in linked_ideas}
+    available_ideas = [i for i in crud.get_all_open_ideas(db) if i.id not in linked_idea_ids]
 
     return templates.TemplateResponse(request, "project_detail.html", {
         "project": project,
@@ -205,6 +208,8 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
         "current_user": current_user,
         "can_edit": can_edit,
         "can_sensitive": can_sensitive,
+        "linked_ideas": linked_ideas,
+        "available_ideas": available_ideas,
     })
 
 
@@ -404,3 +409,46 @@ def phase_delete(request: Request, project_id: int, phase_id: int, db: Session =
     if project and can_edit_project(current_user, project):
         crud.delete_phase(db, phase_id)
     return RedirectResponse(url=f"/projects/{project_id}#timeline", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Project ↔ Idea linking
+# ---------------------------------------------------------------------------
+
+@router.post("/projects/{project_id}/ideas/link")
+def project_link_idea(
+    request: Request,
+    project_id: int,
+    idea_id: int = Form(...),
+    note: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+
+    project = crud.get_project(db, project_id)
+    if project and can_edit_project(current_user, project):
+        crud.link_idea_to_project(db, project_id, idea_id, current_user.id, note)
+    return RedirectResponse(url=f"/projects/{project_id}#inspired-by", status_code=303)
+
+
+@router.post("/projects/{project_id}/ideas/{idea_id}/unlink")
+def project_unlink_idea(
+    request: Request,
+    project_id: int,
+    idea_id: int,
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+
+    project = crud.get_project(db, project_id)
+    if project and can_edit_project(current_user, project):
+        crud.unlink_idea_from_project(db, project_id, idea_id)
+    return RedirectResponse(url=f"/projects/{project_id}#inspired-by", status_code=303)

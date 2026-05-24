@@ -1,5 +1,31 @@
 # PM Product Tracker — Changelog
 
+## v1.0.0 — Good Ideas + Project Linkage + AI Dual-Mode (Build 11)
+_2026-05-24_
+
+**Good Ideas board** (`/ideas`)
+- New `ideas` table with: name, description, idea_type, source, source_detail, contributor, status
+- Six type columns: material · structure · feature · aesthetic · manufacturing · other
+- Seven sources: factory · tradeshow · internet · customer · team · competitor · other
+- Serial number auto-derived: `IDEA-001`, `IDEA-002`, …
+- Source filter on board
+- Card visual style with source-tinted badges
+- Permissions: all roles create; PM+admin edit; admin only deletes
+
+**Project ↔ Idea linkage** (many-to-many via new `project_ideas` table)
+- "Inspired By" section on project detail page
+- Modal picker to link an existing idea, with optional usage note
+- Unlink button per linked idea
+- Idea status auto-flips: `open` → `in_use` on first link, back to `open` on last unlink
+
+**AI Dual-Mode Intake**
+- New `extract_intake()` in `app/ai/parser.py` classifies pasted text as project or idea
+- Ambiguous input defaults to "idea" (low-friction capture)
+- Confirmation page conditionally renders the project form OR the idea form
+- User can toggle classification if AI got it wrong (link in banner)
+- New route `POST /ai/intake/confirm-idea` creates an idea from confirmed extraction
+- File-upload intake (PDF/image) still goes to the project path (unchanged)
+
 ## v0.9.0 — Calendar + Admin Nav Hardening (Build 10)
 _2026-05-23_
 

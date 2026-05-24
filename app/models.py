@@ -31,6 +31,7 @@ class Project(Base):
     files = relationship("ProjectFile", back_populates="project", cascade="all, delete-orphan")
     changes = relationship("ProjectChange", back_populates="project", cascade="all, delete-orphan")
     ai_messages = relationship("AIMessage", back_populates="project", cascade="all, delete-orphan")
+    idea_links = relationship("ProjectIdea", back_populates="project", cascade="all, delete-orphan")
 
 
 class ProjectPhase(Base):
@@ -149,3 +150,55 @@ class UserSession(Base):
     expires_at = Column(DateTime, nullable=False)
 
     user = relationship("User", back_populates="sessions")
+
+
+# ---------------------------------------------------------------------------
+# Ideas (Good Ideas board) + Project ↔ Idea many-to-many linkage
+# ---------------------------------------------------------------------------
+
+class Idea(Base):
+    __tablename__ = "ideas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    idea_type = Column(String, nullable=False)
+    # material / structure / feature / aesthetic / manufacturing / other
+    source = Column(String, nullable=False)
+    # factory / tradeshow / internet / customer / team / competitor / other
+    source_detail = Column(String, nullable=True)
+    contributor = Column(String, nullable=True)
+    contributor_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    status = Column(String, default="open")   # open / in_use / archived
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    contributor_user = relationship("User", foreign_keys=[contributor_user_id])
+    project_links = relationship(
+        "ProjectIdea",
+        back_populates="idea",
+        cascade="all, delete-orphan",
+    )
+
+    @property
+    def serial_number(self) -> str:
+        return f"IDEA-{self.id:03d}"
+
+
+class ProjectIdea(Base):
+    """Association table linking projects to ideas (many-to-many).
+    Records who linked the idea, when, and an optional note about how the
+    idea was used in the project.
+    """
+    __tablename__ = "project_ideas"
+
+    project_id = Column(Integer, ForeignKey("projects.id"), primary_key=True)
+    idea_id = Column(Integer, ForeignKey("ideas.id"), primary_key=True)
+    linked_at = Column(DateTime, default=datetime.utcnow)
+    linked_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    note = Column(String, nullable=True)
+
+    project = relationship("Project", back_populates="idea_links")
+    idea = relationship("Idea", back_populates="project_links")
+    linked_by_user = relationship("User", foreign_keys=[linked_by_user_id])

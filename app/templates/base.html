@@ -23,6 +23,9 @@
       <a class="nav-link px-3 {% if request.url.path.startswith('/calendar') %}active{% endif %}" href="/calendar">
         <i class="bi bi-calendar3 me-1"></i>Calendar
       </a>
+      <a class="nav-link px-3 {% if request.url.path.startswith('/ideas') %}active{% endif %}" href="/ideas">
+        <i class="bi bi-lightbulb me-1"></i>Good Ideas
+      </a>
       {% endif %}
       {% if current_user and current_user.role in ('admin', 'pm') %}
       <a class="nav-link px-3 {% if request.url.path.startswith('/ai') %}active{% endif %}" href="/ai/intake">
@@ -38,7 +41,7 @@
       </a>
       {% endif %}
       <button class="btn btn-sm nav-help-btn ms-1" data-bs-toggle="modal" data-bs-target="#helpModal">
-        <i class="bi bi-question-circle me-1"></i>v0.9 Help
+        <i class="bi bi-question-circle me-1"></i>v1.0 Help
       </button>
       {% if current_user %}
       <span class="nav-link px-2 text-white-50 small" style="cursor:default">
@@ -96,12 +99,12 @@
           <div class="tab-pane fade show active" id="pane-version" role="tabpanel">
             <div class="d-flex align-items-start gap-4 mb-4">
               <div>
-                <div class="help-version-badge">v0.9.0</div>
+                <div class="help-version-badge">v1.0.0</div>
               </div>
               <div>
                 <h6 class="mb-1 fw-bold">PM Product Tracker</h6>
-                <p class="text-muted small mb-0">Build 10 — Calendar + Admin Nav Hardening</p>
-                <p class="text-muted small">Last updated: 2026-05-23</p>
+                <p class="text-muted small mb-0">Build 11 — Good Ideas + AI Dual-Mode Intake</p>
+                <p class="text-muted small">Last updated: 2026-05-24</p>
               </div>
             </div>
             <p class="mb-3">This version supports:</p>
@@ -114,6 +117,9 @@
               <li><i class="bi bi-check-circle-fill text-success me-2"></i>Help/Ask AI modal (role-aware, grounded in the user guide)</li>
               <li><i class="bi bi-check-circle-fill text-success me-2"></i>Multi-role auth (admin/pm/viewer) with invite-PIN registration</li>
               <li><i class="bi bi-check-circle-fill text-success me-2"></i>Calendar — see planned vs. actually-launched projects by month</li>
+              <li><i class="bi bi-check-circle-fill text-success me-2"></i>Good Ideas board — collect materials/structures/features by column</li>
+              <li><i class="bi bi-check-circle-fill text-success me-2"></i>Project ↔ Idea linkage — record which ideas inspired each project</li>
+              <li><i class="bi bi-check-circle-fill text-success me-2"></i>AI dual-mode intake — auto-detects Project vs Idea</li>
               <li><i class="bi bi-check-circle-fill text-success me-2"></i>Railway-ready deploy with one-time admin bootstrap + emergency reset</li>
             </ul>
           </div>
@@ -121,6 +127,17 @@
           <!-- Changelog -->
           <div class="tab-pane fade" id="pane-changelog" role="tabpanel">
             <div class="help-changelog">
+              <div class="help-cl-entry">
+                <div class="help-cl-version">v1.0.0</div>
+                <div class="help-cl-name">Good Ideas + Project Linkage + AI Dual-Mode</div>
+                <ul>
+                  <li>New /ideas board with 6 columns by type (material, structure, feature, …)</li>
+                  <li>Project detail "Inspired By" section — many-to-many idea linking</li>
+                  <li>AI intake now classifies pasted text as Project OR Idea, routes to right form</li>
+                  <li>Ambiguous defaults to Idea (low-friction capture); user can toggle</li>
+                  <li>Permissions: all create, PM+admin edit, admin only deletes ideas</li>
+                </ul>
+              </div>
               <div class="help-cl-entry">
                 <div class="help-cl-version">v0.9.0</div>
                 <div class="help-cl-name">Calendar + Admin Nav Hardening</div>

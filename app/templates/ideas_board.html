@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Good Ideas — PM Tracker{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3 flex-wrap">
+    <div>
+      <h1 class="page-title">💡 Good Ideas</h1>
+      <p class="page-subtitle">Materials, structures, features &amp; aesthetics from across the team — combine across columns to make new products.</p>
+    </div>
+    <div class="ms-auto d-flex align-items-center gap-2">
+      <form method="get" action="/ideas" class="d-inline">
+        <select name="source" class="form-select form-select-sm d-inline-block" style="width:auto"
+                onchange="this.form.submit()">
+          <option value="">All sources</option>
+          {% for s in idea_sources %}
+          <option value="{{ s }}" {% if current_source == s %}selected{% endif %}>
+            {{ s | replace('_',' ') | title }}
+          </option>
+          {% endfor %}
+        </select>
+      </form>
+      <a href="/ideas/new" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-lg me-1"></i>New Idea
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="ideas-board">
+  {% for t in idea_types %}
+  {% set type_ideas = grouped[t] %}
+  <div class="ideas-column">
+    <div class="ideas-column-header">
+      <span class="ideas-column-title">{{ t | title }}</span>
+      <span class="ideas-column-count">{{ type_ideas|length }}</span>
+    </div>
+    <div class="ideas-column-body">
+      {% if type_ideas %}
+        {% for idea in type_ideas %}
+        <div class="idea-card{% if request.query_params.get('highlight') == (idea.id | string) %} idea-highlight{% endif %}{% if idea.status == 'in_use' %} idea-in-use{% endif %}">
+          <div class="idea-serial">{{ idea.serial_number }}</div>
+          <div class="idea-name">{{ idea.name }}</div>
+          {% if idea.description %}
+          <div class="idea-desc">{{ idea.description[:140] }}{% if idea.description|length > 140 %}…{% endif %}</div>
+          {% endif %}
+          <div class="idea-meta">
+            <span class="idea-source-badge source-{{ idea.source }}">{{ idea.source }}</span>
+            {% if idea.source_detail %}<span class="idea-meta-detail">· {{ idea.source_detail }}</span>{% endif %}
+          </div>
+          {% if idea.contributor %}
+          <div class="idea-meta">
+            <i class="bi bi-person me-1"></i>{{ idea.contributor }}
+          </div>
+          {% endif %}
+          {% if idea.project_links %}
+          <div class="idea-meta">
+            <i class="bi bi-link-45deg me-1"></i>Used in {{ idea.project_links|length }} project{% if idea.project_links|length != 1 %}s{% endif %}
+          </div>
+          {% endif %}
+          <div class="idea-actions">
+            <span class="idea-date">{{ idea.created_at.strftime('%b %d') }}</span>
+            {% if current_user.role in ('admin', 'pm') %}
+            <a href="/ideas/{{ idea.id }}/edit" class="idea-action-link"><i class="bi bi-pencil"></i></a>
+            {% endif %}
+            {% if current_user.role == 'admin' %}
+            <form method="post" action="/ideas/{{ idea.id }}/delete" class="d-inline"
+                  onsubmit="return confirm('Delete {{ idea.serial_number }}?')">
+              <button class="idea-action-link" title="Delete idea"><i class="bi bi-x-lg"></i></button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div class="idea-empty">No ideas yet.</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

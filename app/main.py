@@ -15,6 +15,7 @@ from app.routes.help import router as help_router
 from app.routes.auth import router as auth_router
 from app.routes.admin_users import router as admin_users_router
 from app.routes.calendar import router as calendar_router
+from app.routes.ideas import router as ideas_router
 
 
 def _bootstrap_admin_from_env():
@@ -74,6 +75,7 @@ app.include_router(help_router)
 app.include_router(auth_router)
 app.include_router(admin_users_router)
 app.include_router(calendar_router)
+app.include_router(ideas_router)
 
 
 @app.get("/healthz")

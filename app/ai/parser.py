@@ -2,7 +2,7 @@ import os
 import json
 import base64
 from openai import OpenAI
-from app.ai.prompts import EXTRACTION_SYSTEM_PROMPT, VISION_EXTRACTION_SYSTEM_PROMPT
+from app.ai.prompts import EXTRACTION_SYSTEM_PROMPT, VISION_EXTRACTION_SYSTEM_PROMPT, DUAL_MODE_INTAKE_PROMPT
 
 _client: OpenAI | None = None
 
@@ -128,3 +128,35 @@ def answer_help_question(question: str) -> str:
         return response.choices[0].message.content or "I couldn't generate an answer."
     except Exception as e:
         return f"Sorry, I couldn't answer that right now: {e}"
+
+
+def extract_intake(raw_text: str) -> dict:
+    """Dual-mode classifier: returns {classification: 'project'|'idea',
+    project_fields: {...}, idea_fields: {...}}. Defaults to 'idea' on
+    ambiguous text per product policy.
+    """
+    try:
+        client = _get_client()
+        response = client.chat.completions.create(
+            model="gpt-5.4",
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": DUAL_MODE_INTAKE_PROMPT},
+                {"role": "user", "content": raw_text},
+            ],
+            max_completion_tokens=1200,
+            temperature=0.1,
+        )
+        raw = response.choices[0].message.content or "{}"
+        parsed = json.loads(raw)
+        # Normalize the shape
+        cls = parsed.get("classification")
+        if cls not in ("project", "idea"):
+            cls = "idea"  # default to idea on missing/invalid classification
+        return {
+            "classification": cls,
+            "project_fields": parsed.get("project_fields") or {},
+            "idea_fields": parsed.get("idea_fields") or {},
+        }
+    except Exception as e:
+        return {"_error": str(e)}

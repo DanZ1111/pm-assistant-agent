@@ -10,8 +10,9 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Project
 import app.crud as crud
-from app.ai.parser import extract_project_fields, extract_from_pdf, extract_from_image
+from app.ai.parser import extract_project_fields, extract_from_pdf, extract_from_image, extract_intake
 from app.ai.matching import find_best_match, MATCH_THRESHOLD
+from app.crud import IDEA_TYPES, IDEA_SOURCES
 from app.routes.files import detect_file_type
 from app.dependencies import get_current_user, require_auth, can_use_ai_intake, _RedirectException
 
@@ -116,27 +117,47 @@ async def intake_extract(
             "uploaded_file_type": "", "uploaded_file_category": "", "uploaded_ai_summary": "",
         })
 
-    extracted = extract_project_fields(raw_text)
-
-    if "_error" in extracted:
+    # Dual-mode classification: project vs idea
+    result = extract_intake(raw_text)
+    if "_error" in result:
         return templates.TemplateResponse(request, "intake.html", {
             "proposed": None, "raw_text": raw_text, "health": None,
-            "error": f"AI extraction failed: {extracted['_error']}",
+            "error": f"AI extraction failed: {result['_error']}",
             "uploaded_filename": "", "uploaded_original_filename": "",
             "uploaded_file_type": "", "uploaded_file_category": "", "uploaded_ai_summary": "",
+            "classification": None, "idea_fields": None,
         })
 
-    health = _health_from_dict(extracted)
+    classification = result["classification"]
+    project_fields = result["project_fields"] or {}
+    idea_fields = result["idea_fields"] or {}
+
     crud.save_ai_message(db, None, "user", raw_text, None)
-    crud.save_ai_message(db, None, "assistant", str(extracted), {"extracted_fields": extracted})
+    crud.save_ai_message(db, None, "assistant", str(result),
+                         {"classification": classification,
+                          "project_fields": project_fields,
+                          "idea_fields": idea_fields})
 
-    matched_project, match_score = _find_match(extracted, db)
+    # When classified as project, run health + match. When idea, skip.
+    health = None
+    matched_project = None
+    match_score = 0.0
+    if classification == "project":
+        health = _health_from_dict(project_fields)
+        matched_project, match_score = _find_match(project_fields, db)
 
+    # `proposed` is the project_fields dict (for backward compat with template),
+    # idea_fields is passed separately
     return templates.TemplateResponse(request, "intake.html", {
-        "proposed": extracted, "raw_text": raw_text, "health": health, "error": None,
+        "proposed": project_fields, "raw_text": raw_text, "health": health, "error": None,
         "uploaded_filename": "", "uploaded_original_filename": "",
         "uploaded_file_type": "", "uploaded_file_category": "", "uploaded_ai_summary": "",
         "matched_project": matched_project, "match_score": match_score,
+        "classification": classification,
+        "idea_fields": idea_fields,
+        "idea_types": IDEA_TYPES,
+        "idea_sources": IDEA_SOURCES,
+        "current_user": current_user,
     })
 
 
@@ -358,3 +379,52 @@ def intake_confirm(
     db.commit()
 
     return RedirectResponse(url=f"/projects/{project.id}", status_code=303)
+
+
+# ── Idea confirmation (dual-mode intake) ─────────────────────────────────────
+
+@router.post("/ai/intake/confirm-idea")
+def intake_confirm_idea(
+    request: Request,
+    raw_text: str = Form(""),
+    name: str = Form(""),
+    description: str = Form(""),
+    idea_type: str = Form("other"),
+    source: str = Form("other"),
+    source_detail: str = Form(""),
+    contributor: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+    # Anyone authenticated can create ideas (matches /ideas/new permission)
+    name = name.strip()
+    if not name:
+        return templates.TemplateResponse(request, "intake.html", {
+            "proposed": None, "raw_text": raw_text, "health": None,
+            "error": "Idea name is required to confirm.",
+            "uploaded_filename": "", "uploaded_original_filename": "",
+            "uploaded_file_type": "", "uploaded_file_category": "", "uploaded_ai_summary": "",
+            "classification": "idea", "idea_fields": None,
+            "current_user": current_user,
+        })
+
+    data = {
+        "name": name,
+        "description": description,
+        "idea_type": idea_type,
+        "source": source,
+        "source_detail": source_detail,
+        "contributor": contributor or (current_user.display_name or current_user.username),
+    }
+    idea = crud.create_idea(db, data, contributor_user_id=current_user.id)
+    crud.save_ai_message(db, None, "user", raw_text or "(idea intake)", None)
+    crud.save_ai_message(
+        db, None, "assistant",
+        f"Created idea '{idea.serial_number}: {idea.name}' from AI intake.",
+        {"source": "intake_confirm_idea", "idea_id": idea.id},
+    )
+    return RedirectResponse(url=f"/ideas?highlight={idea.id}", status_code=303)

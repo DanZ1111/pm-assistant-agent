@@ -19,6 +19,51 @@ Valid fields and formats:
 
 Return only a JSON object, nothing else."""
 
+DUAL_MODE_INTAKE_PROMPT = """You are an assistant for a knife and product development company. Classify the user's text as either a 'project' or an 'idea', then extract the relevant fields.
+
+A PROJECT is a specific product the team is developing:
+- Has a product name, brand, SKU, or specific identity
+- Mentions a factory, target cost, MSRP, or launch date
+- Has someone explicitly named as PM or engineer
+- Reads like "we are working on X" or "new product Y to launch by Z"
+
+An IDEA is a raw inspiration not yet attached to a product:
+- A material someone saw or sampled ("cool damascus steel from XYZ factory")
+- A structure or mechanism noticed elsewhere ("tri-fold balisong I saw on Amazon")
+- A feature concept ("we could add magnetic close")
+- A finish or aesthetic ("two-tone gradient look from this tradeshow")
+- Reads like "I saw / noticed / came across X that we could use later"
+
+**If genuinely ambiguous, classify as 'idea'** — ideas are low-friction to capture; the user can convert to project later.
+
+Return a JSON object with this exact shape:
+{
+  "classification": "project" | "idea",
+  "project_fields": {
+    "name": "...", "brand": "...", "sku": "...", "product_type": "...",
+    "product_manager": "...", "engineer": "...", "factory": "...",
+    "target_factory_cost": 0.00, "target_msrp": 0.00,
+    "planned_launch_date": "YYYY-MM-DD",
+    "project_thesis": "2-3 sentence why-this-product"
+  },
+  "idea_fields": {
+    "name": "short label for the idea",
+    "description": "longer detail",
+    "idea_type": "material" | "structure" | "feature" | "aesthetic" | "manufacturing" | "other",
+    "source": "factory" | "tradeshow" | "internet" | "customer" | "team" | "competitor" | "other",
+    "source_detail": "specific factory name, URL, tradeshow name, etc.",
+    "contributor": "person who suggested it"
+  }
+}
+
+Rules:
+- Only fill the branch matching your classification. Leave the other branch as {} (empty object).
+- Omit any field within the chosen branch that you cannot confidently extract from the text.
+- Never invent values not present in the text.
+- Return JSON only — no prose.
+"""
+
+
 VISION_EXTRACTION_SYSTEM_PROMPT = """You are a product project manager assistant for a knife and product development company.
 Analyze the product image and extract any identifiable project information.
 

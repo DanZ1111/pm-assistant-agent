@@ -1,9 +1,20 @@
 # PM Product Tracker — Version
 
-**Current Version:** v0.9.0
-**Current Build:** Build 10 — Calendar + Admin Nav Hardening
-**Status:** Ready for production deploy
-**Last Updated:** 2026-05-23
+**Current Version:** v1.0.0
+**Current Build:** Build 11 — Good Ideas + AI Dual-Mode Intake
+**Status:** Feature-complete
+**Last Updated:** 2026-05-24
+
+## What's in v1.0.0
+
+- Everything from v0.9.0 (see below)
+- **Good Ideas board** at `/ideas` — collect raw inspirations (materials, structures, features, aesthetics, manufacturing) categorized into columns
+- Anyone can submit ideas; PMs and admin can edit; admin can delete
+- **Project ↔ Idea linkage** — projects can record which ideas they derive from (many-to-many)
+- "Inspired By" section on project detail page with link/unlink modal
+- **AI dual-mode intake** — AI now classifies pasted text/files as either a Project or an Idea and routes to the appropriate confirmation form
+- AI defaults to "idea" on ambiguous input (low-friction capture)
+- User can toggle classification if AI got it wrong
 
 ## What's in v0.9.0
 
@@ -43,3 +54,4 @@
 | v0.7.0 | Build 7 | AI Update Existing Project + Help AI Assistant |
 | v0.8.0 | Build 8 + 9 | Multi-Role Auth + Railway Deploy |
 | v0.9.0 | Build 10 | Calendar + Admin Nav Hardening |
+| v1.0.0 | Build 11 | Good Ideas + Project Linkage + AI Dual-Mode |

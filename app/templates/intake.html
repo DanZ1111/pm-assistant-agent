@@ -79,6 +79,20 @@
 
 {% else %}
 {# ── State 2: Review & Confirm ── #}
+
+{# Classification banner — let user toggle if AI got it wrong #}
+{% if classification %}
+<div class="alert {% if classification == 'idea' %}alert-warning{% else %}alert-info{% endif %} mb-3" style="font-size:0.875rem">
+  <i class="bi {% if classification == 'idea' %}bi-lightbulb{% else %}bi-folder2{% endif %} me-2"></i>
+  <strong>AI classified this as {% if classification == 'idea' %}an Idea 💡{% else %}a Project 📁{% endif %}.</strong>
+  {% if classification == 'idea' %}
+  <a href="?as=project" class="ms-2 small">Actually this is a project →</a>
+  {% else %}
+  <a href="?as=idea" class="ms-2 small">Actually this is an idea →</a>
+  {% endif %}
+</div>
+{% endif %}
+
 <div class="row g-4">
 
   {# Left column: original text / AI summary reference #}
@@ -109,6 +123,79 @@
   {# Right column: proposed fields + confirm form #}
   <div class="col-lg-8">
 
+  {% if classification == 'idea' %}
+    {# ── Idea confirmation form ────────────────────────────────────────── #}
+    <div class="detail-section mb-3">
+      <div class="section-header">
+        <h2 class="section-title" style="font-size:1rem"><i class="bi bi-lightbulb me-2"></i>New Idea — Review &amp; Confirm</h2>
+      </div>
+      <p class="text-muted small mb-4">AI extracted these fields. Edit anything before confirming.</p>
+      <form method="post" action="/ai/intake/confirm-idea">
+        <input type="hidden" name="raw_text" value="{{ raw_text | e }}">
+
+        <div class="form-section">
+          <h3 class="form-section-title">Idea</h3>
+          <div class="form-grid">
+            <div class="form-group-full">
+              <label class="form-label">Name <span class="badge-required">Required</span></label>
+              <input type="text" name="name" class="form-control form-control-lg" required autofocus
+                     value="{{ idea_fields.get('name', '') or '' }}"
+                     placeholder="Short label">
+            </div>
+            <div class="form-group-full">
+              <label class="form-label">Description</label>
+              <textarea name="description" class="form-control" rows="3"
+                        placeholder="Longer detail">{{ idea_fields.get('description', '') or '' }}</textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section-title">Categorize</h3>
+          <div class="form-grid">
+            <div>
+              <label class="form-label">Type <span class="badge-required">Required</span></label>
+              <select name="idea_type" class="form-select" required>
+                {% for t in idea_types %}
+                <option value="{{ t }}" {% if idea_fields.get('idea_type') == t %}selected{% endif %}>{{ t | title }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Source <span class="badge-required">Required</span></label>
+              <select name="source" class="form-select" required>
+                {% for s in idea_sources %}
+                <option value="{{ s }}" {% if idea_fields.get('source') == s %}selected{% endif %}>{{ s | title }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group-full">
+              <label class="form-label">Source Detail</label>
+              <input type="text" name="source_detail" class="form-control"
+                     value="{{ idea_fields.get('source_detail', '') or '' }}"
+                     placeholder="Factory name, URL, tradeshow name…">
+            </div>
+            <div class="form-group-full">
+              <label class="form-label">Contributor</label>
+              <input type="text" name="contributor" class="form-control"
+                     value="{{ idea_fields.get('contributor', '') or (current_user.display_name or current_user.username) }}"
+                     placeholder="Who suggested it">
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex gap-3 mt-4 mb-2">
+          <button type="submit" class="btn btn-primary btn-lg">
+            <i class="bi bi-lightbulb me-2"></i>Confirm &amp; Save Idea
+          </button>
+          <a href="/ai/intake" class="btn btn-outline-secondary btn-lg">Start Over</a>
+        </div>
+        <p class="text-muted small">The idea will appear on the <a href="/ideas">Good Ideas board</a> in the {{ idea_fields.get('idea_type','other') | title }} column.</p>
+      </form>
+    </div>
+
+  {% else %}
+    {# ── Project confirmation form (existing) ──────────────────────────── #}
     {# Match banner #}
     {% if matched_project %}
     <div class="alert alert-info mb-4" style="font-size:0.875rem">
@@ -294,6 +381,7 @@
 
       </form>
     </div>
+  {% endif %}{# end classification branching #}
 
   </div>
 </div>
