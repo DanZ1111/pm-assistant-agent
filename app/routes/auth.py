@@ -101,7 +101,10 @@ def register_submit(
     db: Session = Depends(get_db),
 ):
     username = username.strip().lower()
-    invite_pin = invite_pin.strip().upper()
+    invite_pin_raw = (invite_pin or "").strip().upper()
+    # Forgiving normalization: strip all non-alphanumeric chars so PMs/viewers
+    # can paste "PM-X7KP2Q", "PMX7KP2Q", "pm-x7kp2q", etc. and still match.
+    pin_normalized = "".join(c for c in invite_pin_raw if c.isalnum())
 
     def err(msg):
         return templates.TemplateResponse(request, "auth/register.html", {"error": msg})
@@ -116,14 +119,21 @@ def register_submit(
         return err("Password must be at least 8 characters.")
     if password != confirm_password:
         return err("Passwords do not match.")
-    if not invite_pin:
+    if not pin_normalized:
         return err("Invite PIN is required. Ask your administrator for one.")
 
-    # Validate PIN
-    pin_row = db.query(InvitePin).filter(
-        InvitePin.pin == invite_pin,
-        InvitePin.used_by_user_id == None,  # noqa: E711
-    ).first()
+    # Match the PIN by stripping non-alphanumerics on both sides too,
+    # in case stored format ever differs (defensive).
+    candidates = (
+        db.query(InvitePin)
+        .filter(InvitePin.used_by_user_id == None)  # noqa: E711
+        .all()
+    )
+    pin_row = None
+    for c in candidates:
+        if "".join(ch for ch in (c.pin or "").upper() if ch.isalnum()) == pin_normalized:
+            pin_row = c
+            break
     if not pin_row:
         return err("Invalid or already-used invite PIN.")
 
