@@ -7,6 +7,7 @@ import os
 from app.database import engine, Base, SessionLocal
 import app.models  # register models before create_all
 from app.models import User
+from app import migrations
 from app.routes.projects import router as projects_router
 from app.routes.admin import router as admin_router
 from app.routes.files import router as files_router
@@ -56,7 +57,13 @@ def _bootstrap_admin_from_env():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # 1) Create any new tables defined in models.py (idempotent — only adds
+    #    tables that don't exist; never modifies existing schemas).
     Base.metadata.create_all(bind=engine)
+    # 2) Run versioned migrations for column additions on existing tables.
+    #    Safe on both fresh and existing DBs. Idempotent. Logged.
+    migrations.run_pending(engine)
+    # 3) Ensure upload dir exists + run one-time admin bootstrap from env vars.
     os.makedirs("app/uploads", exist_ok=True)
     _bootstrap_admin_from_env()
     yield

@@ -32,6 +32,15 @@ class Project(Base):
     changes = relationship("ProjectChange", back_populates="project", cascade="all, delete-orphan")
     ai_messages = relationship("AIMessage", back_populates="project", cascade="all, delete-orphan")
     idea_links = relationship("ProjectIdea", back_populates="project", cascade="all, delete-orphan")
+    # v1.1 (Build 13)
+    journal_entries = relationship("ProjectJournalEntry", back_populates="project",
+                                   cascade="all, delete-orphan",
+                                   order_by="ProjectJournalEntry.created_at.desc()")
+    variants = relationship("ProjectVariant", back_populates="project",
+                            cascade="all, delete-orphan",
+                            order_by="ProjectVariant.created_at")
+    variant_components = relationship("ProjectVariantComponent", back_populates="project",
+                                      cascade="all, delete-orphan")
 
 
 class ProjectPhase(Base):
@@ -53,6 +62,10 @@ class ProjectPhase(Base):
     updated_at = Column(DateTime, default=datetime.utcnow)
 
     project = relationship("Project", back_populates="phases")
+    # v1.1 (Build 13): Timeline 2.0 — record reasons when planned dates shift
+    plan_changes = relationship("PhasePlanChange", back_populates="phase",
+                                cascade="all, delete-orphan",
+                                order_by="PhasePlanChange.changed_at")
 
 
 class ProjectFile(Base):
@@ -97,12 +110,16 @@ class AIMessage(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
+    # v1.1 (Build 13): groups messages into conversations. Nullable for
+    # backward compat with v1.0 messages that pre-date this column.
+    conversation_id = Column(Integer, ForeignKey("ai_conversations.id"), nullable=True)
     role = Column(String, nullable=False)   # user / assistant / system
     message = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     metadata_json = Column(JSON, nullable=True)
 
     project = relationship("Project", back_populates="ai_messages")
+    conversation = relationship("AIConversation", back_populates="messages")
 
 
 # ---------------------------------------------------------------------------
@@ -117,12 +134,17 @@ class User(Base):
     display_name = Column(String, nullable=True)
     hashed_password = Column(String, nullable=False)
     role = Column(String, nullable=False, default="viewer")  # admin / pm / viewer
+    # v1.1 (Build 13): UI language. ALL READS must fallback to "en":
+    #   lang = user.language or "en"
+    # DEFAULT may not backfill existing rows uniformly across SQLite/Postgres.
+    language = Column(String, default="en")
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)
 
     sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
     created_pins = relationship("InvitePin", foreign_keys="InvitePin.created_by_user_id", back_populates="created_by")
     used_pins = relationship("InvitePin", foreign_keys="InvitePin.used_by_user_id", back_populates="used_by")
+    ai_conversations = relationship("AIConversation", back_populates="user", cascade="all, delete-orphan")
 
 
 class InvitePin(Base):
@@ -202,3 +224,140 @@ class ProjectIdea(Base):
     project = relationship("Project", back_populates="idea_links")
     idea = relationship("Idea", back_populates="project_links")
     linked_by_user = relationship("User", foreign_keys=[linked_by_user_id])
+
+
+# ---------------------------------------------------------------------------
+# v1.1 — Build 13: schema additions
+#
+# All 5 tables below are purely additive. Existing v1.0 tables are untouched.
+# Two existing tables get nullable columns (users.language, ai_messages.conversation_id).
+# Migration helper in app/migrations.py adds those columns idempotently.
+# ---------------------------------------------------------------------------
+
+
+class ProjectJournalEntry(Base):
+    """Product reasoning evolution — raw text, AI summary, proposed updates.
+    Distinct from ProjectChange (which audits field-level edits): journal
+    records WHY product thinking changed (factory discussions, cost discoveries,
+    abandoned directions, open questions).
+
+    Raw `entry_text` is the source of truth. AI summary and extracted_updates
+    are derived and re-parseable from raw text in future builds.
+    """
+    __tablename__ = "project_journal_entries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    entry_text = Column(Text, nullable=False)
+    entry_type = Column(String, default="general")
+    # general / factory_discussion / cost_discovery / design_feedback /
+    # decision / risk / packaging / variant / other
+    title = Column(String, nullable=True)            # short AI-generated summary
+    visibility = Column(String, default="internal")  # internal / public
+    author_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    ai_summary = Column(Text, nullable=True)
+    extracted_updates_json = Column(JSON, nullable=True)
+    open_questions_json = Column(JSON, nullable=True)
+    decisions_json = Column(JSON, nullable=True)
+    options_json = Column(JSON, nullable=True)
+    linked_file_id = Column(Integer, ForeignKey("project_files.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    project = relationship("Project", back_populates="journal_entries")
+    author = relationship("User", foreign_keys=[author_user_id])
+    linked_file = relationship("ProjectFile", foreign_keys=[linked_file_id])
+
+
+class ProjectVariant(Base):
+    """Multi-SKU support. A project can have multiple variants (colors,
+    materials, sizes, budget/premium splits).
+
+    is_primary is enforced at the SERVICE LAYER (Build 16): only one variant
+    per project should be primary at a time. NOT a DB unique constraint —
+    too risky for migrations.
+    """
+    __tablename__ = "project_variants"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    variant_name = Column(String, nullable=False)
+    sku = Column(String, nullable=True)
+    status = Column(String, default="evaluating")
+    # idea / evaluating / selected / rejected / launched
+    is_primary = Column(Boolean, default=False)
+    target_factory_cost = Column(Float, nullable=True)
+    actual_factory_cost = Column(Float, nullable=True)
+    target_msrp = Column(Float, nullable=True)
+    material_summary = Column(Text, nullable=True)
+    size_color_summary = Column(Text, nullable=True)
+    packaging_summary = Column(Text, nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    project = relationship("Project", back_populates="variants")
+    components = relationship("ProjectVariantComponent", back_populates="variant",
+                              cascade="all, delete-orphan")
+
+
+class ProjectVariantComponent(Base):
+    """Packaging + accessories. May belong to a specific variant
+    (variant_id set) OR apply to all variants of the project (variant_id NULL).
+    """
+    __tablename__ = "project_variant_components"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    variant_id = Column(Integer, ForeignKey("project_variants.id"), nullable=True)
+    component_type = Column(String, default="accessory")  # packaging / accessory
+    name = Column(String, nullable=False)
+    target_cost = Column(Float, nullable=True)
+    actual_cost = Column(Float, nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    project = relationship("Project", back_populates="variant_components")
+    variant = relationship("ProjectVariant", back_populates="components")
+
+
+class PhasePlanChange(Base):
+    """Records when a phase's planned date is shifted and WHY.
+    Required for Timeline 2.0 (Build 17). Plan dates aren't freely mutable —
+    every change must capture a reason.
+    """
+    __tablename__ = "phase_plan_changes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    phase_id = Column(Integer, ForeignKey("project_phases.id"), nullable=False)
+    field_changed = Column(String, nullable=False)  # e.g. 'planned_end_date'
+    old_date = Column(Date, nullable=True)
+    new_date = Column(Date, nullable=True)
+    reason = Column(Text, nullable=False)
+    changed_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    changed_at = Column(DateTime, default=datetime.utcnow)
+
+    phase = relationship("ProjectPhase", back_populates="plan_changes")
+    changed_by = relationship("User", foreign_keys=[changed_by_user_id])
+
+
+class AIConversation(Base):
+    """Groups AI chat messages into conversations.
+    project_id NULL = global chat. status='archived' removes from active
+    runtime context but keeps the conversation searchable.
+    """
+    __tablename__ = "ai_conversations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
+    title = Column(String, nullable=True)
+    status = Column(String, default="active")  # active / archived
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="ai_conversations")
+    project = relationship("Project", foreign_keys=[project_id])
+    messages = relationship("AIMessage", back_populates="conversation",
+                            order_by="AIMessage.created_at")
