@@ -9,7 +9,8 @@ from app.models import Project
 import app.crud as crud
 from app.dependencies import (
     get_current_user, require_auth, require_admin,
-    can_edit_project, can_view_sensitive_fields, _RedirectException
+    can_edit_project, can_view_sensitive_fields, can_view_journal,
+    _RedirectException
 )
 
 router = APIRouter()
@@ -197,6 +198,16 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
     linked_idea_ids = {li["idea"].id for li in linked_ideas}
     available_ideas = [i for i in crud.get_all_open_ideas(db) if i.id not in linked_idea_ids]
 
+    # v1.1 Build 14: Journal section. Viewer cannot see it at all — only
+    # load entries if the user is allowed to view them, so the section
+    # never appears even by template accident.
+    can_journal = can_view_journal(current_user)
+    journal_entries = (
+        crud.get_journal_entries_for_project(db, project_id) if can_journal else []
+    )
+    journal_error = request.query_params.get("journal_error")
+    journal_error_entry_id = request.query_params.get("entry_id")
+
     return templates.TemplateResponse(request, "project_detail.html", {
         "project": project,
         "phases": phases,
@@ -210,6 +221,10 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
         "can_sensitive": can_sensitive,
         "linked_ideas": linked_ideas,
         "available_ideas": available_ideas,
+        "can_view_journal": can_journal,
+        "journal_entries": journal_entries,
+        "journal_error": journal_error,
+        "journal_error_entry_id": journal_error_entry_id,
     })
 
 

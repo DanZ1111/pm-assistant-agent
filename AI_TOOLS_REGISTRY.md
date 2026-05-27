@@ -24,11 +24,12 @@ Status legend:
 
 ---
 
-## Current Tools (v1.0.x baseline — none yet wired)
+## Current Tools
 
 | Tool | Params | Permission | Confirmation | Status |
 |---|---|---|---|---|
-| (none — registry initialized in Build 12; first tools land in Build 20) | | | | |
+| `create_journal_entry` (HTTP route) | project_id, entry_text, entry_type | auth + `can_view_journal` + `can_edit_project` | No (low-stakes capture) | **route implemented (Build 14)**; bottom-chat tool wiring lands in Build 20/21 |
+| `summarize_journal_entry` (HTTP route) | entry_id (via URL) | auth + `can_view_journal` + `can_edit_project` | No (preserves existing on failure) | **route implemented (Build 14)**; bottom-chat tool wiring lands in Build 20/21 |
 
 ## Planned for v1.1.0 (priority order)
 

@@ -2,7 +2,12 @@ import os
 import json
 import base64
 from openai import OpenAI
-from app.ai.prompts import EXTRACTION_SYSTEM_PROMPT, VISION_EXTRACTION_SYSTEM_PROMPT, DUAL_MODE_INTAKE_PROMPT
+from app.ai.prompts import (
+    EXTRACTION_SYSTEM_PROMPT,
+    VISION_EXTRACTION_SYSTEM_PROMPT,
+    DUAL_MODE_INTAKE_PROMPT,
+    JOURNAL_SUMMARY_PROMPT,
+)
 
 _client: OpenAI | None = None
 
@@ -158,5 +163,35 @@ def extract_intake(raw_text: str) -> dict:
             "project_fields": parsed.get("project_fields") or {},
             "idea_fields": parsed.get("idea_fields") or {},
         }
+    except Exception as e:
+        return {"_error": str(e)}
+
+
+def summarize_journal_entry(entry_text: str) -> dict:
+    """Summarize a Project Journal entry into {'title': str, 'summary': str}.
+    Returns {'_error': str} on failure so the caller can preserve the existing
+    title/summary instead of overwriting with garbage.
+    """
+    if not entry_text or not entry_text.strip():
+        return {"_error": "Entry text is empty."}
+    try:
+        client = _get_client()
+        response = client.chat.completions.create(
+            model="gpt-5.4",
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": JOURNAL_SUMMARY_PROMPT},
+                {"role": "user", "content": entry_text},
+            ],
+            max_completion_tokens=300,
+            temperature=0.2,
+        )
+        raw = response.choices[0].message.content or "{}"
+        parsed = json.loads(raw)
+        title = (parsed.get("title") or "").strip()
+        summary = (parsed.get("summary") or "").strip()
+        if not title or not summary:
+            return {"_error": "AI returned an incomplete summary."}
+        return {"title": title, "summary": summary}
     except Exception as e:
         return {"_error": str(e)}

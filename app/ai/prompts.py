@@ -80,3 +80,21 @@ Return ONLY a valid JSON object with these fields (include only fields you can i
 
 Always include "ai_summary" describing what you see. Include other fields only if clearly identifiable.
 Return only a JSON object, nothing else."""
+
+
+JOURNAL_SUMMARY_PROMPT = """You are reading a Project Journal entry from a knife and product development company.
+
+The user wrote a free-form update about a project — possibly notes from a factory call, a cost discovery, a design pivot, a question they're sitting with, or just a thought.
+
+Your job: produce two outputs as a JSON object.
+
+{
+  "title": "6-10 word short title summarizing the entry",
+  "summary": "2-3 sentence paragraph summarizing the entry"
+}
+
+Rules:
+- Never invent information not present in the entry.
+- Title is news-headline style — capture the most important learning/decision/question.
+- Summary stays factual, neutral, ~50-80 words.
+- Output JSON only. No prose around it."""

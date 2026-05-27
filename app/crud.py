@@ -803,3 +803,119 @@ def get_ideas_for_project(db: Session, project_id: int) -> list[dict]:
             "note": link.note,
         })
     return result
+
+
+# ---------------------------------------------------------------------------
+# v1.1 Build 14: Project Journal CRUD
+# ---------------------------------------------------------------------------
+
+from app.models import ProjectJournalEntry  # late import to avoid circular
+
+
+def create_journal_entry(
+    db: Session,
+    project_id: int,
+    entry_text: str,
+    entry_type: str,
+    author_user_id: int | None = None,
+) -> ProjectJournalEntry:
+    """Create a journal entry. Raw entry_text is preserved forever — never
+    overwritten silently. title and ai_summary are filled later via
+    summarize_journal_entry()."""
+    entry = ProjectJournalEntry(
+        project_id=project_id,
+        entry_text=entry_text.strip(),
+        entry_type=(entry_type or "general").strip(),
+        author_user_id=author_user_id,
+        visibility="internal",
+    )
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+
+def update_journal_entry(
+    db: Session,
+    entry_id: int,
+    entry_text: str,
+    entry_type: str,
+    edited_by_user_id: int | None = None,
+) -> ProjectJournalEntry | None:
+    """Edit raw text and/or type. Writes a project_changes audit row so the
+    edit is visible in the project's change log even though per-edit text
+    history isn't kept."""
+    entry = db.query(ProjectJournalEntry).filter(ProjectJournalEntry.id == entry_id).first()
+    if not entry:
+        return None
+    old_text = entry.entry_text or ""
+    new_text = (entry_text or "").strip()
+    if not new_text:
+        return entry  # silently ignore empty save
+    if new_text == old_text and entry_type == entry.entry_type:
+        return entry  # no actual change
+
+    entry.entry_text = new_text
+    entry.entry_type = (entry_type or "general").strip()
+    entry.updated_at = datetime.utcnow()
+    # AI title/summary may be stale after edit — caller can re-Summarize.
+    # Don't auto-invalidate; user might know they're fine.
+    db.flush()
+
+    # Audit row in project_changes
+    snippet_old = (old_text[:60] + "…") if len(old_text) > 60 else old_text
+    snippet_new = (new_text[:60] + "…") if len(new_text) > 60 else new_text
+    write_change(
+        db, entry.project_id, "event_note",
+        changed_by="user",
+        summary=f"Journal entry edited: '{snippet_old}' → '{snippet_new}'",
+        source_type="manual_edit",
+    )
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+
+def delete_journal_entry(db: Session, entry_id: int) -> bool:
+    entry = db.query(ProjectJournalEntry).filter(ProjectJournalEntry.id == entry_id).first()
+    if not entry:
+        return False
+    project_id = entry.project_id
+    snippet = (entry.entry_text or "")[:80]
+    db.delete(entry)
+    write_change(
+        db, project_id, "event_note",
+        changed_by="user",
+        summary=f"Journal entry deleted: '{snippet}…'" if len(snippet) >= 80 else f"Journal entry deleted: '{snippet}'",
+        source_type="manual_edit",
+    )
+    db.commit()
+    return True
+
+
+def get_journal_entries_for_project(
+    db: Session, project_id: int
+) -> list[ProjectJournalEntry]:
+    """Returns entries newest-first. Always preserves raw entry_text."""
+    return (
+        db.query(ProjectJournalEntry)
+        .filter(ProjectJournalEntry.project_id == project_id)
+        .order_by(ProjectJournalEntry.created_at.desc())
+        .all()
+    )
+
+
+def apply_ai_summary(
+    db: Session, entry_id: int, title: str, summary: str
+) -> ProjectJournalEntry | None:
+    """Called only on AI summarize SUCCESS. On AI failure, the caller does
+    not invoke this — existing title/ai_summary stay intact."""
+    entry = db.query(ProjectJournalEntry).filter(ProjectJournalEntry.id == entry_id).first()
+    if not entry:
+        return None
+    entry.title = title.strip() or None
+    entry.ai_summary = summary.strip() or None
+    entry.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(entry)
+    return entry

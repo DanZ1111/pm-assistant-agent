@@ -162,6 +162,11 @@
       {% endif %}
     </section>
 
+    {# 1a. Project Journal — hidden-by-default reveal section. Admin/PM only. #}
+    {% if can_view_journal %}
+      {% include "components/journal_section.html" %}
+    {% endif %}
+
     <!-- 1b. Inspired By (linked ideas) -->
     <section class="detail-section" id="inspired-by">
       <div class="section-header">

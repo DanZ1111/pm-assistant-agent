@@ -64,6 +64,12 @@ def can_use_ai_intake(user: User) -> bool:
     return user.role in ("admin", "pm")
 
 
+def can_view_journal(user: User | None) -> bool:
+    """Project Journal contains product reasoning, factory discussions, cost
+    discoveries, abandoned directions — strictly internal. Viewers cannot see."""
+    return bool(user) and user.role in ("admin", "pm")
+
+
 # ── AI Permission Guard ───────────────────────────────────────────────────────
 
 # Topics that are forbidden for everyone (raw secrets / system internals)
@@ -81,6 +87,9 @@ _VIEWER_FORBIDDEN = [
     "factory", "supplier", "manufacturer", "engineer", "engineering",
     "quotation", "factory cost", "unit cost", "target cost",
     "which factory", "who is engineer", "which supplier",
+    # v1.1 Build 14: Project Journal is admin/PM only — viewer AI must not
+    # surface journal content even indirectly
+    "journal", "internal note", "project update", "journal entry",
 ]
 
 
