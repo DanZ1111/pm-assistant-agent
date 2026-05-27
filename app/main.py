@@ -64,6 +64,27 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="PM Product Tracker", lifespan=lifespan)
 
+# Register Jinja2 globals so templates can use {{ APP_VERSION }} etc.
+# All version display in the UI MUST read from these — no hardcoded version literals.
+# FastAPI's Jinja2Templates creates a SEPARATE Environment per instance, so
+# we must inject globals into every router's `templates` (each routes module
+# instantiates its own). Walk them all.
+from app.version import CURRENT_VERSION, CURRENT_BUILD_NAME, LAST_UPDATED  # noqa: E402
+from app.routes import projects as _r_projects, admin as _r_admin, files as _r_files  # noqa: E402
+from app.routes import intake as _r_intake, help as _r_help, auth as _r_auth  # noqa: E402
+from app.routes import admin_users as _r_admin_users, calendar as _r_calendar, ideas as _r_ideas  # noqa: E402
+
+_GLOBALS = {
+    "APP_VERSION": CURRENT_VERSION,
+    "APP_BUILD_NAME": CURRENT_BUILD_NAME,
+    "APP_LAST_UPDATED": LAST_UPDATED,
+}
+for _mod in (_r_projects, _r_admin, _r_files, _r_intake, _r_help, _r_auth,
+             _r_admin_users, _r_calendar, _r_ideas):
+    _t = getattr(_mod, "templates", None)
+    if _t is not None:
+        _t.env.globals.update(_GLOBALS)
+
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.mount("/uploads", StaticFiles(directory="app/uploads"), name="uploads")
 

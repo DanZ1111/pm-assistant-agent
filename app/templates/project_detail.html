@@ -294,15 +294,15 @@
                 <button class="btn-phase-edit"
                         data-bs-toggle="modal" data-bs-target="#phaseModal"
                         data-phase-id="{{ phase.id }}"
-                        data-phase-name="{{ phase.phase_name }}"
-                        data-phase-type="{{ phase.phase_type or '' }}"
-                        data-status="{{ phase.status }}"
+                        data-phase-name="{{ phase.phase_name | e }}"
+                        data-phase-type="{{ phase.phase_type | e if phase.phase_type else '' }}"
+                        data-status="{{ phase.status | e }}"
                         data-planned-start="{{ phase.planned_start_date.isoformat() if phase.planned_start_date else '' }}"
                         data-planned-end="{{ phase.planned_end_date.isoformat() if phase.planned_end_date else '' }}"
                         data-actual-start="{{ phase.actual_start_date.isoformat() if phase.actual_start_date else '' }}"
                         data-actual-end="{{ phase.actual_end_date.isoformat() if phase.actual_end_date else '' }}"
-                        data-owner="{{ phase.owner or '' }}"
-                        data-notes="{{ phase.notes or '' }}"
+                        data-owner="{{ phase.owner | e if phase.owner else '' }}"
+                        data-notes="{{ phase.notes | e if phase.notes else '' }}"
                         title="Edit phase">
                   <i class="bi bi-pencil"></i>
                 </button>
@@ -516,14 +516,16 @@
       </div>
       {% endif %}
 
-      <!-- Upload zone -->
+      <!-- Upload zone (only for users who can edit this project) -->
+      {% if can_edit %}
       <form method="post" action="/projects/{{ project.id }}/files"
             enctype="multipart/form-data" id="uploadForm">
         <div class="upload-zone" id="uploadDropArea">
           <i class="bi bi-cloud-arrow-up upload-icon"></i>
           <p class="upload-label">Drop file here or <span class="upload-link">click to browse</span></p>
           <p class="upload-name" id="fileNamePreview">No file selected</p>
-          <input type="file" name="file" id="fileInput" style="display:none" required>
+          {# `required` removed: HTML5 validation aborts submission when a required field is non-focusable (display:none). JS keeps the submit button disabled until a file is selected, which is sufficient validation. #}
+          <input type="file" name="file" id="fileInput" style="display:none">
         </div>
         <div class="upload-meta">
           <select name="file_category" class="form-select form-select-sm" style="width:160px">
@@ -542,6 +544,7 @@
           </button>
         </div>
       </form>
+      {% endif %}
     </section>
 
     <!-- 4. Change Log -->

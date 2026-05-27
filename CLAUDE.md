@@ -6,6 +6,14 @@ Before any significant work, read:
 - `ARCHITECTURE.md` — what this system is and how it must be built
 - `TESTING_RULES.md` — how to prove work is done
 
+Before designing a new feature or proposing a schema change, also read:
+- `PRODUCT_DEVELOPMENT_PHILOSOPHY.md` — 10 product principles
+- `FEATURE_DESIGN_PROCESS.md` — the 11-question Feature Design Review
+
+Produce a Feature Design Review (the 11 questions answered in 1 sentence each) before writing any code for a non-trivial feature.
+
+For any feature that creates structured data, add a corresponding tool entry in `AI_TOOLS_REGISTRY.md` — AI must eventually be able to use every feature, not just chat about them.
+
 If a request conflicts with these files, explain the conflict before proceeding.
 
 ---

@@ -41,7 +41,7 @@
       </a>
       {% endif %}
       <button class="btn btn-sm nav-help-btn ms-1" data-bs-toggle="modal" data-bs-target="#helpModal">
-        <i class="bi bi-question-circle me-1"></i>v1.0 Help
+        <i class="bi bi-question-circle me-1"></i>v{{ APP_VERSION }} Help
       </button>
       {% if current_user %}
       <span class="nav-link px-2 text-white-50 small" style="cursor:default">
@@ -99,12 +99,12 @@
           <div class="tab-pane fade show active" id="pane-version" role="tabpanel">
             <div class="d-flex align-items-start gap-4 mb-4">
               <div>
-                <div class="help-version-badge">v1.0.0</div>
+                <div class="help-version-badge">v{{ APP_VERSION }}</div>
               </div>
               <div>
                 <h6 class="mb-1 fw-bold">PM Product Tracker</h6>
-                <p class="text-muted small mb-0">Build 11 — Good Ideas + AI Dual-Mode Intake</p>
-                <p class="text-muted small">Last updated: 2026-05-24</p>
+                <p class="text-muted small mb-0">{{ APP_BUILD_NAME }}</p>
+                <p class="text-muted small">Last updated: {{ APP_LAST_UPDATED }}</p>
               </div>
             </div>
             <p class="mb-3">This version supports:</p>
@@ -309,7 +309,7 @@
         </div><!-- /tab-content -->
       </div><!-- /modal-body -->
       <div class="modal-footer">
-        <span class="text-muted small me-auto">PM Product Tracker v0.6.0</span>
+        <span class="text-muted small me-auto">PM Product Tracker v{{ APP_VERSION }}</span>
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
