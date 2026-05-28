@@ -1,5 +1,28 @@
 # PM Product Tracker — Changelog
 
+## v1.1.0-build20 — AI Tools Architecture + Permission Guard (Build 20)
+_2026-05-28_
+
+**Goal:** Build 21's Bottom Chat will need to invoke our v1.1 features via OpenAI function-calling. Today the AI has no schema describing those operations, no dispatcher, no permission discipline applied at the tool boundary. Build 20 builds that foundation: schemas for everything, ONE real handler to prove the pattern, and a security-first dispatcher.
+
+**New module `app/ai/tools.py`** —
+- `TOOL_SCHEMAS` — 16 OpenAI function-calling schemas (`{"type": "function", "function": {"name", "description", "parameters"}}`) covering every AI-callable operation: 13 mapped to existing HTTP routes from Builds 14-18, plus 3 new (`update_project_field`, `link_idea_to_project`, `create_idea`).
+- `TOOL_PERMISSIONS` — per-tool role/project/journal/allowlist rules consulted by the dispatcher.
+- `UPDATE_PROJECT_FIELD_ALLOWED` — conservative set: `name, brand, sku, product_type, project_owner, product_manager, planned_launch_date, project_thesis, notes`. **Deliberately excludes `current_stage`** (derived per CLAUDE.md §5) and **`status`** (operationally consequential — will get a dedicated `change_project_status` tool with mandatory confirmation in Build 21+ if needed).
+- `dispatch(tool_name, args, db, user)` — 6-step pipeline: tool exists → role check → project ownership → journal access → field allowlist → handler (or `not_wired_until_build_21` stub). **Permission discipline applies even when the handler is a stub.**
+
+**Only `create_journal_entry` is fully wired in v1.1.** Reuses `crud.create_journal_entry` (Build 14) end-to-end; on success returns `{"ok": True, "entry_id": <int>}`. The other 15 schemas have stubs that return `{"ok": False, "error": "not_wired_until_build_21"}` after permission has passed. This means Build 21 only needs to add handlers — the schema layer, permission layer, and dispatcher contract are all done.
+
+**AI Permission Guard verified.** `_VIEWER_FORBIDDEN` in `app/dependencies.py:92` already covered every v1.1 sensitive source. Build 20 adds explicit per-source test coverage (business plan, journal entries, variant cost, packaging cost, quotation) so the guard can't silently rot.
+
+**AI_TOOLS_REGISTRY.md updated** — "Current Tools" now lists all 16 with `route + schema implemented (Build NN/20); handler wiring lands in Build 21` status strings. New "How the dispatcher works" subsection documents the 6-step pipeline. The "Planned" table now only has post-v1.1 entries (`search_projects`, `get_project_context`, `change_project_status`).
+
+**No schema change. No user-facing UI changes.** Infrastructure for Build 21.
+
+**Files modified:** `AI_TOOLS_REGISTRY.md`, `app/version.py`, `VERSION.md`
+
+**Files created:** `app/ai/tools.py`, `test_build20.py`
+
 ## v1.1.0-build19 — My Projects + Attention banner cleanup + last-project memory (Build 19)
 _2026-05-28_
 

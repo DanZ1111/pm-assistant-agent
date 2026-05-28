@@ -2464,7 +2464,7 @@ No new AI tools. `get_projects_for_user` is a service function only; not exposed
 
 ---
 
-### Build 20 — AI Tools Architecture + Permission Guard update ← CURRENT BUILD
+### Build 20 — AI Tools Architecture + Permission Guard update ✓ SHIPPED v1.1.0-build20
 
 #### Context
 We've built 13 manual HTTP routes that mutate project data (Builds 14-18). Each represents something the AI should eventually be able to do via chat — but today the AI has no schema describing those tools, no dispatcher, no permission discipline applied at the tool boundary. Build 21 (Bottom Chat) needs that foundation. Build 20 builds it: define every tool's JSON schema in one place, wire ONE real handler (`create_journal_entry`) end-to-end to prove the pattern, and leave the other tools as schema + permission-checked stub. Also verifies the AI Permission Guard still covers every sensitive source we've added in v1.1.

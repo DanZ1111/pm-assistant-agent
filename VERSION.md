@@ -1,9 +1,17 @@
 # PM Product Tracker — Version
 
-**Current Version:** v1.1.0-build19
-**Current Build:** Build 19 — My Projects + Attention banner cleanup + last-project memory
+**Current Version:** v1.1.0-build20
+**Current Build:** Build 20 — AI Tools Architecture + Permission Guard
 **Status:** v1.1.0 in progress (build-by-build per roadmap)
 **Last Updated:** 2026-05-28
+
+## What's new in v1.1.0-build20
+
+- **New module `app/ai/tools.py`** — OpenAI function-calling schemas for all 16 AI-callable operations on the system (13 existing HTTP-route operations from Builds 14-18 plus 3 new: `update_project_field`, `link_idea_to_project`, `create_idea`).
+- **Dispatcher with security-first checks** — `dispatch(tool_name, args, db, user)` runs role check, project ownership, journal access, and field allowlist BEFORE looking up the handler. This means unwired tools still report `forbidden` to unauthorized users; they only return `not_wired_until_build_21` once permission has passed. Build 21 inherits a tool surface that has never silently bypassed auth.
+- **Only `create_journal_entry` is fully wired in v1.1** — the rest have schemas + permission rules + stub responses. Bottom-chat invocation lands in Build 21.
+- **`update_project_field` allowlist is conservative**: excludes `current_stage` (derived from phases per CLAUDE.md §5), `status` (will get a dedicated change tool with confirmation if needed), and the existing sensitive set (factory, engineer, costs).
+- **No user-facing UI changes** — this build is infrastructure for Build 21.
 
 ## What's new in v1.1.0-build19
 

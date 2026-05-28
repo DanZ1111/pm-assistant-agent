@@ -28,33 +28,48 @@ Status legend:
 
 ## Current Tools
 
+All 16 tools below have an OpenAI function-calling schema in `app/ai/tools.py` as of Build 20. Only `create_journal_entry` has a real handler in v1.1; the rest pass through dispatcher permission checks then return `{"ok": False, "error": "not_wired_until_build_21"}`.
+
 | Tool | Params | Permission | Confirmation | Status |
 |---|---|---|---|---|
-| `create_journal_entry` (HTTP route) | project_id, entry_text, entry_type | auth + `can_view_journal` + `can_edit_project` | No (low-stakes capture) | **route implemented (Build 14)**; bottom-chat tool wiring lands in Build 20/21 |
-| `summarize_journal_entry` (HTTP route) | entry_id (via URL) | auth + `can_view_journal` + `can_edit_project` | No (preserves existing on failure) | **route implemented (Build 14)**; bottom-chat tool wiring lands in Build 20/21 |
-| `extract_thesis_from_business_plan` (HTTP route) | project_id, business_plan file (or file_id) | auth + `can_edit_project` | YES — preview/confirm screen before write | **route implemented (Build 15)**; one-time AI call persisted to `ai_messages` for refresh-safe preview; bottom-chat tool wiring lands in Build 20/21 |
-| `create_variant` (HTTP route) | project_id, variant_name, sku, status, is_primary, costs, summaries, notes | auth + `can_edit_project` | No (additive) | **route implemented (Build 16)**; bottom-chat tool wiring lands in Build 20/21 |
-| `update_variant` / `set_primary_variant` (HTTP routes) | project_id, variant_id, fields | auth + `can_edit_project` | No (small fields); is_primary auto-unsets siblings via service layer | **route implemented (Build 16)** |
-| `delete_variant` (HTTP route) | project_id, variant_id | auth + admin only | YES — destructive, requires admin | **route implemented (Build 16)** |
-| `create_variant_component` (HTTP route) | project_id, variant_id (nullable), component_type, name, costs | auth + `can_edit_project` | No (cost-tracking only) | **route implemented (Build 16)** |
-| `update_variant_component` (HTTP route) | component_id, fields | auth + `can_edit_project` | No | **route implemented (Build 16)** |
-| `delete_variant_component` (HTTP route) | component_id | auth + admin only | YES — destructive | **route implemented (Build 16)** |
-| `finish_phase` (HTTP route) | project_id, phase_id | auth + `can_edit_project` | YES — irreversible state transition (one-click; user confirms in dialog) | **route implemented (Build 17)**; bottom-chat tool wiring lands in Build 20/21 |
-| `adjust_phase_plan` (HTTP route — via phase_edit) | phase_id, planned_*_date, reason | auth + `can_edit_project` | YES — reason is mandatory; rejected if blank | **route implemented (Build 17)** |
-| `update_file_comment` (HTTP route) | project_id, file_id, comment | auth + `can_edit_project` | No (low-stakes annotation; writes change_log) | **route implemented (Build 18)** — covers rendering & prototype-photo notes via the shared `project_files.source_note` field; bottom-chat tool wiring lands in Build 20/21 |
+| `create_journal_entry` | project_id, entry_text, entry_type | auth + `can_view_journal` + `can_edit_project` | No (low-stakes capture) | **route + schema + handler implemented (Build 14/20)** — fully wired |
+| `summarize_journal_entry` | entry_id | auth + `can_view_journal` + `can_edit_project` | No | **route + schema implemented (Build 14/20)**; handler wiring lands in Build 21 |
+| `extract_thesis_from_business_plan` | project_id, file_id | auth + `can_edit_project` | YES — preview/confirm before write | **route + schema implemented (Build 15/20)**; handler wiring lands in Build 21 |
+| `create_variant` | project_id, variant_name, sku, status, is_primary, costs, summaries, notes | auth + `can_edit_project` | No (additive) | **route + schema implemented (Build 16/20)**; handler wiring lands in Build 21 |
+| `update_variant` | variant_id, fields | auth + `can_edit_project` | No (small fields) | **route + schema implemented (Build 16/20)**; handler wiring lands in Build 21 |
+| `set_primary_variant` | project_id, variant_id | auth + `can_edit_project` | No (auto-unsets siblings via service layer) | **route + schema implemented (Build 16/20)**; handler wiring lands in Build 21 |
+| `delete_variant` | variant_id | auth + admin only | YES — destructive, requires admin | **route + schema implemented (Build 16/20)**; handler wiring lands in Build 21 |
+| `create_variant_component` | project_id, variant_id (nullable), component_type, name, costs | auth + `can_edit_project` | No (cost-tracking) | **route + schema implemented (Build 16/20)**; handler wiring lands in Build 21 |
+| `update_variant_component` | component_id, fields | auth + `can_edit_project` | No | **route + schema implemented (Build 16/20)**; handler wiring lands in Build 21 |
+| `delete_variant_component` | component_id | auth + admin only | YES — destructive | **route + schema implemented (Build 16/20)**; handler wiring lands in Build 21 |
+| `finish_phase` | project_id, phase_id | auth + `can_edit_project` | YES — irreversible state transition | **route + schema implemented (Build 17/20)**; handler wiring lands in Build 21 |
+| `adjust_phase_plan` | phase_id, planned_*_date, reason | auth + `can_edit_project` | YES — reason mandatory | **route + schema implemented (Build 17/20)**; handler wiring lands in Build 21 |
+| `update_file_comment` | project_id, file_id, comment | auth + `can_edit_project` | No (low-stakes annotation) | **route + schema implemented (Build 18/20)**; handler wiring lands in Build 21 |
+| `update_project_field` | project_id, field_name, new_value | auth + `can_edit_project` + field allowlist | YES — show confirmation card with old → new | **schema implemented (Build 20)** — handler stub; full wiring in Build 21 |
+| `link_idea_to_project` | project_id, idea_id, note | auth + `can_edit_project` | YES — show confirmation | **schema implemented (Build 20)** — handler stub; full wiring in Build 21 |
+| `create_idea` | name, description, idea_type, source, source_detail, contributor, notes | auth (all roles incl. viewer) | No — low-stakes capture | **schema implemented (Build 20)** — handler stub; full wiring in Build 21 |
 
-## Planned for v1.1.0 (priority order)
+## How the dispatcher works
+
+`app/ai/tools.dispatch(tool_name, args, db, user)` runs in this order — **permission discipline applies even when the handler is a stub**, so Build 21 inherits a tool surface where unwired tools have never silently bypassed auth:
+
+1. **Tool exists** in `TOOL_SCHEMAS` → else `{"ok": False, "error": "unknown_tool"}`.
+2. **User role check** per `TOOL_PERMISSIONS[tool_name]["require_role"]` → else `forbidden / role_not_allowed`.
+3. **Project ownership** if `needs_project: True` — checks `can_edit_project(user, project)` → else `forbidden / cannot_edit_project`.
+4. **Journal access** if `needs_journal: True` — checks `can_view_journal(user)` → else `forbidden / cannot_view_journal`.
+5. **Field allowlist** for tools that carry a `field_allowlist` (today: only `update_project_field`) → else `field_not_allowlisted`.
+6. **Handler lookup** in `_HANDLERS` — if absent, return `not_wired_until_build_21` (the v1.1 stub response).
+7. **Call handler** → return its `{"ok": True, ...}` or `{"ok": False, ...}`.
+
+## Planned (post v1.1.0)
 
 | Tool | Purpose | Permission | Confirmation | Target Build |
 |---|---|---|---|---|
-| `create_journal_entry(project_id, entry_text, entry_type)` | Create a Project Journal entry from chat | auth + `can_edit_project` (for that project_id) | No (creating new entry, not mutating) | 14 (Journal) / 20 (Tools arch) |
-| `update_project_field(project_id, field_name, new_value)` | Propose a field change to an existing project | auth + `can_edit_project` + non-sensitive field allowlist | YES — show confirmation card with old → new | 20 |
-| `link_idea_to_project(project_id, idea_id, note)` | Connect an existing idea to a project | auth + `can_edit_project` | YES | 20 |
-| `create_idea(name, description, idea_type, source, ...)` | Create a Good Idea entry | auth (all roles) | No — idea creation is low-stakes | 20 |
-| ~~`add_rendering_note(file_id, note)`~~ | Superseded by `update_file_comment` (Build 18) — see Current Tools | — | — | ✓ shipped Build 18 |
-| ~~`add_prototype_photo_note(file_id, note)`~~ | Superseded by `update_file_comment` (Build 18) — see Current Tools | — | — | ✓ shipped Build 18 |
 | `search_projects(query)` | Cross-project search for AI context | auth — filter by viewer permission | No (read-only) | 21 (Bottom chat) |
 | `get_project_context(project_id)` | Build per-project AI context — role-filtered | auth — filter sensitive fields by role | No (read-only) | 21 |
+| `change_project_status(project_id, new_status, reason)` | Dedicated tool for the operationally consequential status flip | auth + `can_edit_project` | YES — mandatory reason + confirm | 21+ (replaces using `update_project_field` for `status`) |
+| ~~`add_rendering_note(file_id, note)`~~ | Superseded by `update_file_comment` (Build 18) | — | — | ✓ shipped Build 18 |
+| ~~`add_prototype_photo_note(file_id, note)`~~ | Superseded by `update_file_comment` (Build 18) | — | — | ✓ shipped Build 18 |
 
 ## Deferred (post v1.1.0)
 
