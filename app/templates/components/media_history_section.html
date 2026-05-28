@@ -1,0 +1,96 @@
+{# Build 18 — Reusable media history partial for Renderings + Prototype Photos.
+   Required context: project, can_edit, current_user
+   Required params (set via Jinja {% set %} before include):
+     media_kind  — "rendering" | "prototype_photo"
+     media_title — display title
+     media_icon  — bootstrap icon class
+     media_files — list of ProjectFile rows (newest first)
+     media_anchor — anchor id used in the upload form action redirect
+#}
+<section class="detail-section media-history-section" id="{{ media_anchor }}">
+  <div class="section-header">
+    <h2 class="section-title">
+      <i class="bi {{ media_icon }} me-2"></i>{{ media_title }}
+      <span class="text-muted small ms-2">({{ media_files|length }})</span>
+    </h2>
+    {% if can_edit %}
+    <a href="#files" class="btn btn-sm btn-outline-primary" title="Use Files upload below (pick the matching category)">
+      <i class="bi bi-upload me-1"></i>Upload (Files section ↓)
+    </a>
+    {% endif %}
+  </div>
+
+  {% if media_files %}
+  <div class="media-history-list">
+    {% for f in media_files %}
+    <div class="media-history-item" id="{{ media_anchor }}-{{ f.id }}">
+      <div class="media-history-thumb">
+        {% if f.file_type == 'image' %}
+        <a href="/uploads/{{ f.filename }}" target="_blank" title="Open full-size">
+          <img src="/uploads/{{ f.filename }}" alt="{{ f.original_filename or f.filename }}"
+               loading="lazy">
+        </a>
+        {% else %}
+        <a href="/uploads/{{ f.filename }}" class="media-history-doc" target="_blank">
+          <i class="bi bi-file-earmark"></i>
+        </a>
+        {% endif %}
+      </div>
+      <div class="media-history-meta">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="media-history-filename">{{ f.original_filename or f.filename }}</div>
+            <div class="small text-muted">
+              {{ f.uploaded_at.strftime('%b %d, %Y · %H:%M') }}
+              {% if f.ai_summary %}<span class="ms-1">· <i class="bi bi-robot me-1"></i>AI-tagged</span>{% endif %}
+            </div>
+          </div>
+          {% if can_edit and current_user.role == 'admin' %}
+          <form method="post" action="/projects/{{ project.id }}/files/{{ f.id }}/delete" class="d-inline"
+                onsubmit="return confirm('Delete this {{ media_kind|replace('_',' ') }}? This cannot be undone.')">
+            <button class="btn btn-sm btn-ghost text-danger" title="Delete (admin only)">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </form>
+          {% endif %}
+        </div>
+
+        {# Comment — display + inline edit #}
+        <div class="media-history-comment" id="{{ media_anchor }}-comment-{{ f.id }}">
+          {% if f.source_note %}
+          <p class="mb-1">{{ f.source_note }}</p>
+          {% else %}
+          <p class="mb-1 text-muted small fst-italic">No comment yet.</p>
+          {% endif %}
+          {% if can_edit %}
+          <a href="#" class="small" onclick="toggleMediaCommentEdit('{{ media_anchor }}', {{ f.id }}); return false;">
+            <i class="bi bi-pencil me-1"></i>{% if f.source_note %}Edit comment{% else %}Add comment{% endif %}
+          </a>
+          {% endif %}
+        </div>
+
+        {% if can_edit %}
+        <form method="post" action="/projects/{{ project.id }}/files/{{ f.id }}/comment"
+              class="media-history-comment-form d-none mt-1"
+              id="{{ media_anchor }}-comment-form-{{ f.id }}">
+          <input type="hidden" name="anchor" value="{{ media_anchor }}">
+          <textarea name="comment" class="form-control form-control-sm" rows="2"
+                    placeholder="What does this {{ media_kind|replace('_',' ') }} show? Pivots, feedback, who liked what...">{{ f.source_note or '' }}</textarea>
+          <div class="d-flex gap-2 mt-1">
+            <button type="submit" class="btn btn-primary btn-sm">Save</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    onclick="toggleMediaCommentEdit('{{ media_anchor }}', {{ f.id }})">Cancel</button>
+          </div>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-muted small mb-0">
+    No {{ media_title|lower }} yet.
+    {% if can_edit %}Use the Files section below to upload — pick "{{ media_title.split(' ')[0] }}" or "{{ media_kind|replace('_', ' ')|title }}" as the category.{% endif %}
+  </p>
+  {% endif %}
+</section>

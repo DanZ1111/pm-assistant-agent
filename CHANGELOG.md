@@ -1,5 +1,43 @@
 # PM Product Tracker — Changelog
 
+## v1.1.0-build18 — Rendering History + Prototype Photos (Build 18)
+_2026-05-28_
+
+**Goal:** product development is visual — renderings get iterated, prototypes get photographed, and PMs need a chronological record of "what did this thing look like in week 3?" with a quick note about why each version mattered. Build 18 surfaces this history without forcing a new schema.
+
+**Two new sections** on every project detail page (inserted after the existing Files & Renderings section, before the Change Log):
+- **Rendering History** — every file uploaded with `file_category="rendering"`, newest first. Image previews render inline (96×96 thumb, clickable to full-size). Non-image files (PDF mocks etc.) render as a generic doc icon.
+- **Prototype Photos** — same pattern, dedicated section for `file_category="prototype_photo"` (new category added to the upload dropdown).
+
+**Per-file comments** — each entry shows the current `source_note` plus an inline-edit link (PM + admin only). The comment uses the existing `project_files.source_note` column — no new schema. Saving writes a `change_log` row (`change_type=event_note`).
+
+**New POST route:** `/projects/{project_id}/files/{file_id}/comment` — guarded by `can_edit_project`, redirects back to the originating anchor.
+
+**Latest rendering thumbnail on the project card** — `/projects` card view shows the most recent rendering (image only) as a 56×56 thumbnail in the top-right corner. `get_projects_enriched` attaches `latest_rendering` per project; card hides cleanly when no rendering exists.
+
+**Reusable partial** — `app/templates/components/media_history_section.html` is parameterized by `media_kind` / `media_title` / `media_icon` / `media_files` / `media_anchor` so both new sections share one template.
+
+**Permissions** —
+- Viewer: see filenames, thumbnails, comments. Cannot edit comments or delete (existing rule).
+- PM: edit comments on own projects; can delete files PM uploaded? — delete stays admin-only per existing pattern.
+- Admin: full control.
+
+**No schema migration.** All data lives in pre-existing columns of `project_files`.
+
+**Files modified:**
+- `app/crud.py` — new `get_files_by_category`, `get_latest_rendering`, `update_file_comment`; `get_projects_enriched` now attaches `latest_rendering` per project
+- `app/routes/files.py` — new POST `/projects/{pid}/files/{fid}/comment` route
+- `app/routes/projects.py` — `project_detail()` passes `renderings` + `prototype_photos` to template
+- `app/templates/project_detail.html` — two new `{% include %}` blocks + `toggleMediaCommentEdit()` JS + `prototype_photo` added to upload category select
+- `app/templates/projects_list.html` — `card-rendering-thumb` block
+- `app/static/css/styles.css` — Build 18 media-history + card-thumb styles
+- `app/version.py`, `VERSION.md`, `USER_GUIDE.md`, `AI_TOOLS_REGISTRY.md`
+
+**Files created:**
+- `app/templates/components/media_history_section.html`
+- `test_build18.py`
+- `AGENTS.md`, `HANDOFF.md` (Claude/Codex handoff protocol — applies project-wide, not specific to this build)
+
 ## v1.1.0-build17 — Timeline 2.0 (Plan / Reality split + Finish Phase) (Build 17)
 _2026-05-27_
 

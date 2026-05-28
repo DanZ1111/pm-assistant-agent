@@ -107,6 +107,7 @@
     {% set p = e.project %}
     {% set delay = e.delay %}
     {% set health = e.health %}
+    {% set latest_rendering = e.latest_rendering %}
     <a href="/projects/{{ p.id }}" class="project-card {% if delay %}card-delayed{% elif health.needs_info %}card-needs-info{% endif %}">
       <div class="card-top">
         <div class="card-title-row">
@@ -159,6 +160,11 @@
         <span class="badge badge-ok"><i class="bi bi-check-circle me-1"></i>On track</span>
         {% endif %}
       </div>
+      {% if latest_rendering %}
+      <div class="card-rendering-thumb" aria-hidden="true">
+        <img src="/uploads/{{ latest_rendering.filename }}" alt="" loading="lazy">
+      </div>
+      {% endif %}
     </a>
     {% endfor %}
   </div>

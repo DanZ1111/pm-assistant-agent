@@ -293,10 +293,12 @@ def get_projects_enriched(db: Session, status: str = None, brand: str = None, se
         files = p.files
         health = get_project_health(p, phases, files)
         delay = calculate_delay(p, phases)
+        latest_rendering = get_latest_rendering(db, p.id)
         result.append({
             "project": p,
             "health": health,
             "delay": delay,
+            "latest_rendering": latest_rendering,
         })
     return result
 
@@ -1444,3 +1446,57 @@ def get_quotation_files_for_project(db: Session, project_id: int) -> list[Projec
         .order_by(ProjectFile.uploaded_at.desc())
         .all()
     )
+
+
+# ---------------------------------------------------------------------------
+# Build 18 — Rendering History + Prototype Photos
+# Per-upload comments are stored in the existing project_files.source_note
+# field. PM+admin can update them inline via the new comment route.
+# ---------------------------------------------------------------------------
+
+def get_files_by_category(db: Session, project_id: int, category: str) -> list[ProjectFile]:
+    """Newest first — used by Rendering History + Prototype Photos sections."""
+    return (
+        db.query(ProjectFile)
+        .filter(
+            ProjectFile.project_id == project_id,
+            ProjectFile.file_category == category,
+        )
+        .order_by(ProjectFile.uploaded_at.desc())
+        .all()
+    )
+
+
+def get_latest_rendering(db: Session, project_id: int) -> ProjectFile | None:
+    """Used by the project card to show a tiny thumbnail."""
+    return (
+        db.query(ProjectFile)
+        .filter(
+            ProjectFile.project_id == project_id,
+            ProjectFile.file_category == "rendering",
+            ProjectFile.file_type == "image",
+        )
+        .order_by(ProjectFile.uploaded_at.desc())
+        .first()
+    )
+
+
+def update_file_comment(db: Session, file_id: int, new_comment: str) -> ProjectFile | None:
+    """Inline-edit a per-file comment (uses project_files.source_note)."""
+    pf = db.query(ProjectFile).filter(ProjectFile.id == file_id).first()
+    if not pf:
+        return None
+    old = (pf.source_note or "").strip()
+    new = (new_comment or "").strip()
+    if old == new:
+        return pf
+    pf.source_note = new or None
+    write_change(
+        db, project_id=pf.project_id, change_type="event_note",
+        summary=f"Comment updated on {pf.file_category or 'file'}: "
+                f"{pf.original_filename or pf.filename}",
+        source_type="manual_edit",
+    )
+    db.commit()
+    db.refresh(pf)
+    return pf

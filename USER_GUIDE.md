@@ -144,6 +144,18 @@ Upload any file associated with the project. Files are organized by category:
 
 **Upload:** Drag and drop a file onto the upload zone, or click the zone to browse. Select a category, then click **Upload File**.
 
+### 3a. Rendering History (Build 18)
+
+Every file you upload with category **Rendering** also appears here, newest first. Each entry shows the thumbnail, filename, when it was uploaded, and a short comment.
+
+- Click a thumbnail to open the rendering at full size.
+- Click **Add comment / Edit comment** (PM + admin) to write a short note about the rendering — "what changed in this version", "why we picked this finish", "what the factory pushed back on". Comments are saved instantly and recorded in the Change Log.
+- The most recent rendering also appears as a small thumbnail in the top-right of the project's card on the Projects list page — so you can scan the grid and remember which project looks like what.
+
+### 3b. Prototype Photos (Build 18)
+
+Same idea as Rendering History but for physical prototype photos. Upload a file with category **Prototype Photo** and it appears here. Use the comment field to capture context — "first sample, plastic too brittle", "v2 with new hinge", "color match approved by client".
+
 ### 4. Change Log
 
 A history of every change made to the project, newest first. Includes:

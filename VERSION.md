@@ -1,9 +1,17 @@
 # PM Product Tracker — Version
 
-**Current Version:** v1.1.0-build17
-**Current Build:** Build 17 — Timeline 2.0 (Plan / Reality split + Finish Phase)
+**Current Version:** v1.1.0-build18
+**Current Build:** Build 18 — Rendering History + Prototype Photos
 **Status:** v1.1.0 in progress (build-by-build per roadmap)
-**Last Updated:** 2026-05-27
+**Last Updated:** 2026-05-28
+
+## What's new in v1.1.0-build18
+
+- **Rendering History** section on every project detail page — chronological (newest first) list of every file uploaded with category `Rendering`. Click a thumbnail to open full-size in a new tab.
+- **Prototype Photos** section — same pattern, separate section, for files uploaded with the new `Prototype Photo` category.
+- **Per-file comments** — every rendering / prototype-photo can carry an inline-editable comment ("what does this show? what pivot? who liked it?"). PM and admin can edit; viewers see read-only. The comment uses the existing `project_files.source_note` column (no schema change). Each edit writes a `change_log` row.
+- **Latest rendering thumbnail on the project card** — when a project has at least one rendering uploaded, the most recent one shows as a small thumbnail in the top-right corner of the card on `/projects`.
+- **Admin-only delete** stays consistent with the existing files-delete pattern.
 
 ## What's new in v1.1.0-build17
 

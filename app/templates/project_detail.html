@@ -226,6 +226,14 @@
       var d = document.getElementById('thesisDisplay');
       if (d) d.style.display = '';
     }
+    // Build 18 — inline edit toggle for per-file comments in Rendering History + Prototype Photos
+    function toggleMediaCommentEdit(anchor, fileId) {
+      var d = document.getElementById(anchor + '-comment-' + fileId);
+      var f = document.getElementById(anchor + '-comment-form-' + fileId);
+      if (!d || !f) return;
+      d.classList.toggle('d-none');
+      f.classList.toggle('d-none');
+    }
     </script>
 
     {# 1a. Project Journal — hidden-by-default reveal section. Admin/PM only. #}
@@ -688,6 +696,7 @@
         <div class="upload-meta">
           <select name="file_category" class="form-select form-select-sm" style="width:160px">
             <option value="rendering">Rendering</option>
+            <option value="prototype_photo">Prototype Photo</option>
             <option value="reference">Reference</option>
             <option value="quotation">Quotation</option>
             <option value="thesis">Thesis doc</option>
@@ -704,6 +713,22 @@
       </form>
       {% endif %}
     </section>
+
+    {# 3a. Rendering History — Build 18 #}
+    {% set media_kind = "rendering" %}
+    {% set media_title = "Rendering History" %}
+    {% set media_icon = "bi-image" %}
+    {% set media_files = renderings %}
+    {% set media_anchor = "renderings" %}
+    {% include "components/media_history_section.html" %}
+
+    {# 3b. Prototype Photos — Build 18 #}
+    {% set media_kind = "prototype_photo" %}
+    {% set media_title = "Prototype Photos" %}
+    {% set media_icon = "bi-camera" %}
+    {% set media_files = prototype_photos %}
+    {% set media_anchor = "prototype-photos" %}
+    {% include "components/media_history_section.html" %}
 
     <!-- 4. Change Log -->
     <section id="changes" class="detail-section">

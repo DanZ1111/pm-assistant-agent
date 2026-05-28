@@ -112,6 +112,32 @@ def file_download(request: Request, project_id: int, file_id: int, db: Session =
     return FileResponse(disk_path, filename=pf.original_filename or pf.filename)
 
 
+@router.post("/projects/{project_id}/files/{file_id}/comment")
+def file_comment_edit(
+    request: Request,
+    project_id: int,
+    file_id: int,
+    comment: str = Form(""),
+    anchor: str = Form("files"),
+    db: Session = Depends(get_db),
+):
+    """Build 18 — inline-edit a per-file comment (uses source_note)."""
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+    project = crud.get_project(db, project_id)
+    if not project or not can_edit_project(current_user, project):
+        return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+    pf = db.query(ProjectFile).filter(
+        ProjectFile.id == file_id, ProjectFile.project_id == project_id).first()
+    if not pf:
+        raise HTTPException(status_code=404, detail="File not found")
+    crud.update_file_comment(db, file_id, comment)
+    return RedirectResponse(url=f"/projects/{project_id}#{anchor}", status_code=303)
+
+
 @router.post("/projects/{project_id}/files/{file_id}/delete")
 def file_delete(request: Request, project_id: int, file_id: int, db: Session = Depends(get_db)):
     current_user = get_current_user(request, db)

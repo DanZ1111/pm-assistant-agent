@@ -2,11 +2,16 @@
 
 ## Read First
 
-Before any significant work, read:
-- `ARCHITECTURE.md` — what this system is and how it must be built
-- `TESTING_RULES.md` — how to prove work is done
+At session start, in this order:
+1. `CURRENT_TASK.md` — short relay note about the in-flight build (if present).
+2. `AGENTS.md` — handoff protocol (very short).
+3. This file (CLAUDE.md) — project rules.
+4. `git status` / `git diff` / `git log --oneline -5` — what's actually in flight.
+5. `MASTERPLAN.md` — only when you need roadmap context (it is long).
 
 Before designing a new feature or proposing a schema change, also read:
+- `ARCHITECTURE.md` — what this system is and how it must be built
+- `TESTING_RULES.md` — how to prove work is done
 - `PRODUCT_DEVELOPMENT_PHILOSOPHY.md` — 10 product principles
 - `FEATURE_DESIGN_PROCESS.md` — the 11-question Feature Design Review
 
@@ -24,8 +29,7 @@ If a request conflicts with these files, explain the conflict before proceeding.
 - After finishing, stop and report (see Report Format below).
 - If a build is large, ask to confirm scope before starting.
 
-**Current build order:**
-Build 1 → Build 1.5 → Build 2 → Build 3 → Build 4 → Build 5 → Build 6 → Build 7
+**Current build order:** see the Build List table in `MASTERPLAN.md` and the per-build detail sections below it. Each shipped build's H3 header carries a `✓ SHIPPED vX.Y.Z` marker. To find the next build, take the first build *without* such a marker. Cross-check against `git log -5 --oneline` and `app/version.py` for the authoritative current state.
 
 ---
 
@@ -49,7 +53,7 @@ Do not add columns casually. See `ARCHITECTURE.md §14`.
 
 After every build or significant change:
 1. Start the app: `python run.py`
-2. Run Playwright tests: `python3 test_build1.py` (or equivalent for the build)
+2. Run the current build's test file (e.g. `python3 test_build18.py`) AND at least one regression test from a prior build (e.g. `python3 test_build17.py`)
 3. Fix all failures before reporting complete
 
 See `TESTING_RULES.md` for required test flows per build.
@@ -73,7 +77,7 @@ Service functions added/changed:
 DB tables affected:
 What is placeholder (not yet implemented):
 
-Tests run: python3 test_build1.py (headless)
+Tests run: python3 test_buildNN.py (current build) + at least one regression test
 Passed: N / N
 Failed: (list any)
 Fixes made: (list any)
@@ -85,10 +89,11 @@ Remaining manual review: (list anything that can't be automated)
 ## Common Commands
 
 ```bash
-python run.py                          # start app at http://localhost:8000
+python run.py                          # start app at http://localhost:8000 (reload mode in dev)
 pip install -r requirements.txt        # install deps
-python3 test_build1.py                 # run Build 1 tests
-pip install playwright && python3 -m playwright install chromium  # setup Playwright
+python3 test_buildNN.py                # run a specific build's tests (latest currently: test_build18.py)
+git log -5 --oneline                   # what's been shipped recently
+git status && git diff                 # what's in flight right now
 ```
 
 ---

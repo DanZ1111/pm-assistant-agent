@@ -1753,3 +1753,64 @@ body {
   padding-top: 10px;
   border-top: 1px dashed var(--color-border);
 }
+
+/* ------------------------------------------------------------------ */
+/* Build 18 — Rendering History + Prototype Photos                     */
+/* ------------------------------------------------------------------ */
+.media-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+.media-history-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 8px;
+  background: #fff;
+}
+.media-history-thumb { flex: 0 0 96px; }
+.media-history-thumb img {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 6px;
+  display: block;
+}
+.media-history-doc {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 96px;
+  background: #f3f4f6;
+  border-radius: 6px;
+  font-size: 32px;
+  color: #6b7280;
+  text-decoration: none;
+}
+.media-history-meta { flex: 1; min-width: 0; }
+.media-history-filename { font-weight: 600; font-size: 0.95rem; word-break: break-all; }
+.media-history-comment p { font-size: 0.9rem; color: #374151; margin: 4px 0; }
+.media-history-comment-form textarea { font-size: 0.9rem; }
+
+/* Project-card thumbnail (latest rendering on right) */
+.project-card { position: relative; }
+.card-rendering-thumb {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 56px;
+  height: 56px;
+  pointer-events: none;
+}
+.card-rendering-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}

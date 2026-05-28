@@ -295,6 +295,10 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
     quotation_files = crud.get_quotation_files_for_project(db, project_id)
     can_costs = can_view_costs(current_user)
 
+    # Build 18 — Rendering History + Prototype Photos
+    renderings = crud.get_files_by_category(db, project_id, "rendering")
+    prototype_photos = crud.get_files_by_category(db, project_id, "prototype_photo")
+
     # Build 17 — Timeline 2.0: plan-change history per phase + error flash
     plan_changes_by_phase = crud.get_plan_changes_by_project(db, project_id)
     timeline_error = request.query_params.get("timeline_error")
@@ -334,6 +338,8 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
         "plan_changes_by_phase": plan_changes_by_phase,
         "timeline_error": timeline_error,
         "current_phase": current_phase,
+        "renderings": renderings,
+        "prototype_photos": prototype_photos,
     })
 
 
