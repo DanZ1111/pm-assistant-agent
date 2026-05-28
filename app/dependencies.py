@@ -90,6 +90,9 @@ _VIEWER_FORBIDDEN = [
     # v1.1 Build 14: Project Journal is admin/PM only — viewer AI must not
     # surface journal content even indirectly
     "journal", "internal note", "project update", "journal entry",
+    # v1.1 Build 15: Business plan / thesis extraction sources can contain
+    # margin/pricing strategy — viewers must not be able to AI-summarize them
+    "business plan", "thesis extraction", "margin target", "pricing strategy",
 ]
 
 

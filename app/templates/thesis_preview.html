@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Review Thesis Extraction — {{ project.name }} — PM Tracker{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3">
+    <a href="/projects/{{ project.id }}" class="btn-back">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+      <h1 class="page-title">Review Thesis Extraction</h1>
+      <p class="page-subtitle">{{ project.name }}</p>
+    </div>
+  </div>
+</div>
+
+<div class="thesis-preview-page">
+  <div class="alert alert-info mb-3" style="font-size:0.9rem">
+    <i class="bi bi-file-earmark-text me-2"></i>
+    <strong>Source:</strong> {{ source_filename or 'business plan' }}
+    {% if duration_seconds %}<span class="text-muted ms-2">· extracted in {{ duration_seconds }}s</span>{% endif %}
+    <span class="text-muted ms-2">· AI proposes; you confirm. Nothing is saved until you click Confirm.</span>
+  </div>
+
+  {% if error %}
+  <div class="alert alert-warning mb-3">
+    <i class="bi bi-exclamation-triangle me-2"></i>
+    <strong>Extraction failed:</strong> {{ error }}
+    <div class="mt-2 small">Your project and the uploaded file are saved. You can fill the thesis manually or upload a different file from the project detail page.</div>
+  </div>
+  {% endif %}
+
+  <form method="post" action="/projects/{{ project.id }}/thesis/confirm">
+    <input type="hidden" name="extraction_id" value="{{ extraction_id }}">
+
+    <div class="row g-3">
+      <!-- Proposed Thesis -->
+      <div class="col-lg-7">
+        <div class="form-section">
+          <h3 class="form-section-title">
+            <i class="bi bi-lightbulb me-2"></i>Proposed Thesis
+            <span class="thesis-hint">Needs at least 80 characters · edit freely before confirming</span>
+          </h3>
+          <textarea name="project_thesis" class="form-control thesis-textarea" rows="14"
+                    id="thesisPreviewField"
+                    placeholder="Edit or write the thesis here...">{{ thesis_text }}</textarea>
+          <div class="thesis-counter">
+            <span id="thesisPreviewCount">0</span> characters
+          </div>
+        </div>
+      </div>
+
+      <!-- Detected Inspirations -->
+      <div class="col-lg-5">
+        <div class="form-section">
+          <h3 class="form-section-title">
+            <i class="bi bi-stars me-2"></i>Detected Inspirations
+            <span class="text-muted small">({{ inspirations_with_matches|length }})</span>
+          </h3>
+
+          {% if not inspirations_with_matches %}
+          <p class="text-muted small mb-0">No inspirations detected in the source. You can always add ideas manually from the Good Ideas page.</p>
+          {% else %}
+          <p class="text-muted small mb-3">For each, choose whether to create a new idea, link to an existing one, or skip.</p>
+
+          {% for item in inspirations_with_matches %}
+          {% set d = item.data %}
+          <div class="inspiration-card mb-3 p-2 border rounded">
+            <div class="d-flex align-items-start gap-2">
+              <div class="flex-grow-1">
+                <div class="fw-bold">{{ d.name or '(untitled)' }}</div>
+                {% if d.description %}<div class="small text-muted">{{ d.description }}</div>{% endif %}
+                <div class="small mt-1">
+                  <span class="badge bg-secondary">{{ d.idea_type or 'other' }}</span>
+                  <span class="badge bg-light text-dark">source: {{ d.source or 'other' }}</span>
+                  {% if d.source_detail %}<span class="small text-muted">{{ d.source_detail }}</span>{% endif %}
+                </div>
+                {% if item.matched_idea %}
+                <div class="mt-2 p-2 bg-light rounded small">
+                  <i class="bi bi-info-circle me-1"></i>
+                  Looks similar to existing
+                  <strong>IDEA-{{ "%03d"|format(item.matched_idea.id) }}: {{ item.matched_idea.name }}</strong>
+                  ({{ (item.match_score * 100)|int }}% match)
+                </div>
+                {% endif %}
+              </div>
+            </div>
+
+            <!-- Hidden inspiration data — sent on confirm -->
+            <input type="hidden" name="inspiration_name_{{ loop.index0 }}" value="{{ d.name or '' }}">
+            <input type="hidden" name="inspiration_description_{{ loop.index0 }}" value="{{ d.description or '' }}">
+            <input type="hidden" name="inspiration_idea_type_{{ loop.index0 }}" value="{{ d.idea_type or 'other' }}">
+            <input type="hidden" name="inspiration_source_{{ loop.index0 }}" value="{{ d.source or 'other' }}">
+            <input type="hidden" name="inspiration_source_detail_{{ loop.index0 }}" value="{{ d.source_detail or '' }}">
+            <input type="hidden" name="inspiration_idea_id_{{ loop.index0 }}" value="{{ item.matched_idea.id if item.matched_idea else '' }}">
+
+            <!-- Action radios -->
+            <div class="mt-2 d-flex gap-3 small">
+              {% if item.matched_idea %}
+              <label class="d-inline-flex align-items-center gap-1">
+                <input type="radio" name="inspiration_action_{{ loop.index0 }}" value="link" checked>
+                Link existing
+              </label>
+              <label class="d-inline-flex align-items-center gap-1">
+                <input type="radio" name="inspiration_action_{{ loop.index0 }}" value="create">
+                Create new anyway
+              </label>
+              {% else %}
+              <label class="d-inline-flex align-items-center gap-1">
+                <input type="radio" name="inspiration_action_{{ loop.index0 }}" value="create" checked>
+                Create new
+              </label>
+              {% endif %}
+              <label class="d-inline-flex align-items-center gap-1">
+                <input type="radio" name="inspiration_action_{{ loop.index0 }}" value="skip">
+                Skip
+              </label>
+            </div>
+          </div>
+          {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions mt-3">
+      <a href="/projects/{{ project.id }}" class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check-circle me-1"></i>Confirm — Write Thesis + Selected Ideas
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+(function () {
+  var ta = document.getElementById('thesisPreviewField');
+  var cnt = document.getElementById('thesisPreviewCount');
+  if (!ta || !cnt) return;
+  function update() {
+    var n = ta.value.length;
+    cnt.textContent = n;
+    cnt.parentElement.classList.toggle('text-success', n >= 80);
+    cnt.parentElement.classList.toggle('text-danger', n > 0 && n < 80);
+  }
+  ta.addEventListener('input', update);
+  update();
+})();
+</script>
+{% endblock %}

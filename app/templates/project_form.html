@@ -19,7 +19,7 @@
   <div class="alert alert-danger mb-4"><i class="bi bi-exclamation-circle me-2"></i>{{ error }}</div>
   {% endif %}
 
-  <form method="post" action="{% if is_edit %}/projects/{{ project.id }}/edit{% else %}/projects/new{% endif %}">
+  <form method="post" action="{% if is_edit %}/projects/{{ project.id }}/edit{% else %}/projects/new{% endif %}" enctype="multipart/form-data">
 
     <!-- Project Identity -->
     <div class="form-section">
@@ -165,6 +165,20 @@
         {% endif %}
       </div>
     </div>
+
+    {% if not is_edit %}
+    <!-- Build 15 — Business Plan upload (optional, create flow only) -->
+    <div class="form-section" id="business-plan">
+      <h3 class="form-section-title">
+        <i class="bi bi-file-earmark-text me-2"></i>Business Plan <span class="text-muted small">(optional)</span>
+      </h3>
+      <p class="form-help-text">
+        Upload a business plan or product brief (PDF, Word, or image). After the project is created, AI will draft a Product Thesis from it for you to review before saving — much faster than typing one from scratch.
+      </p>
+      <input type="file" name="business_plan" class="form-control"
+             accept=".pdf,.docx,.doc,.png,.jpg,.jpeg,.webp,.gif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/*">
+    </div>
+    {% endif %}
 
     <!-- Product Thesis -->
     <div class="form-section" id="thesis">

@@ -30,6 +30,7 @@ Status legend:
 |---|---|---|---|---|
 | `create_journal_entry` (HTTP route) | project_id, entry_text, entry_type | auth + `can_view_journal` + `can_edit_project` | No (low-stakes capture) | **route implemented (Build 14)**; bottom-chat tool wiring lands in Build 20/21 |
 | `summarize_journal_entry` (HTTP route) | entry_id (via URL) | auth + `can_view_journal` + `can_edit_project` | No (preserves existing on failure) | **route implemented (Build 14)**; bottom-chat tool wiring lands in Build 20/21 |
+| `extract_thesis_from_business_plan` (HTTP route) | project_id, business_plan file (or file_id) | auth + `can_edit_project` | YES — preview/confirm screen before write | **route implemented (Build 15)**; one-time AI call persisted to `ai_messages` for refresh-safe preview; bottom-chat tool wiring lands in Build 20/21 |
 
 ## Planned for v1.1.0 (priority order)
 
@@ -45,7 +46,6 @@ Status legend:
 | `add_rendering_note(file_id, note)` | Annotate an uploaded rendering | auth + `can_edit_project` | No | 18 (Rendering history) |
 | `add_prototype_photo_note(file_id, note)` | Annotate a prototype photo | auth + `can_edit_project` | No | 18 |
 | `adjust_phase_plan(phase_id, new_planned_end_date, reason)` | Change a planned date; require reason | auth + `can_edit_project` | YES — reason is mandatory | 17 |
-| `create_business_plan_summary(project_id, file_id)` | AI summarizes uploaded business plan into thesis draft | auth + `can_edit_project` | YES — thesis writes go through preview/confirm | 15 (Business Plan) |
 | `search_projects(query)` | Cross-project search for AI context | auth — filter by viewer permission | No (read-only) | 21 (Bottom chat) |
 | `get_project_context(project_id)` | Build per-project AI context — role-filtered | auth — filter sensitive fields by role | No (read-only) | 21 |
 

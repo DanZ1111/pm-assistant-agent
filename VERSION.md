@@ -1,9 +1,20 @@
 # PM Product Tracker — Version
 
-**Current Version:** v1.0.0
-**Current Build:** Build 11 — Good Ideas + AI Dual-Mode Intake
-**Status:** Feature-complete
-**Last Updated:** 2026-05-24
+**Current Version:** v1.1.0-build15
+**Current Build:** Build 15 — Business Plan Upload + Thesis Extraction
+**Status:** v1.1.0 in progress (build-by-build per roadmap)
+**Last Updated:** 2026-05-27
+
+## What's new in v1.1.0-build15
+
+- **Upload a business plan to draft your Product Thesis.** Optional file input on Create Project; "Extract from Business Plan" button on the project detail page.
+- **PDF, Word (DOCX), DOC, and image** are all supported. DOC requires LibreOffice on the server (otherwise a friendly error is shown).
+- **AI proposes; you confirm.** Preview screen shows the proposed thesis (editable) + detected inspirations with create/link/skip toggles. Nothing is written to the DB until you click Confirm.
+- **Refreshing the preview never re-runs AI** — the extraction is persisted on the upload POST and the preview is a pure GET render of the saved result.
+- **Detected inspirations get fuzzy-matched against your Good Ideas board** — matches above 65% suggest linking instead of duplicating.
+- **Inline thesis edit on the project detail page** for admin/PM — no need to open the full edit form for a quick tweak.
+- **Thesis section is now scrollable** (max-height 220px) so long theses don't dominate the page.
+- **AI Permission Guard updated** so viewer bottom-chat (Build 21) cannot surface business-plan / margin / pricing content.
 
 ## What's in v1.0.0
 

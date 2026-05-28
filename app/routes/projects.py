@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, Request, Form, HTTPException
+import os
+import uuid
+from fastapi import APIRouter, Depends, Request, Form, HTTPException, UploadFile, File
 from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -7,6 +9,8 @@ from datetime import date
 from app.database import get_db
 from app.models import Project
 import app.crud as crud
+from app.ai.parser import extract_thesis_and_inspirations
+from app.ai.matching import find_best_match, MATCH_THRESHOLD
 from app.dependencies import (
     get_current_user, require_auth, require_admin,
     can_edit_project, can_view_sensitive_fields, can_view_journal,
@@ -33,6 +37,59 @@ def parse_float(val: str) -> float | None:
         return float(val.strip().replace(",", ""))
     except ValueError:
         return None
+
+
+# Build 15 — map an uploaded business-plan file extension to the dispatch
+# key the parser uses. The generic project_files.file_type column groups
+# .doc + .docx as "word" already; for extraction we need finer granularity
+# so we resolve from extension here.
+_BUSINESS_PLAN_TYPES = {
+    "pdf": "pdf",
+    "docx": "docx",
+    "doc": "doc",
+    "png": "image", "jpg": "image", "jpeg": "image", "webp": "image", "gif": "image",
+}
+
+
+def _resolve_business_plan_type(filename: str) -> str | None:
+    if not filename or "." not in filename:
+        return None
+    ext = filename.rsplit(".", 1)[-1].lower()
+    return _BUSINESS_PLAN_TYPES.get(ext)
+
+
+def _save_uploaded_business_plan(
+    db: Session, project_id: int, upload: UploadFile, content: bytes,
+) -> tuple:
+    """Save the uploaded business plan to disk + DB. Returns (ProjectFile, dispatch_type)."""
+    ext = upload.filename.rsplit(".", 1)[-1].lower() if "." in upload.filename else ""
+    unique_name = f"{uuid.uuid4().hex}.{ext}" if ext else uuid.uuid4().hex
+    os.makedirs(crud.UPLOAD_DIR, exist_ok=True)
+    disk_path = os.path.join(crud.UPLOAD_DIR, unique_name)
+    with open(disk_path, "wb") as fh:
+        fh.write(content)
+
+    # generic file_type for the file row (matches files.py convention)
+    if ext == "pdf":
+        file_type = "pdf"
+    elif ext in ("doc", "docx"):
+        file_type = "word"
+    elif ext in ("png", "jpg", "jpeg", "webp", "gif"):
+        file_type = "image"
+    else:
+        file_type = "other"
+
+    pf = crud.upload_file(
+        db,
+        project_id=project_id,
+        filename=unique_name,
+        original_filename=upload.filename,
+        file_path=f"uploads/{unique_name}",
+        file_type=file_type,
+        file_category="business_plan",
+        file_size=len(content),
+    )
+    return pf, _resolve_business_plan_type(upload.filename)
 
 
 # ---------------------------------------------------------------------------
@@ -120,7 +177,7 @@ def project_new_form(request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("/projects/new")
-def project_new_submit(
+async def project_new_submit(
     request: Request,
     name: str = Form(...),
     brand: str = Form(""),
@@ -135,6 +192,7 @@ def project_new_submit(
     planned_launch_date: str = Form(""),
     project_thesis: str = Form(""),
     prototype_rounds: str = Form("single"),
+    business_plan: UploadFile = File(None),
     db: Session = Depends(get_db),
 ):
     current_user = get_current_user(request, db)
@@ -168,6 +226,24 @@ def project_new_submit(
         "project_thesis": project_thesis.strip() or None,
     }
     project = crud.create_project(db, data, prototype_rounds=prototype_rounds)
+
+    # Build 15 — optional business plan upload + thesis extraction
+    if business_plan is not None and business_plan.filename:
+        content = await business_plan.read()
+        if content:
+            pf, dispatch_type = _save_uploaded_business_plan(db, project.id, business_plan, content)
+            if dispatch_type is None:
+                payload = {"_error": "Unsupported business plan file type. Use PDF, DOCX, DOC, or image."}
+            else:
+                payload = extract_thesis_and_inspirations(
+                    os.path.join(crud.UPLOAD_DIR, pf.filename), dispatch_type,
+                )
+            extraction = crud.save_thesis_extraction(db, project.id, pf, payload)
+            return RedirectResponse(
+                url=f"/projects/{project.id}/thesis/preview?extraction_id={extraction.id}",
+                status_code=303,
+            )
+
     return RedirectResponse(url=f"/projects/{project.id}", status_code=303)
 
 
@@ -208,6 +284,10 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
     journal_error = request.query_params.get("journal_error")
     journal_error_entry_id = request.query_params.get("entry_id")
 
+    # Build 15 — latest attached business plan (used for Re-extract button)
+    business_plan_file = crud.get_latest_business_plan_file(db, project_id)
+    thesis_error = request.query_params.get("thesis_error")
+
     return templates.TemplateResponse(request, "project_detail.html", {
         "project": project,
         "phases": phases,
@@ -225,6 +305,8 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
         "journal_entries": journal_entries,
         "journal_error": journal_error,
         "journal_error_entry_id": journal_error_entry_id,
+        "business_plan_file": business_plan_file,
+        "thesis_error": thesis_error,
     })
 
 
@@ -467,3 +549,188 @@ def project_unlink_idea(
     if project and can_edit_project(current_user, project):
         crud.unlink_idea_from_project(db, project_id, idea_id)
     return RedirectResponse(url=f"/projects/{project_id}#inspired-by", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Build 15 — Business Plan Thesis Extraction (preview-confirm)
+# AI extraction is a one-time POST action. The preview page is a pure GET
+# render of saved data — refreshing it must NEVER re-trigger the AI call.
+# ---------------------------------------------------------------------------
+
+@router.post("/projects/{project_id}/thesis/extract-upload")
+async def thesis_extract_upload(
+    request: Request,
+    project_id: int,
+    business_plan: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if not can_edit_project(current_user, project):
+        return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+
+    if not business_plan or not business_plan.filename:
+        return RedirectResponse(
+            url=f"/projects/{project_id}?thesis_error=no_file",
+            status_code=303,
+        )
+
+    content = await business_plan.read()
+    if not content:
+        return RedirectResponse(
+            url=f"/projects/{project_id}?thesis_error=empty_file",
+            status_code=303,
+        )
+
+    pf, dispatch_type = _save_uploaded_business_plan(db, project_id, business_plan, content)
+    if dispatch_type is None:
+        payload = {"_error": "Unsupported business plan file type. Use PDF, DOCX, DOC, or image."}
+    else:
+        payload = extract_thesis_and_inspirations(
+            os.path.join(crud.UPLOAD_DIR, pf.filename), dispatch_type,
+        )
+
+    extraction = crud.save_thesis_extraction(db, project_id, pf, payload)
+    return RedirectResponse(
+        url=f"/projects/{project_id}/thesis/preview?extraction_id={extraction.id}",
+        status_code=303,
+    )
+
+
+@router.get("/projects/{project_id}/thesis/preview", response_class=HTMLResponse)
+def thesis_preview(
+    request: Request,
+    project_id: int,
+    extraction_id: int,
+    db: Session = Depends(get_db),
+):
+    """Pure GET render of a saved extraction. Refreshing this page does NOT
+    re-trigger AI — the result was persisted on the upload POST."""
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if not can_edit_project(current_user, project):
+        return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+
+    extraction = crud.get_thesis_extraction(db, extraction_id, project_id)
+    if not extraction:
+        return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+
+    meta = extraction.metadata_json or {}
+    error = meta.get("_error")
+    thesis_text = meta.get("thesis") or ""
+    raw_inspirations = meta.get("inspirations") or []
+
+    # Compute fuzzy matches against current open ideas (cheap, no AI)
+    open_ideas = crud.get_all_open_ideas(db)
+    inspirations_with_matches = []
+    for insp in raw_inspirations:
+        match, score = find_best_match(insp.get("name", ""), open_ideas)
+        inspirations_with_matches.append({
+            "data": insp,
+            "matched_idea": match if score >= MATCH_THRESHOLD else None,
+            "match_score": round(score, 2) if score else 0.0,
+        })
+
+    return templates.TemplateResponse(request, "thesis_preview.html", {
+        "project": project,
+        "extraction": extraction,
+        "extraction_id": extraction_id,
+        "source_filename": meta.get("source_filename"),
+        "duration_seconds": meta.get("duration_seconds"),
+        "thesis_text": thesis_text,
+        "inspirations_with_matches": inspirations_with_matches,
+        "error": error,
+        "current_user": current_user,
+    })
+
+
+@router.post("/projects/{project_id}/thesis/confirm")
+async def thesis_confirm(
+    request: Request,
+    project_id: int,
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if not can_edit_project(current_user, project):
+        return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+
+    form = await request.form()
+    extraction_id = int(form.get("extraction_id") or 0)
+    if not extraction_id or not crud.get_thesis_extraction(db, extraction_id, project_id):
+        return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+
+    new_thesis = (form.get("project_thesis") or "").strip()
+
+    # Reassemble inspirations from posted form fields. Indices are 0..N-1.
+    inspirations = []
+    idx = 0
+    while True:
+        action_key = f"inspiration_action_{idx}"
+        if action_key not in form:
+            break
+        inspirations.append({
+            "action": form.get(action_key) or "skip",
+            "idea_id": form.get(f"inspiration_idea_id_{idx}") or None,
+            "name": form.get(f"inspiration_name_{idx}") or "",
+            "description": form.get(f"inspiration_description_{idx}") or "",
+            "idea_type": form.get(f"inspiration_idea_type_{idx}") or "other",
+            "source": form.get(f"inspiration_source_{idx}") or "other",
+            "source_detail": form.get(f"inspiration_source_detail_{idx}") or "",
+        })
+        idx += 1
+
+    crud.apply_thesis_extraction(
+        db, project_id, extraction_id, new_thesis, inspirations, current_user,
+    )
+    return RedirectResponse(url=f"/projects/{project_id}#thesis", status_code=303)
+
+
+@router.post("/projects/{project_id}/thesis/inline-edit")
+def thesis_inline_edit(
+    request: Request,
+    project_id: int,
+    project_thesis: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if not can_edit_project(current_user, project):
+        return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+
+    new = (project_thesis or "").strip()
+    if not new:
+        return RedirectResponse(
+            url=f"/projects/{project_id}?thesis_error=empty",
+            status_code=303,
+        )
+    crud.update_project(db, project_id, {"project_thesis": new}, changed_by=current_user.role)
+    return RedirectResponse(url=f"/projects/{project_id}#thesis", status_code=303)

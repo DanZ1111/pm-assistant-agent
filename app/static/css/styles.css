@@ -555,6 +555,19 @@ body {
 }
 .thesis-empty a { color: var(--color-danger); }
 
+/* Build 15 — scrollable thesis box (caps height so long thesis doesn't
+   dominate the page; inline-edit form below replaces it when editing) */
+.thesis-scrollable {
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+/* Build 15 — Thesis preview page */
+.thesis-preview-page { max-width: 1200px; }
+.inspiration-card { background: #fff; transition: border-color 0.15s; }
+.inspiration-card:hover { border-color: var(--color-accent, #6c8eef) !important; }
+
 /* Timeline table */
 .timeline-table-wrap { overflow-x: auto; }
 .timeline-table {

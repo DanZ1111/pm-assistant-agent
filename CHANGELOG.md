@@ -1,5 +1,30 @@
 # PM Product Tracker — Changelog
 
+## v1.1.0-build15 — Business Plan Upload + Thesis Extraction (Build 15)
+_2026-05-27_
+
+**Goal:** lower the burden of getting a Product Thesis onto a project. PMs upload a business plan once and AI proposes a thesis + any inspirations to capture as Ideas — preview, edit, then confirm before any DB write.
+
+**One-time AI, then pure GET preview** — the AI extraction runs once on POST. The result is persisted as an `ai_messages` row (`message="thesis_extraction"`, payload in `metadata_json`). The preview page is a pure GET render — refreshing it does NOT re-trigger AI.
+
+**File formats supported:** PDF, DOCX, DOC (via LibreOffice if installed; friendly error otherwise), and image (PNG/JPG/WEBP/GIF via vision). New dependency: `python-docx`.
+
+**Two entry points:**
+- Create Project form: optional Business Plan file input. On submit → project created → file saved as `file_category="business_plan"` → AI runs once → redirect to preview.
+- Project Detail Thesis section: "Extract from Business Plan" button (or "Re-extract" if a plan is already attached) reveals an inline upload form that follows the same path.
+
+**Preview screen** (`thesis_preview.html`): two-column. Proposed thesis textarea (editable) + detected inspirations checklist. Each inspiration is fuzzy-matched against existing open Ideas; matches above 65% surface a "Link existing IDEA-005 (87% match)" suggestion with radio toggle Link/Create new/Skip. Cancel returns to project; Confirm writes everything in one transaction.
+
+**Confirm transaction:** `update_project(project_thesis=...)` writes automatic per-field change-log row; each inspiration with action=create/link creates/links an Idea; `write_change(event_note, changed_by="ai", source_type="ai_chat")` marks AI source; AIMessage row updated with `confirmed_at` + `confirmed_thesis` + `confirmed_inspirations` for full audit.
+
+**Inline thesis edit on detail page:** click Edit on the Thesis section → textarea + Save without leaving the page. Distinct route from the full edit form so it only needs the thesis field.
+
+**Detail page Thesis section:** now scrollable (max-height 220px) so long theses don't dominate the page. Extract/Re-extract button is admin/PM only.
+
+**AI Permission Guard:** `_VIEWER_FORBIDDEN` extended with `business plan`, `thesis extraction`, `margin target`, `pricing strategy`.
+
+**AI Tools Registry:** `extract_thesis_from_business_plan` added (HTTP route implemented; bottom-chat tool wiring lands in Build 20/21).
+
 ## v1.0.0 — Good Ideas + Project Linkage + AI Dual-Mode (Build 11)
 _2026-05-24_
 

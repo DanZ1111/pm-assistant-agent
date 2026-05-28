@@ -3,25 +3,30 @@ import difflib
 MATCH_THRESHOLD = 0.65
 
 
-def find_best_match(candidate_name: str, projects: list) -> tuple:
-    """Fuzzy-match candidate_name against a list of Project objects by name.
-    Returns (best_project, score) or (None, 0.0) when no candidate or no projects.
+def find_best_match(candidate_name: str, items: list, key=None) -> tuple:
+    """Fuzzy-match candidate_name against a list of objects by some name field.
+    Returns (best_item, score) or (None, 0.0) when no candidate or no items.
     Score: 1.0 = exact, 0.85 = substring, 0.0–1.0 = difflib ratio.
+
+    By default matches on item.name. Pass key=lambda x: x.something to match a different field.
     """
-    if not candidate_name or not projects:
+    if not candidate_name or not items:
         return None, 0.0
 
-    best_project = None
+    if key is None:
+        key = lambda x: x.name
+
+    best_item = None
     best_score = 0.0
     c = candidate_name.lower().strip()
 
-    for project in projects:
-        p = (project.name or "").lower().strip()
+    for item in items:
+        p = (key(item) or "").lower().strip()
         if not p:
             continue
 
         if c == p:
-            return project, 1.0
+            return item, 1.0
 
         if c in p or p in c:
             score = 0.85
@@ -30,6 +35,6 @@ def find_best_match(candidate_name: str, projects: list) -> tuple:
 
         if score > best_score:
             best_score = score
-            best_project = project
+            best_item = item
 
-    return best_project, best_score
+    return best_item, best_score

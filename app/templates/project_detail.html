@@ -139,28 +139,94 @@
   <div class="detail-main">
 
     <!-- 1. Product Thesis -->
-    <section class="detail-section">
+    <section class="detail-section" id="thesis">
       <div class="section-header">
         <h2 class="section-title"><i class="bi bi-lightbulb me-2"></i>Product Thesis</h2>
-        <a href="/projects/{{ project.id }}/edit#thesis" class="btn btn-sm btn-ghost">
-          <i class="bi bi-pencil me-1"></i>Edit
-        </a>
-      </div>
-      {% if project.project_thesis and project.project_thesis|length >= 80 %}
-      <div class="thesis-box">
-        <div class="thesis-guide">
-          <span>Why this product exists · Who it's for · What makes it different · Brand fit · Price logic · Risks</span>
+        {% if can_edit %}
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-sm btn-ghost" onclick="toggleThesisEdit()">
+            <i class="bi bi-pencil me-1"></i>Edit
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-primary" onclick="toggleThesisExtractForm()">
+            <i class="bi bi-file-earmark-text me-1"></i>{% if business_plan_file %}Re-extract{% else %}Extract from Business Plan{% endif %}
+          </button>
         </div>
-        <p class="thesis-text">{{ project.project_thesis }}</p>
+        {% endif %}
       </div>
-      {% else %}
-      <div class="thesis-empty">
-        <i class="bi bi-exclamation-circle text-danger me-2"></i>
-        <span>Product Thesis is missing or too short. </span>
-        <a href="/projects/{{ project.id }}/edit#thesis">Add it now</a> — it's the most important field.
+
+      {% if thesis_error %}
+      <div class="alert alert-warning mb-3" style="font-size:0.85rem">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        {% if thesis_error == 'no_file' %}No file selected for extraction.
+        {% elif thesis_error == 'empty_file' %}The uploaded file was empty.
+        {% elif thesis_error == 'empty' %}Thesis cannot be empty — use Edit to clear it intentionally.
+        {% else %}Something went wrong with thesis extraction.{% endif %}
       </div>
       {% endif %}
+
+      <div id="thesisDisplay">
+        {% if project.project_thesis and project.project_thesis|length >= 80 %}
+        <div class="thesis-box thesis-scrollable">
+          <div class="thesis-guide">
+            <span>Why this product exists · Who it's for · What makes it different · Brand fit · Price logic · Risks</span>
+          </div>
+          <p class="thesis-text">{{ project.project_thesis }}</p>
+        </div>
+        {% else %}
+        <div class="thesis-empty">
+          <i class="bi bi-exclamation-circle text-danger me-2"></i>
+          <span>Product Thesis is missing or too short. </span>
+          {% if can_edit %}<a href="#" onclick="toggleThesisEdit(); return false;">Add it now</a> — it's the most important field.{% endif %}
+        </div>
+        {% endif %}
+      </div>
+
+      {% if can_edit %}
+      <form id="thesisEditForm" method="post" action="/projects/{{ project.id }}/thesis/inline-edit" class="d-none mt-2">
+        <textarea name="project_thesis" class="form-control" rows="10" required
+                  placeholder="Why does this product exist? Who is it for...">{{ project.project_thesis or '' }}</textarea>
+        <div class="d-flex gap-2 mt-2">
+          <button type="submit" class="btn btn-primary btn-sm">Save</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleThesisEdit()">Cancel</button>
+        </div>
+      </form>
+
+      <form id="thesisExtractForm" method="post"
+            action="/projects/{{ project.id }}/thesis/extract-upload"
+            enctype="multipart/form-data" class="d-none mt-2 border rounded p-3 bg-light">
+        <label class="form-label fw-bold">Upload business plan (PDF, Word, or image)</label>
+        <p class="text-muted small mb-2">AI will read it and propose a thesis + any inspirations for your review. Nothing gets saved until you confirm on the preview screen.</p>
+        <input type="file" name="business_plan" class="form-control" required
+               accept=".pdf,.docx,.doc,.png,.jpg,.jpeg,.webp,.gif">
+        <div class="d-flex gap-2 mt-2">
+          <button type="submit" class="btn btn-primary btn-sm">Upload & Extract</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleThesisExtractForm()">Cancel</button>
+        </div>
+      </form>
+      {% endif %}
     </section>
+
+    <script>
+    function toggleThesisEdit() {
+      var d = document.getElementById('thesisDisplay');
+      var f = document.getElementById('thesisEditForm');
+      var x = document.getElementById('thesisExtractForm');
+      if (!f) return;
+      f.classList.toggle('d-none');
+      var editing = !f.classList.contains('d-none');
+      if (d) d.style.display = editing ? 'none' : '';
+      if (x && editing) x.classList.add('d-none');
+    }
+    function toggleThesisExtractForm() {
+      var f = document.getElementById('thesisExtractForm');
+      var e = document.getElementById('thesisEditForm');
+      if (!f) return;
+      f.classList.toggle('d-none');
+      if (e) e.classList.add('d-none');
+      var d = document.getElementById('thesisDisplay');
+      if (d) d.style.display = '';
+    }
+    </script>
 
     {# 1a. Project Journal — hidden-by-default reveal section. Admin/PM only. #}
     {% if can_view_journal %}

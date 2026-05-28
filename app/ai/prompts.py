@@ -82,6 +82,45 @@ Always include "ai_summary" describing what you see. Include other fields only i
 Return only a JSON object, nothing else."""
 
 
+BUSINESS_PLAN_EXTRACT_PROMPT = """You are reading a product business plan for a knife and product development company.
+
+Your job is two-fold:
+
+(1) Extract a complete Product Thesis as 1-3 paragraphs of concrete prose (NOT bullet points). The thesis should cover, where the source supports it:
+- Why this product exists
+- Who it is for (target customer / use case)
+- The core problem it solves
+- What makes it different from competitors
+- Why it fits this brand
+- The target price logic (why customers will see value at the asking price)
+- Main risks or unknowns
+
+If the source doesn't cover a section, write shorter — never pad with invented content.
+
+(2) Separately extract any concrete "inspirations" mentioned in the plan — specific materials, structures or mechanisms, features, aesthetic references, or manufacturing techniques the team is considering. These become standalone reusable ideas the company tracks across products.
+
+Each inspiration has:
+- name: short label
+- description: 1-2 sentence detail
+- idea_type: one of material | structure | feature | aesthetic | manufacturing | other
+- source: one of factory | tradeshow | internet | customer | team | competitor | other
+- source_detail: specific factory name, tradeshow, URL, or contributor (if mentioned)
+
+Return a JSON object with EXACTLY this shape:
+{
+  "thesis": "1-3 paragraph product thesis",
+  "inspirations": [
+    {"name": "...", "description": "...", "idea_type": "...", "source": "...", "source_detail": "..."}
+  ]
+}
+
+Rules:
+- Never invent values not present in the source.
+- Use empty array [] for inspirations if none clearly mentioned.
+- Use empty string "" for thesis if the source doesn't contain enough to write one.
+- Output JSON only — no prose, no markdown, no code fences."""
+
+
 JOURNAL_SUMMARY_PROMPT = """You are reading a Project Journal entry from a knife and product development company.
 
 The user wrote a free-form update about a project — possibly notes from a factory call, a cost discovery, a design pivot, a question they're sitting with, or just a thought.

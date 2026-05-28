@@ -8,6 +8,7 @@ openai
 python-dateutil
 aiofiles
 pypdf
+python-docx
 passlib[bcrypt]
 bcrypt<4
 psycopg2-binary

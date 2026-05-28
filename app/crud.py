@@ -919,3 +919,157 @@ def apply_ai_summary(
     db.commit()
     db.refresh(entry)
     return entry
+
+
+# ---------------------------------------------------------------------------
+# Build 15 — Business Plan Thesis Extraction (preview-confirm)
+# ---------------------------------------------------------------------------
+
+THESIS_EXTRACTION_SENTINEL = "thesis_extraction"
+
+
+def save_thesis_extraction(
+    db: Session,
+    project_id: int,
+    source_file: ProjectFile | None,
+    payload: dict,
+) -> AIMessage:
+    """Persist a one-time AI extraction as an ai_messages row so the preview
+    page can re-render without re-running AI. payload is the dict returned by
+    parser.extract_thesis_and_inspirations (or {'_error': '...'} on failure —
+    still saved so the failure is auditable)."""
+    metadata = {
+        "kind": THESIS_EXTRACTION_SENTINEL,
+        "source_file_id": source_file.id if source_file else None,
+        "source_filename": source_file.original_filename if source_file else None,
+        "source_file_type": source_file.file_type if source_file else None,
+        "confirmed_at": None,
+        "confirmed_thesis": None,
+        "confirmed_inspirations": None,
+        **payload,
+    }
+    msg = AIMessage(
+        project_id=project_id,
+        role="assistant",
+        message=THESIS_EXTRACTION_SENTINEL,
+        metadata_json=metadata,
+    )
+    db.add(msg)
+    db.commit()
+    db.refresh(msg)
+    return msg
+
+
+def get_thesis_extraction(db: Session, extraction_id: int, project_id: int) -> AIMessage | None:
+    """Load a saved extraction by id, verifying it belongs to project_id AND
+    is actually a thesis_extraction row. Returns None on any mismatch."""
+    msg = db.query(AIMessage).filter(AIMessage.id == extraction_id).first()
+    if not msg:
+        return None
+    if msg.project_id != project_id:
+        return None
+    if msg.message != THESIS_EXTRACTION_SENTINEL:
+        return None
+    return msg
+
+
+def get_latest_business_plan_file(db: Session, project_id: int) -> ProjectFile | None:
+    """Latest uploaded ProjectFile with file_category='business_plan' for the project."""
+    return (
+        db.query(ProjectFile)
+        .filter(
+            ProjectFile.project_id == project_id,
+            ProjectFile.file_category == "business_plan",
+        )
+        .order_by(ProjectFile.uploaded_at.desc())
+        .first()
+    )
+
+
+def apply_thesis_extraction(
+    db: Session,
+    project_id: int,
+    extraction_id: int,
+    new_thesis: str,
+    inspirations: list[dict],
+    user,
+) -> dict:
+    """Confirm path: write thesis + create/link selected ideas in one transaction.
+
+    inspirations: list of {"action": "create"|"link"|"skip", "idea_id": int|None,
+                           "name", "description", "idea_type", "source", "source_detail"}
+
+    update_project() automatically writes a field_update change-log row for
+    project_thesis. We also emit an event_note tagged changed_by='ai' so the
+    AI source of the thesis is visible in the change log.
+    """
+    summary = {"thesis_updated": False, "ideas_created": 0, "ideas_linked": 0}
+
+    # 1. Thesis write — only if non-empty (preserves existing on cancel-with-empty)
+    new_thesis = (new_thesis or "").strip()
+    if new_thesis:
+        update_project(db, project_id, {"project_thesis": new_thesis}, changed_by="ai")
+        summary["thesis_updated"] = True
+
+    # 2. Ideas
+    final_inspirations = []
+    for insp in inspirations or []:
+        action = (insp.get("action") or "skip").lower()
+        if action == "create":
+            new_idea = create_idea(
+                db,
+                {
+                    "name": insp.get("name") or "(untitled)",
+                    "description": insp.get("description"),
+                    "idea_type": insp.get("idea_type"),
+                    "source": insp.get("source"),
+                    "source_detail": insp.get("source_detail"),
+                },
+                contributor_user_id=user.id if user else None,
+            )
+            link_idea_to_project(
+                db, project_id, new_idea.id,
+                linked_by_user_id=user.id if user else None,
+                note="From business plan extraction",
+            )
+            summary["ideas_created"] += 1
+            final_inspirations.append({**insp, "action": "create", "resulting_idea_id": new_idea.id})
+        elif action == "link":
+            idea_id = insp.get("idea_id")
+            if idea_id:
+                link_idea_to_project(
+                    db, project_id, int(idea_id),
+                    linked_by_user_id=user.id if user else None,
+                    note="From business plan extraction",
+                )
+                summary["ideas_linked"] += 1
+                final_inspirations.append({**insp, "action": "link", "resulting_idea_id": int(idea_id)})
+        else:
+            final_inspirations.append({**insp, "action": "skip"})
+
+    # 3. Event-note row marking AI source
+    write_change(
+        db,
+        project_id=project_id,
+        change_type="event_note",
+        changed_by="ai",
+        source_type="ai_chat",
+        summary=(
+            f"Thesis extracted from business plan "
+            f"(thesis_updated={summary['thesis_updated']}, "
+            f"ideas_created={summary['ideas_created']}, "
+            f"ideas_linked={summary['ideas_linked']})"
+        ),
+    )
+
+    # 4. Mark the AIMessage with the user's final selections (audit)
+    msg = db.query(AIMessage).filter(AIMessage.id == extraction_id).first()
+    if msg and msg.metadata_json:
+        meta = dict(msg.metadata_json)
+        meta["confirmed_at"] = datetime.utcnow().isoformat()
+        meta["confirmed_thesis"] = new_thesis
+        meta["confirmed_inspirations"] = final_inspirations
+        msg.metadata_json = meta
+        db.commit()
+
+    return summary
