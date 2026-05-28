@@ -37,6 +37,8 @@ Status legend:
 | `create_variant_component` (HTTP route) | project_id, variant_id (nullable), component_type, name, costs | auth + `can_edit_project` | No (cost-tracking only) | **route implemented (Build 16)** |
 | `update_variant_component` (HTTP route) | component_id, fields | auth + `can_edit_project` | No | **route implemented (Build 16)** |
 | `delete_variant_component` (HTTP route) | component_id | auth + admin only | YES — destructive | **route implemented (Build 16)** |
+| `finish_phase` (HTTP route) | project_id, phase_id | auth + `can_edit_project` | YES — irreversible state transition (one-click; user confirms in dialog) | **route implemented (Build 17)**; bottom-chat tool wiring lands in Build 20/21 |
+| `adjust_phase_plan` (HTTP route — via phase_edit) | phase_id, planned_*_date, reason | auth + `can_edit_project` | YES — reason is mandatory; rejected if blank | **route implemented (Build 17)** |
 
 ## Planned for v1.1.0 (priority order)
 
@@ -45,11 +47,9 @@ Status legend:
 | `create_journal_entry(project_id, entry_text, entry_type)` | Create a Project Journal entry from chat | auth + `can_edit_project` (for that project_id) | No (creating new entry, not mutating) | 14 (Journal) / 20 (Tools arch) |
 | `update_project_field(project_id, field_name, new_value)` | Propose a field change to an existing project | auth + `can_edit_project` + non-sensitive field allowlist | YES — show confirmation card with old → new | 20 |
 | `link_idea_to_project(project_id, idea_id, note)` | Connect an existing idea to a project | auth + `can_edit_project` | YES | 20 |
-| `finish_phase(project_id, phase_id)` | Mark current phase done; advance next phase | auth + `can_edit_project` | YES — irreversible state transition | 17 (Timeline 2.0) / 20 |
 | `create_idea(name, description, idea_type, source, ...)` | Create a Good Idea entry | auth (all roles) | No — idea creation is low-stakes | 20 |
 | `add_rendering_note(file_id, note)` | Annotate an uploaded rendering | auth + `can_edit_project` | No | 18 (Rendering history) |
 | `add_prototype_photo_note(file_id, note)` | Annotate a prototype photo | auth + `can_edit_project` | No | 18 |
-| `adjust_phase_plan(phase_id, new_planned_end_date, reason)` | Change a planned date; require reason | auth + `can_edit_project` | YES — reason is mandatory | 17 |
 | `search_projects(query)` | Cross-project search for AI context | auth — filter by viewer permission | No (read-only) | 21 (Bottom chat) |
 | `get_project_context(project_id)` | Build per-project AI context — role-filtered | auth — filter sensitive fields by role | No (read-only) | 21 |
 

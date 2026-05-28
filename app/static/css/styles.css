@@ -721,6 +721,80 @@ body {
 .btn-phase-edit:hover  { border-color: var(--color-primary); color: var(--color-primary); background: #eff6ff; }
 .btn-phase-delete:hover { border-color: var(--color-danger); color: var(--color-danger); background: #fee2e2; }
 
+/* Build 17 — Timeline 2.0: Plan / Reality split */
+.timeline-table-v2 .th-plan,
+.timeline-table-v2 .plan-cell {
+  background: #f7faff;
+}
+.timeline-table-v2 .th-reality,
+.timeline-table-v2 .reality-cell {
+  background: #f9fafb;
+}
+.timeline-table-v2 .th-plan {
+  border-left: 2px solid #c7d8f0;
+  color: #1d4ed8;
+}
+.timeline-table-v2 .th-reality {
+  border-left: 2px solid #d4d4d8;
+  color: #475569;
+}
+.timeline-table-v2 thead th {
+  text-align: center;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+.plan-changed-marker {
+  color: #f59e0b;
+  font-weight: bold;
+  margin-left: 3px;
+  cursor: help;
+}
+.phase-row-current {
+  outline: 2px solid #bfdbfe;
+  outline-offset: -2px;
+}
+.history-toggle {
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+.history-toggle:hover { color: var(--color-primary); text-decoration: underline; }
+
+.plan-history-row td { background: #fefce8; }
+.plan-history-box {
+  padding: 10px 12px;
+  border-left: 3px solid #facc15;
+}
+.plan-history-list {
+  list-style: none;
+  padding-left: 0;
+  margin-top: 6px;
+}
+.plan-history-list li {
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--color-border);
+  font-size: 13px;
+}
+.plan-history-list li:last-child { border-bottom: none; }
+
+/* Finish Phase button — green check */
+.btn-phase-finish {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  padding: 2px 6px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #166534;
+  transition: all 0.12s;
+  line-height: 1;
+  margin-right: 2px;
+}
+.btn-phase-finish:hover {
+  border-color: #16a34a;
+  color: #fff;
+  background: #16a34a;
+}
+
 /* Delay summary inside timeline section */
 .delay-summary {
   background: #fff5f5;

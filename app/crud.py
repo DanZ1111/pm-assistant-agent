@@ -334,12 +334,28 @@ def add_phase(db: Session, project_id: int, data: dict) -> ProjectPhase:
     recalculate_stage_and_delay(db, project_id)
     return phase
 
-def update_phase(db: Session, phase_id: int, data: dict, changed_by: str = "user") -> ProjectPhase | None:
+PLAN_DATE_FIELDS = ("planned_start_date", "planned_end_date")
+
+
+def update_phase(
+    db: Session, phase_id: int, data: dict,
+    changed_by: str = "user", reason: str = "",
+    changed_by_user_id: int | None = None,
+) -> ProjectPhase | None:
+    """Build 17 — Timeline 2.0. Plan-date changes are tracked separately:
+    every change to planned_start_date or planned_end_date writes a
+    phase_plan_changes row recording the old/new date and the reason.
+    Empty reason on a plan-date change is allowed (so existing flows don't
+    break), but the UI requires it for new edits.
+    """
+    from app.models import PhasePlanChange  # local — avoid circular at module load
+
     phase = db.query(ProjectPhase).filter(ProjectPhase.id == phase_id).first()
     if not phase:
         return None
 
     changes = []
+    plan_date_changes = []
     fields = [
         "phase_name", "phase_type", "status",
         "planned_start_date", "planned_end_date",
@@ -354,21 +370,123 @@ def update_phase(db: Session, phase_id: int, data: dict, changed_by: str = "user
         if str(old_val or "") != str(new_val or ""):
             changes.append((field, old_val, new_val))
             setattr(phase, field, new_val)
+            if field in PLAN_DATE_FIELDS:
+                plan_date_changes.append((field, old_val, new_val))
 
     phase.updated_at = datetime.utcnow()
+
+    # Write a phase_plan_changes row for each plan-date shift
+    for field, old_val, new_val in plan_date_changes:
+        db.add(PhasePlanChange(
+            phase_id=phase.id,
+            field_changed=field,
+            old_date=old_val if old_val else None,
+            new_date=new_val if new_val else None,
+            reason=(reason or "").strip() or "(no reason given)",
+            changed_by_user_id=changed_by_user_id,
+        ))
 
     if changes:
         summary_parts = [f"{f.replace('_', ' ')}: {o or '—'} → {n or '—'}" for f, o, n in changes]
         write_change(
             db, phase.project_id, "phase_update", changed_by=changed_by,
             field_name=phase.phase_name,
-            summary=f"Phase '{phase.phase_name}' updated: {'; '.join(summary_parts)}",
+            summary=f"Phase '{phase.phase_name}' updated: {'; '.join(summary_parts)}"
+                    + (f" (reason: {reason.strip()})" if reason and plan_date_changes else ""),
             source_type="manual_edit",
         )
 
     db.commit()
     recalculate_stage_and_delay(db, phase.project_id)
     return phase
+
+
+def get_plan_changes_for_phase(db: Session, phase_id: int) -> list:
+    """Newest first — used by the timeline history accordion."""
+    from app.models import PhasePlanChange
+    return (
+        db.query(PhasePlanChange)
+        .filter(PhasePlanChange.phase_id == phase_id)
+        .order_by(PhasePlanChange.changed_at.desc())
+        .all()
+    )
+
+
+def get_plan_changes_by_project(db: Session, project_id: int) -> dict:
+    """Returns {phase_id: [PhasePlanChange, ...]} for the whole project.
+    One query — used by the project detail page so the timeline section
+    doesn't N+1 against phase_plan_changes."""
+    from app.models import PhasePlanChange
+    phase_ids = [p.id for p in db.query(ProjectPhase.id).filter(
+        ProjectPhase.project_id == project_id).all()]
+    if not phase_ids:
+        return {}
+    rows = (
+        db.query(PhasePlanChange)
+        .filter(PhasePlanChange.phase_id.in_(phase_ids))
+        .order_by(PhasePlanChange.changed_at.desc())
+        .all()
+    )
+    out = {pid: [] for pid in phase_ids}
+    for r in rows:
+        out[r.phase_id].append(r)
+    return out
+
+
+def finish_phase(
+    db: Session, phase_id: int,
+    changed_by: str = "user", changed_by_user_id: int | None = None,
+) -> dict | None:
+    """Build 17 — one-click 'mark phase done and advance next phase'.
+    - Current phase: status=done, actual_end_date=today.
+      If actual_start_date is None, also set it (best guess = planned_start_date or today).
+    - Next phase (next phase_order in same project that is not done/skipped):
+      status=in_progress, actual_start_date=today (if not already set).
+    Returns {'finished': phase, 'next': next_phase_or_None}, or None if phase
+    not found.
+    """
+    phase = db.query(ProjectPhase).filter(ProjectPhase.id == phase_id).first()
+    if not phase:
+        return None
+    today = date.today()
+
+    # Finish the current phase
+    if not phase.actual_start_date:
+        phase.actual_start_date = phase.planned_start_date or today
+    phase.actual_end_date = today
+    phase.status = "done"
+    phase.updated_at = datetime.utcnow()
+
+    # Find the next phase to advance
+    siblings = (
+        db.query(ProjectPhase)
+        .filter(
+            ProjectPhase.project_id == phase.project_id,
+            ProjectPhase.phase_order > phase.phase_order,
+            ProjectPhase.status.notin_(("done", "skipped")),
+        )
+        .order_by(ProjectPhase.phase_order)
+        .all()
+    )
+    next_phase = siblings[0] if siblings else None
+    if next_phase:
+        if not next_phase.actual_start_date:
+            next_phase.actual_start_date = today
+        next_phase.status = "in_progress"
+        next_phase.updated_at = datetime.utcnow()
+
+    summary = f"Phase '{phase.phase_name}' marked done."
+    if next_phase:
+        summary += f" '{next_phase.phase_name}' is now in progress."
+    write_change(
+        db, phase.project_id, "phase_update", changed_by=changed_by,
+        field_name=phase.phase_name, summary=summary,
+        source_type="manual_edit",
+    )
+
+    db.commit()
+    recalculate_stage_and_delay(db, phase.project_id)
+    return {"finished": phase, "next": next_phase}
 
 def delete_phase(db: Session, phase_id: int) -> int | None:
     phase = db.query(ProjectPhase).filter(ProjectPhase.id == phase_id).first()

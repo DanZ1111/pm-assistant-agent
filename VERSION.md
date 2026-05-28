@@ -1,9 +1,19 @@
 # PM Product Tracker — Version
 
-**Current Version:** v1.1.0-build16
-**Current Build:** Build 16 — Variants + Packaging + Quotation + Profit Model placeholder
+**Current Version:** v1.1.0-build17
+**Current Build:** Build 17 — Timeline 2.0 (Plan / Reality split + Finish Phase)
 **Status:** v1.1.0 in progress (build-by-build per roadmap)
 **Last Updated:** 2026-05-27
+
+## What's new in v1.1.0-build17
+
+- **Plan / Reality split** on the timeline table — each phase row now shows Planned Start / Planned End side-by-side with Actual Start / Actual End. Plan and Reality have separate visual columns.
+- **Plan-date changes require a reason** — any change to `planned_start_date` or `planned_end_date` writes a row to `phase_plan_changes` capturing the old date, new date, who changed it, and why. The reason field is in the phase edit modal.
+- **`*` asterisk** appears next to any planned date that's been adjusted. Hovering shows the adjustment count.
+- **Plan-change history accordion** — clicking the "N plan changes" link under a phase reveals the full edit trail (newest first) with old → new dates, who, when, and the reason.
+- **Finish Phase button** (green checkmark) on every active phase — one click marks the phase done (sets `actual_end_date=today`, `status=done`) AND advances the next phase to in_progress (sets its `actual_start_date=today`).
+- The current in-progress phase is outlined in blue on the timeline.
+- `current_stage` and `calculate_delay` recalc automatically after Finish Phase + phase edits.
 
 ## What's new in v1.1.0-build16
 

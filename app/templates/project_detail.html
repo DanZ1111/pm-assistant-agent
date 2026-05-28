@@ -321,11 +321,21 @@
     {% include "components/quotation_section.html" %}
     {% include "components/profit_model_section.html" %}
 
-    <!-- 2. Timeline -->
+    <!-- 2. Timeline (Build 17 — Plan / Reality split) -->
     <section class="detail-section" id="timeline">
       <div class="section-header">
         <h2 class="section-title"><i class="bi bi-calendar-range me-2"></i>Timeline</h2>
+        <span class="text-muted small">Plan ↔ Reality. * marks a planned date that's been adjusted.</span>
       </div>
+
+      {% if timeline_error %}
+      <div class="alert alert-warning mb-3" style="font-size:0.85rem">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        {% if timeline_error == 'reason_required' %}
+          Plan-date changes require a reason. Open the phase, enter a reason in the "Reason for plan change" field, and save again.
+        {% else %}Something went wrong with that timeline action.{% endif %}
+      </div>
+      {% endif %}
 
       {% if delay %}
       <div class="delay-summary">
@@ -340,34 +350,59 @@
 
       {% if phases %}
       <div class="timeline-table-wrap">
-        <table class="timeline-table" id="phaseTable">
+        <table class="timeline-table timeline-table-v2" id="phaseTable">
           <thead>
             <tr>
-              <th>#</th>
-              <th>Phase</th>
-              <th>Status</th>
-              <th>Planned Start</th>
-              <th>Planned End</th>
-              <th>Actual End</th>
-              <th></th>
+              <th rowspan="2">#</th>
+              <th rowspan="2">Phase</th>
+              <th rowspan="2">Status</th>
+              <th colspan="2" class="th-plan">Plan</th>
+              <th colspan="2" class="th-reality">Reality</th>
+              <th rowspan="2"></th>
+            </tr>
+            <tr>
+              <th class="th-plan">Start</th>
+              <th class="th-plan">End</th>
+              <th class="th-reality">Start</th>
+              <th class="th-reality">End</th>
             </tr>
           </thead>
           <tbody>
             {% for phase in phases %}
-            <tr class="phase-row phase-{{ phase.status }}">
+            {% set hist = plan_changes_by_phase.get(phase.id, []) %}
+            {% set start_changed = hist | selectattr('field_changed', 'equalto', 'planned_start_date') | list | length %}
+            {% set end_changed = hist | selectattr('field_changed', 'equalto', 'planned_end_date') | list | length %}
+            <tr class="phase-row phase-{{ phase.status }}{% if current_phase and current_phase.id == phase.id %} phase-row-current{% endif %}">
               <td class="phase-order">{{ phase.phase_order }}</td>
               <td>
                 <span class="phase-name">{{ phase.phase_name }}</span>
                 {% if phase.owner %}<br><small class="text-muted">{{ phase.owner }}</small>{% endif %}
                 {% if phase.notes %}<br><small class="text-muted fst-italic">{{ phase.notes[:60] }}{% if phase.notes|length > 60 %}…{% endif %}</small>{% endif %}
+                {% if hist %}
+                <br><a class="small history-toggle" href="#" onclick="togglePlanHistory({{ phase.id }}); return false;">
+                  <i class="bi bi-clock-history me-1"></i>{{ hist|length }} plan change{{ 's' if hist|length != 1 else '' }}
+                </a>
+                {% endif %}
               </td>
               <td><span class="phase-status-badge phase-status-{{ phase.status }}">{{ phase.status | replace('_', ' ') }}</span></td>
-              <td class="date-cell">{{ phase.planned_start_date.strftime('%b %d, %Y') if phase.planned_start_date else "—" }}</td>
-              <td class="date-cell {% if phase.planned_end_date and phase.planned_end_date < today and phase.status not in ('done','skipped') %}text-danger fw-semibold{% endif %}">
-                {{ phase.planned_end_date.strftime('%b %d, %Y') if phase.planned_end_date else "—" }}
+              <td class="date-cell plan-cell">
+                {{ phase.planned_start_date.strftime('%b %d, %Y') if phase.planned_start_date else "—" }}{% if start_changed %}<span class="plan-changed-marker" title="Plan date has been adjusted ({{ start_changed }}×)">*</span>{% endif %}
               </td>
-              <td class="date-cell">{{ phase.actual_end_date.strftime('%b %d, %Y') if phase.actual_end_date else "—" }}</td>
+              <td class="date-cell plan-cell {% if phase.planned_end_date and phase.planned_end_date < today and phase.status not in ('done','skipped') %}text-danger fw-semibold{% endif %}">
+                {{ phase.planned_end_date.strftime('%b %d, %Y') if phase.planned_end_date else "—" }}{% if end_changed %}<span class="plan-changed-marker" title="Plan date has been adjusted ({{ end_changed }}×)">*</span>{% endif %}
+              </td>
+              <td class="date-cell reality-cell">{{ phase.actual_start_date.strftime('%b %d, %Y') if phase.actual_start_date else "—" }}</td>
+              <td class="date-cell reality-cell">{{ phase.actual_end_date.strftime('%b %d, %Y') if phase.actual_end_date else "—" }}</td>
               <td class="phase-actions">
+                {% if can_edit and phase.status not in ('done','skipped') %}
+                <form method="post" action="/projects/{{ project.id }}/phases/{{ phase.id }}/finish" class="d-inline"
+                      onsubmit="return confirm('Mark {{ phase.phase_name|e }} as done and advance the next phase?')">
+                  <button class="btn-phase-finish" title="Finish phase + advance next">
+                    <i class="bi bi-check2-circle"></i>
+                  </button>
+                </form>
+                {% endif %}
+                {% if can_edit %}
                 <button class="btn-phase-edit"
                         data-bs-toggle="modal" data-bs-target="#phaseModal"
                         data-phase-id="{{ phase.id }}"
@@ -383,14 +418,44 @@
                         title="Edit phase">
                   <i class="bi bi-pencil"></i>
                 </button>
+                {% if current_user.role == 'admin' %}
                 <form method="post" action="/projects/{{ project.id }}/phases/{{ phase.id }}/delete"
                       class="d-inline" onsubmit="return confirm('Delete phase \'{{ phase.phase_name }}\'?')">
                   <button class="btn-phase-delete" title="Delete phase">
                     <i class="bi bi-x"></i>
                   </button>
                 </form>
+                {% endif %}
+                {% endif %}
               </td>
             </tr>
+            {% if hist %}
+            <tr class="plan-history-row d-none" id="plan-history-{{ phase.id }}">
+              <td></td>
+              <td colspan="7">
+                <div class="plan-history-box">
+                  <strong class="small text-muted">Plan-change history (newest first)</strong>
+                  <ul class="plan-history-list mb-0">
+                  {% for ch in hist %}
+                    <li>
+                      <span class="badge bg-light text-dark me-1">{{ ch.field_changed | replace('_', ' ') | replace('planned ', '') }}</span>
+                      {{ ch.old_date.strftime('%b %d, %Y') if ch.old_date else '—' }}
+                      <i class="bi bi-arrow-right mx-1 text-muted"></i>
+                      {{ ch.new_date.strftime('%b %d, %Y') if ch.new_date else '—' }}
+                      <span class="text-muted small">·
+                        {{ ch.changed_at.strftime('%b %d, %Y') }}
+                        {% if ch.changed_by %} · {{ ch.changed_by.display_name or ch.changed_by.username }}{% endif %}
+                      </span>
+                      {% if ch.reason and ch.reason != '(no reason given)' %}
+                      <div class="small mt-1"><em>Reason:</em> {{ ch.reason }}</div>
+                      {% endif %}
+                    </li>
+                  {% endfor %}
+                  </ul>
+                </div>
+              </td>
+            </tr>
+            {% endif %}
             {% endfor %}
           </tbody>
         </table>
@@ -466,6 +531,11 @@
                   <input type="text" name="owner" id="modalOwner" class="form-control" placeholder="Name">
                 </div>
                 <div class="col-12"><hr class="my-1"></div>
+                <div class="col-12">
+                  <small class="text-muted">
+                    <strong>Plan</strong> = what you originally committed to. Changing a planned date requires a reason below (writes to plan-change history).
+                  </small>
+                </div>
                 <div class="col-md-3">
                   <label class="form-label fw-semibold">Planned Start</label>
                   <input type="date" name="planned_start_date" id="modalPlannedStart" class="form-control">
@@ -473,6 +543,17 @@
                 <div class="col-md-3">
                   <label class="form-label fw-semibold">Planned End</label>
                   <input type="date" name="planned_end_date" id="modalPlannedEnd" class="form-control">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-semibold">Reason for plan change <span class="text-muted">(required when changing Planned dates)</span></label>
+                  <input type="text" name="plan_change_reason" id="modalPlanReason" class="form-control"
+                         placeholder="e.g. Factory pushed sample delivery; engineering review took 2 extra weeks">
+                </div>
+                <div class="col-12"><hr class="my-1"></div>
+                <div class="col-12">
+                  <small class="text-muted">
+                    <strong>Reality</strong> = what actually happened. Updating these does NOT require a reason. Tip: use the green "Finish phase" button on the timeline row to set Actual End + advance the next phase in one click.
+                  </small>
                 </div>
                 <div class="col-md-3">
                   <label class="form-label fw-semibold">Actual Start</label>
@@ -694,7 +775,16 @@ document.getElementById('phaseModal').addEventListener('show.bs.modal', function
   document.getElementById('modalActualStart').value  = btn.getAttribute('data-actual-start') || '';
   document.getElementById('modalActualEnd').value    = btn.getAttribute('data-actual-end') || '';
   document.getElementById('modalNotes').value = btn.getAttribute('data-notes') || '';
+  // Build 17 — clear the reason field every time we open the modal
+  var reasonField = document.getElementById('modalPlanReason');
+  if (reasonField) reasonField.value = '';
 });
+
+// Build 17 — toggle the plan-history accordion row under a phase
+function togglePlanHistory(phaseId) {
+  var row = document.getElementById('plan-history-' + phaseId);
+  if (row) row.classList.toggle('d-none');
+}
 
 function toggleAddPhase() {
   var form = document.getElementById('addPhaseForm');

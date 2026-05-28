@@ -131,6 +131,8 @@ def main():
                     fail("Modal pre-fill", "phase name empty after open")
                 # Set a planned end date and submit
                 page.locator("#modalPlannedEnd").fill("2026-12-31")
+                # Build 17 — plan-date changes now require a reason
+                page.locator("#modalPlanReason").fill("Build 12 regression test — pushing planned end")
                 try:
                     with page.expect_navigation(timeout=5000):
                         page.locator(".modal.show button[type=submit]").click()

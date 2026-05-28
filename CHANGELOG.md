@@ -1,5 +1,40 @@
 # PM Product Tracker — Changelog
 
+## v1.1.0-build17 — Timeline 2.0 (Plan / Reality split + Finish Phase) (Build 17)
+_2026-05-27_
+
+**Goal:** projects evolve — original plans slip, and we need to capture WHY without losing the original commitment. Build 17 separates Plan from Reality on the timeline, makes plan-date shifts auditable with a required reason, and adds a one-click Finish Phase that correctly advances the next phase.
+
+**Plan / Reality column split** — each phase row now has two visually distinct column groups: Plan (Planned Start, Planned End) and Reality (Actual Start, Actual End). Plan group is blue-tinted; Reality is neutral.
+
+**Plan-date changes are tracked** — any change to `planned_start_date` or `planned_end_date` via the phase edit modal writes a `phase_plan_changes` row (table existed since Build 13) capturing `old_date`, `new_date`, `changed_by_user_id`, `changed_at`, and `reason`. Reason is required by the route — saving plan-date changes without one redirects with `?timeline_error=reason_required` and a friendly banner.
+
+**Visual indicators** —
+- `*` appears next to any planned date that's been adjusted (one star per field with history, with adjustment count in tooltip).
+- The current in-progress phase row is outlined in blue.
+- A "N plan changes" link under each phase reveals an inline history accordion showing every old → new date shift, who changed it, when, and the reason.
+
+**Finish Phase button** (green checkmark on every active phase row) — one click does the right thing:
+- Marks the current phase done: sets `actual_end_date=today`, `status=done`, and `actual_start_date` if it was still empty (best guess: planned_start or today).
+- Advances the next phase (next `phase_order` that's not done/skipped): sets `actual_start_date=today` (if not already set), `status=in_progress`.
+- Writes one combined change-log event_note recording both transitions.
+- Triggers `recalculate_stage_and_delay` so `current_stage` + `estimated_launch_date` stay correct.
+
+**Permissions** — Finish Phase requires `can_edit_project` (admin + PM on own project). Phase delete now also gated to admin only (consistent with variants/components from Build 16). The reason field appears in the modal only for users who can edit.
+
+**Modal updates** — phase edit modal explicitly splits Plan (with the reason field next to the planned dates) from Reality (with a tip to use the Finish Phase button instead). Reason field is cleared every time the modal opens to avoid stale text.
+
+**No schema migration** — `phase_plan_changes` was created in Build 13.
+
+**Files modified:**
+- `app/crud.py` — `update_phase` extended (reason + changed_by_user_id params, writes `PhasePlanChange` rows on plan-date changes); new `finish_phase`, `get_plan_changes_for_phase`, `get_plan_changes_by_project`
+- `app/routes/projects.py` — phase_edit accepts `plan_change_reason` Form param + redirects with `timeline_error=reason_required` if a plan date changed without one; new `phase_finish` route
+- `app/templates/project_detail.html` — full timeline section rebuild + reason field in modal + plan-history accordion JS
+- `app/static/css/styles.css` — Plan/Reality column tinting, asterisk marker, history accordion, Finish Phase button
+- `app/version.py`, `VERSION.md`, `AI_TOOLS_REGISTRY.md`
+
+**Files created:** `test_build17.py`
+
 ## v1.1.0-build16 — Variants + Packaging + Quotation + Profit Model placeholder (Build 16)
 _2026-05-27_
 

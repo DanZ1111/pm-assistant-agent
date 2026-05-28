@@ -295,6 +295,18 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
     quotation_files = crud.get_quotation_files_for_project(db, project_id)
     can_costs = can_view_costs(current_user)
 
+    # Build 17 — Timeline 2.0: plan-change history per phase + error flash
+    plan_changes_by_phase = crud.get_plan_changes_by_project(db, project_id)
+    timeline_error = request.query_params.get("timeline_error")
+    # Find the current "in_progress" phase (for Finish Phase button decoration)
+    current_phase = next((p for p in phases if p.status == "in_progress"), None)
+    if not current_phase:
+        current_phase = next(
+            (p for p in sorted(phases, key=lambda x: x.phase_order)
+             if p.status not in ("done", "skipped")),
+            None,
+        )
+
     return templates.TemplateResponse(request, "project_detail.html", {
         "project": project,
         "phases": phases,
@@ -319,6 +331,9 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
         "components": components,
         "quotation_files": quotation_files,
         "can_view_costs": can_costs,
+        "plan_changes_by_phase": plan_changes_by_phase,
+        "timeline_error": timeline_error,
+        "current_phase": current_phase,
     })
 
 
@@ -481,6 +496,7 @@ def phase_edit(
     actual_end_date: str = Form(""),
     owner: str = Form(""),
     notes: str = Form(""),
+    plan_change_reason: str = Form(""),
     db: Session = Depends(get_db),
 ):
     current_user = get_current_user(request, db)
@@ -491,6 +507,20 @@ def phase_edit(
 
     project = crud.get_project(db, project_id)
     if project and can_edit_project(current_user, project):
+        # Build 17 — if user is changing a plan date, require a reason
+        existing = crud.get_phase(db, phase_id)
+        if existing:
+            new_pstart = parse_date(planned_start_date)
+            new_pend = parse_date(planned_end_date)
+            plan_changed = (
+                (existing.planned_start_date != new_pstart) or
+                (existing.planned_end_date != new_pend)
+            )
+            if plan_changed and not plan_change_reason.strip():
+                return RedirectResponse(
+                    url=f"/projects/{project_id}?timeline_error=reason_required#timeline",
+                    status_code=303,
+                )
         data = {
             "phase_name": phase_name.strip(),
             "phase_type": phase_type.strip() or None,
@@ -502,7 +532,36 @@ def phase_edit(
             "owner": owner.strip() or None,
             "notes": notes.strip() or None,
         }
-        crud.update_phase(db, phase_id, data)
+        crud.update_phase(
+            db, phase_id, data,
+            changed_by=current_user.role,
+            reason=plan_change_reason,
+            changed_by_user_id=current_user.id,
+        )
+    return RedirectResponse(url=f"/projects/{project_id}#timeline", status_code=303)
+
+
+@router.post("/projects/{project_id}/phases/{phase_id}/finish")
+def phase_finish(
+    request: Request,
+    project_id: int,
+    phase_id: int,
+    db: Session = Depends(get_db),
+):
+    """Build 17 — one-click 'mark phase done + advance next phase'."""
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+
+    project = crud.get_project(db, project_id)
+    if project and can_edit_project(current_user, project):
+        crud.finish_phase(
+            db, phase_id,
+            changed_by=current_user.role,
+            changed_by_user_id=current_user.id,
+        )
     return RedirectResponse(url=f"/projects/{project_id}#timeline", status_code=303)
 
 
