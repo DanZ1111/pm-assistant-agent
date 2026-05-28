@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}My Projects — PM Tracker{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+    <div>
+      <h1 class="page-title">My Projects</h1>
+      <p class="page-subtitle">
+        {% if current_user.role == 'admin' %}
+        Admin view — all {{ rows|length }} project{{ '' if rows|length == 1 else 's' }} in the system.
+        {% else %}
+        Projects where you are the listed PM ({{ rows|length }} total).
+        {% endif %}
+      </p>
+    </div>
+    {% if current_user.role in ('admin', 'pm') %}
+    <a href="/projects/new" class="btn btn-primary btn-lg">
+      <i class="bi bi-plus-lg me-1"></i>New Project
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="px-4 pb-5">
+  {% if rows %}
+  <div class="table-responsive">
+    <table class="table table-hover project-table">
+      <thead>
+        <tr>
+          <th>Project</th>
+          <th>Stage</th>
+          <th>Planned Launch</th>
+          <th>Status</th>
+          <th>Last Updated</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        {% set p = r.project %}
+        {% set delay = r.delay %}
+        <tr onclick="window.location='/projects/{{ p.id }}'" style="cursor:pointer">
+          <td>
+            <div class="fw-semibold">{{ p.name }}</div>
+            <div class="small text-muted">
+              {% if p.brand %}{{ p.brand }}{% endif %}
+              {% if p.sku %}<span class="ms-1">· {{ p.sku }}</span>{% endif %}
+            </div>
+          </td>
+          <td>{% if p.current_stage %}<span class="stage-pill">{{ p.current_stage }}</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+          <td>
+            {% if p.planned_launch_date %}
+              {{ p.planned_launch_date.strftime('%b %d, %Y') }}
+              {% if delay %}
+              <span class="badge badge-delayed ms-2"><i class="bi bi-alarm me-1"></i>{{ delay.days_late }}d late</span>
+              {% endif %}
+            {% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td><span class="status-badge status-{{ p.status }}">{{ p.status }}</span></td>
+          <td class="small text-muted">{% if p.updated_at %}{{ p.updated_at.strftime('%b %d, %Y') }}{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="placeholder-section mt-3">
+    <i class="bi bi-inbox me-2"></i>
+    {% if current_user.role == 'pm' %}
+    You're not listed as the PM on any projects yet. Ask an admin to assign you, or create one yourself.
+    {% else %}
+    No projects in the system yet.
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

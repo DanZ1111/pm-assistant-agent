@@ -16,7 +16,7 @@
       <i class="bi bi-grid-3x3-gap me-2"></i>PM Tracker
     </a>
     <div class="navbar-nav flex-row gap-1 align-items-center">
-      <a class="nav-link px-3 {% if request.url.path.startswith('/projects') %}active{% endif %}" href="/projects">
+      <a class="nav-link px-3 {% if request.url.path.startswith('/projects') %}active{% endif %}" href="/projects" id="navProjectsLink">
         <i class="bi bi-folder2 me-1"></i>Projects
       </a>
       {% if current_user %}
@@ -28,6 +28,9 @@
       </a>
       {% endif %}
       {% if current_user and current_user.role in ('admin', 'pm') %}
+      <a class="nav-link px-3 {% if request.url.path.startswith('/my-projects') %}active{% endif %}" href="/my-projects">
+        <i class="bi bi-person-circle me-1"></i>My Projects
+      </a>
       <a class="nav-link px-3 {% if request.url.path.startswith('/ai') %}active{% endif %}" href="/ai/intake">
         <i class="bi bi-robot me-1"></i>AI Intake
       </a>
@@ -369,6 +372,30 @@
 
   textarea.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) askBtn.click();
+  });
+})();
+
+// Build 19 — Projects nav last-project memory.
+// Single-click → /projects/{pm_last_project_id} if set, else /projects.
+// Double-click → clear memory and go to /projects.
+(function () {
+  var link = document.getElementById('navProjectsLink');
+  if (!link) return;
+  var clickTimer = null;
+  link.addEventListener('click', function (e) {
+    e.preventDefault();
+    if (clickTimer) clearTimeout(clickTimer);
+    clickTimer = setTimeout(function () {
+      var last = localStorage.getItem('pm_last_project_id');
+      window.location.href = (last && /^\d+$/.test(last)) ? '/projects/' + last : '/projects';
+      clickTimer = null;
+    }, 250);
+  });
+  link.addEventListener('dblclick', function (e) {
+    e.preventDefault();
+    if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+    localStorage.removeItem('pm_last_project_id');
+    window.location.href = '/projects';
   });
 })();
 </script>

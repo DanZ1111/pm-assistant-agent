@@ -30,9 +30,6 @@
           {% if e.delay %}
           <span class="badge badge-delayed">{{ e.delay.days_late }}d late</span>
           {% endif %}
-          {% if e.health.needs_info %}
-          <span class="badge badge-needs-info">{{ e.health.critical_count }} missing</span>
-          {% endif %}
         </span>
       </a>
       {% endfor %}

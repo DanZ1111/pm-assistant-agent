@@ -1,9 +1,15 @@
 # PM Product Tracker — Version
 
-**Current Version:** v1.1.0-build18
-**Current Build:** Build 18 — Rendering History + Prototype Photos
+**Current Version:** v1.1.0-build19
+**Current Build:** Build 19 — My Projects + Attention banner cleanup + last-project memory
 **Status:** v1.1.0 in progress (build-by-build per roadmap)
 **Last Updated:** 2026-05-28
+
+## What's new in v1.1.0-build19
+
+- **My Projects** tab in the navbar (admin + PM only; hidden from viewer). Wide row-per-project layout. Admin sees all projects; PM sees only projects where they're listed as the PM (case-insensitive username match).
+- **Attention banner is now delay-only.** "Needs-Info" no longer appears in the top-of-page banner — it still surfaces as the per-card badge and as a filter tab, so nothing is lost; the banner is just less noisy.
+- **Last-opened project memory** on the Projects nav link. Single-click → returns you to the project detail page you last viewed (stored in `localStorage` as `pm_last_project_id`). Double-click → clears the memory and goes to the full `/projects` list. No server-side persistence; pure client-side.
 
 ## What's new in v1.1.0-build18
 

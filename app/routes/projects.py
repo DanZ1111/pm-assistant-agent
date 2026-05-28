@@ -137,7 +137,8 @@ def projects_list(
         "completed": sum(1 for p in all_projects if p.status == "completed"),
         "archived": sum(1 for p in all_projects if p.status == "archived"),
     }
-    needs_attention = [e for e in active_enriched if e["delay"] or e["health"]["needs_info"]]
+    # Build 19 — banner is delay-only (Needs-Info still surfaces via card badge + filter tab)
+    needs_attention = [e for e in active_enriched if e["delay"]]
     phases_due = crud.get_phases_due_this_week(db)
 
     return templates.TemplateResponse(request, "projects_list.html", {
@@ -151,6 +152,34 @@ def projects_list(
         "current_brand": brand or "",
         "search": search or "",
         "current_user": current_user,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Build 19 — My Projects (admin + pm only; viewer redirected)
+# ---------------------------------------------------------------------------
+
+@router.get("/my-projects", response_class=HTMLResponse)
+def my_projects(request: Request, db: Session = Depends(get_db)):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+    if current_user.role not in ("admin", "pm"):
+        return RedirectResponse(url="/projects", status_code=303)
+
+    projects = crud.get_projects_for_user(db, current_user)
+    # Compute per-project delay + current_stage helpers (lightweight; reuse get_projects_enriched-style).
+    rows = []
+    for p in projects:
+        delay = crud.calculate_delay(p, p.phases)
+        rows.append({"project": p, "delay": delay})
+
+    return templates.TemplateResponse(request, "my_projects.html", {
+        "rows": rows,
+        "current_user": current_user,
+        "today": date.today(),
     })
 
 

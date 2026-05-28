@@ -1,5 +1,37 @@
 # PM Product Tracker — Changelog
 
+## v1.1.0-build19 — My Projects + Attention banner cleanup + last-project memory (Build 19)
+_2026-05-28_
+
+**Goal:** small UX polish pass — give PMs a focused view, cut noise from the attention banner, and stop sending them back to the full list every time they click the Projects nav.
+
+**My Projects** — new `/my-projects` route (admin + PM only; viewer is 303-redirected to `/projects`). Wide table layout: name, current stage, planned launch (with inline delay badge), status, last updated. Admin sees all projects; PM sees only projects where `product_manager` matches their username (case-insensitive). Empty-state copy differs by role.
+
+**Attention banner is now delay-only.** `needs_attention = [e for e in active_enriched if e["delay"]]` in `app/routes/projects.py` (was `e["delay"] or e["health"]["needs_info"]`). The Needs-Info per-card badge, the Needs-Info filter tab, the `card-needs-info` row class, the table-view badge, and the route filter logic all remain — only the banner block changed.
+
+**Last-opened project memory** — `app/templates/project_detail.html` writes `localStorage.pm_last_project_id` on every page load. The Projects navbar link gets a 250ms click handler in `app/templates/base.html`: single-click → `/projects/{last_id}` if set, else `/projects`; double-click → clear and go to `/projects`. The click handler uses a setTimeout that's cancelled by `dblclick` so the two events don't compound.
+
+**Navbar** — new "My Projects" link with `bi-person-circle` icon, gated `{% if current_user.role in ('admin', 'pm') %}`. Sits between Good Ideas and AI Intake.
+
+**Permissions** —
+- Viewer: `/my-projects` redirects to `/projects`; navbar link hidden.
+- PM: sees own projects only.
+- Admin: sees all projects in the same view.
+
+**No schema migration.** Pure UI + a new service function (`crud.get_projects_for_user`).
+
+**Files modified:**
+- `app/crud.py` — new `get_projects_for_user(db, user)`
+- `app/routes/projects.py` — new `/my-projects` route; `needs_attention` tightened to delay-only
+- `app/templates/base.html` — My Projects nav link + Projects-nav click/dblclick handler
+- `app/templates/projects_list.html` — Needs-Info badge removed from attention banner block
+- `app/templates/project_detail.html` — `localStorage.pm_last_project_id` writer in extra_js
+- `app/version.py`, `VERSION.md`, `USER_GUIDE.md`
+
+**Files created:**
+- `app/templates/my_projects.html`
+- `test_build19.py`
+
 ## v1.1.0-build18 — Rendering History + Prototype Photos (Build 18)
 _2026-05-28_
 

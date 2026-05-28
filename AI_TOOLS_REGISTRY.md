@@ -3,6 +3,8 @@
 Every feature that creates structured data MUST have a corresponding AI tool here.
 AI must eventually be able to use every major feature — not just chat about them.
 
+> **This registry defines tool schemas and implementation status. It does not override `CLAUDE.md` or `ARCHITECTURE.md`.** Tool allowlists must respect source-of-truth rules such as derived fields not being manually updated (e.g. `current_stage` is derived from phases per CLAUDE.md non-negotiable rule §5 and must NOT appear in any AI write allowlist).
+
 Status legend:
 - `implemented` — registered in `app/ai/tools.py`, wired into the chat flow, has tests
 - `planned`     — schema defined here; handler is a stub or not wired yet
@@ -66,8 +68,11 @@ Status legend:
 
 ## Sensitive Field Allowlist for `update_project_field`
 
-AI can propose updates to: `name`, `brand`, `sku`, `product_type`, `project_owner`, `product_manager`, `planned_launch_date`, `project_thesis`, `status`, `current_stage`, `notes` fields.
+AI can propose updates to: `name`, `brand`, `sku`, `product_type`, `project_owner`, `product_manager`, `planned_launch_date`, `project_thesis`, `notes`.
 
-AI MUST NOT directly write: `factory`, `engineer`, `target_factory_cost`, `target_msrp` — these require explicit user confirmation even from admin, because they're operationally consequential.
+AI MUST NOT directly write:
+- `factory`, `engineer`, `target_factory_cost`, `target_msrp` — operationally consequential; require explicit user confirmation even from admin.
+- `current_stage` — derived from phases per CLAUDE.md non-negotiable rule §5; never settable directly.
+- `status` — operationally consequential (wrong archive via AI typo is a real failure mode); will get a dedicated `change_project_status` tool with mandatory confirmation if needed in Build 21+.
 
 (This list is enforced in the tool handler in `app/ai/tools.py`, not just in this doc.)

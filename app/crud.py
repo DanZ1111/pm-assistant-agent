@@ -191,6 +191,28 @@ def get_all_brands(db: Session) -> list[str]:
     rows = db.query(Project.brand).filter(Project.brand.isnot(None)).distinct().all()
     return sorted([r[0] for r in rows if r[0]])
 
+
+def get_projects_for_user(db: Session, user) -> list[Project]:
+    """Build 19 — projects the given user is the PM of.
+    Admin sees all projects; PM sees only projects where product_manager matches their username
+    (case-insensitive); viewer gets an empty list (the /my-projects route also redirects them away).
+    """
+    if user is None:
+        return []
+    if user.role == "admin":
+        return get_projects(db)
+    if user.role == "pm":
+        uname = (user.username or "").strip().lower()
+        if not uname:
+            return []
+        return (
+            db.query(Project)
+            .filter(func.lower(Project.product_manager) == uname)
+            .order_by(Project.updated_at.desc())
+            .all()
+        )
+    return []  # viewer
+
 def create_project(db: Session, data: dict, prototype_rounds: str = "single") -> Project:
     project = Project(**{k: v for k, v in data.items() if v != "" and v is not None})
     db.add(project)

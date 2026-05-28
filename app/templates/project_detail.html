@@ -823,5 +823,7 @@ function toggleAddPhase() {
     btn.style.display = '';
   }
 }
+// Build 19 — remember this as the last-opened project for the Projects nav single-click target.
+try { localStorage.setItem('pm_last_project_id', '{{ project.id }}'); } catch (e) {}
 </script>
 {% endblock %}

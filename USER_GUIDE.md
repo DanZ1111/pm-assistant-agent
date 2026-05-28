@@ -28,8 +28,9 @@ The projects list is your home screen. It shows all projects and highlights thos
 
 At the top of the page, you'll see:
 - **Delayed projects** — projects with overdue phases (shown in red with days late)
-- **Projects missing critical info** — projects with empty critical fields (shown in orange)
 - **Phases due this week** — phases whose planned end date falls in the next 7 days
+
+(As of Build 19, "Needs Info" no longer appears in this banner — it still shows on each card and as a filter tab below.)
 
 ### Filter tabs
 
@@ -48,6 +49,19 @@ At the top of the page, you'll see:
 - **Table view**: Better for comparing cost, factory, PM, and dates side by side
 
 The toggle button is in the top right of the projects list. Your preference is saved in your browser.
+
+### My Projects (Build 19)
+
+PMs and admins get a separate **My Projects** tab in the navbar (hidden from viewers).
+
+- **PM view**: only projects where you're listed as the Product Manager.
+- **Admin view**: all projects in the system, same wide table layout.
+
+This is the focused view — use it day-to-day. Use the full Projects list when you need to compare across the org.
+
+### Last-opened project memory (Build 19)
+
+Clicking the **Projects** link in the navbar now sends you back to the project detail page you last viewed, not the full list. Double-click the same link to clear that memory and go to the full list. Pure browser-side; nothing is stored on the server.
 
 ---
 

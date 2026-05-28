@@ -98,6 +98,12 @@ git status && git diff                 # what's in flight right now
 
 ---
 
+## Source-of-Truth Discipline
+
+When modifying AI tools, permission rules, allowlists, schemas, or database writes, cross-check against `CLAUDE.md` Non-negotiables and `ARCHITECTURE.md` source-of-truth rules. If `AI_TOOLS_REGISTRY.md` or `MASTERPLAN.md` conflicts with them, stop and report the conflict. `CLAUDE.md` / `ARCHITECTURE.md` win.
+
+---
+
 ## Non-negotiable Rules
 
 1. Routes stay thin — business logic in service functions in `crud.py`

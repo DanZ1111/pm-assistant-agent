@@ -1536,7 +1536,7 @@ After each checkpoint, I'll stop and report so you can verify before I continue 
 | **17** | Timeline 2.0 (Plan / Reality split) | L | Split each phase row into Plan + Reality columns. Plan date changes require a reason → `phase_plan_changes` row → `*` marker on date. Finish Phase button sets current phase done + advances next phase to in_progress (both `actual_*` timestamps from server). Update `current_stage` + `calculate_delay`. |
 | **18** | Rendering History + Prototype Photos | S | Two dedicated sections, chronological with per-upload comments. Comments inline-editable (PM+admin). Latest rendering thumbnail on project card right side. Reuse `project_files` with `file_category="rendering"` and new `file_category="prototype_photo"`. |
 | **19** | My Projects tab + Attention banner cleanup + Project state preservation | S | New `/my-projects` route (admin/pm only, hidden from viewer), wide row-per-project layout. Remove Needs-Info from attention banner (keep card badge + filter tab). localStorage `pm_last_project_id` so clicking Projects nav returns to last opened project (double-click to clear). |
-| **20** | AI Tools Architecture + Permission Guard update | M | Create `app/ai/tools.py` with JSON schemas for all 14 tools. **Only `create_journal_entry` is wired in v1.1.** Others are schemas with TODO handlers. Update `AI_TOOLS_REGISTRY.md`. Extend `is_forbidden_ai_question` and `sanitize_project_for_user` to filter journal entries, business plans, quotations, variant costs, packaging costs for viewers. |
+| **20** | AI Tools Architecture + Permission Guard update | M | Create `app/ai/tools.py` with JSON schemas for all 16 tools. **Only `create_journal_entry` is wired in v1.1.** Others are schemas with TODO handlers. Update `AI_TOOLS_REGISTRY.md`. Extend `is_forbidden_ai_question` and `sanitize_project_for_user` to filter journal entries, business plans, quotations, variant costs, packaging costs for viewers. |
 | **21** | Bottom AI Chat + Side Panel + Conversation History | L | Fixed-position bottom chat input on every authenticated page. Input grows vertically as user types (ChatGPT-style). Files/images drag-droppable into same box. Submit → right-side panel slides open with response. Panel has: Ask/Intake mode toggle, Project/Global scope toggle, conversation history, archive button. `ai_conversations` table stores grouping. Wire `create_journal_entry` as the v1.1 working Intake tool. |
 | **22** | AI-Assisted Create Project (remove AI Intake from nav) | M | Create Project page gets two tabs: Manual Form / AI-Assisted. AI-Assisted is the new home for the unified text+file intake. Remove `/ai/intake` from navbar but keep the route (redirect to Create Project AI tab). |
 | **23** | Chinese i18n | L | `app/i18n.py` + `app/i18n/zh.json`. `t(key)` Jinja2 global. Translate all nav, page titles, section headers, button labels, badges, status labels, form labels. Thoughtful translations (not raw translate). Language switcher in navbar. User preference persisted to `users.language` and a cookie fallback. Deep docs stay English. |
@@ -2418,6 +2418,173 @@ Retrospective lives in [CHANGELOG.md](CHANGELOG.md). Roadmap scope: see the tabl
 ### Build 18 — Rendering History + Prototype Photos ✓ SHIPPED v1.1.0-build18
 
 Retrospective lives in [CHANGELOG.md](CHANGELOG.md). Roadmap scope: see the table row at line 1537.
+
+---
+
+### Build 19 — My Projects tab + Attention banner cleanup + Project state preservation ✓ SHIPPED v1.1.0-build19
+
+#### Context
+v1.1 has grown enough that PMs accumulate noise: the projects list shows everything (including projects they don't own), the attention banner double-flags Needs-Info (already shown on each card + as a filter tab), and the Projects nav link always dumps you back to the full list even when you were deep in one project. Build 19 is a small UX cleanup pass — three independent, low-risk pieces, all S.
+
+#### Scope (three sub-items)
+
+**1. New `/my-projects` route (admin + pm only, hidden from viewer).**
+A focused row-per-project view of projects the current user is the PM of. Admin sees all projects (same view, no filtering, since admin "owns" the org). Viewer is redirected to `/projects`.
+
+- New service fn `crud.get_projects_for_user(db, user)` — admin → all projects; pm → projects where `func.lower(project.product_manager) == user.username.lower()`; viewer → empty list.
+- New route in `app/routes/projects.py` mirroring the admin-guard pattern from `app/routes/admin.py` but allowing `current_user.role in ('admin', 'pm')`. Returns `templates.TemplateResponse('my_projects.html', ...)`.
+- New template `app/templates/my_projects.html` — wide row layout. Reuse the existing table-view markup from `projects_list.html:172-216` as the visual base; trim columns that don't fit a PM's daily workflow (keep: name, current stage, planned launch, delay badge, last updated; drop: brand, factory, cost if too wide).
+- Navbar link in `app/templates/base.html` after line 34 (after AI Intake), guarded `{% if current_user and current_user.role in ('admin', 'pm') %}`. Icon: `bi-person-circle`.
+
+**2. Remove Needs-Info from the attention banner.**
+Surgical 3-line delete in `app/templates/projects_list.html:33-35`. The Needs-Info per-card badge (line ~156), the filter tab (line ~67-69), `card-needs-info` class wiring, table-view badge (line ~199), and the route `needs_attention` list logic all STAY. The banner becomes "delay-only."
+
+**3. localStorage `pm_last_project_id` — last-project memory on the Projects nav.**
+- On every `project_detail.html` load: inline `<script>` writes `localStorage.pm_last_project_id = {{ project.id }}`.
+- Projects navbar link in `base.html` gets a click handler with a 250ms delay (so a real double-click can cancel it). Single-click → redirect to `/projects/{last_id}` if set, else `/projects`. Double-click → clear `pm_last_project_id` and go to `/projects`.
+- No server-side persistence — pure client-side. Stale ID (deleted project) just 404s; user double-clicks the nav to clear.
+
+#### AI tools registry
+No new AI tools. `get_projects_for_user` is a service function only; not exposed via chat in v1.1.
+
+#### Affected files
+- New: `app/templates/my_projects.html`
+- Modify: `app/routes/projects.py` (new `/my-projects` route), `app/crud.py` (new `get_projects_for_user`), `app/templates/base.html` (nav link + click handler), `app/templates/projects_list.html` (delete banner Needs-Info block), `app/templates/project_detail.html` (one-line localStorage write)
+- Bump: `app/version.py`, `VERSION.md`, `CHANGELOG.md`, `USER_GUIDE.md`
+- New: `test_build19.py`
+
+#### Verification
+- `python3 test_build19.py` cases: admin sees all projects in `/my-projects`; PM sees only own; viewer redirected from `/my-projects`; banner no longer contains `badge-needs-info` while the filter tab still does; project_detail page sets localStorage (assert via response HTML containing the inline write); navbar link in HTML for admin/PM but absent for viewer.
+- Regression: `python3 test_build18.py` 17/17 + at least one earlier build (`test_build17.py` 17/17).
+
+#### Out of scope (deferred)
+- AI-assisted "show me my projects" via chat → Build 20 / 21.
+- Server-side persistence of last-project (e.g. `users.last_project_id`) — pure localStorage is fine for v1.1.
+- Renaming "Projects" nav to something else for PMs (would conflict with admin view).
+
+---
+
+### Build 20 — AI Tools Architecture + Permission Guard update ← CURRENT BUILD
+
+#### Context
+We've built 13 manual HTTP routes that mutate project data (Builds 14-18). Each represents something the AI should eventually be able to do via chat — but today the AI has no schema describing those tools, no dispatcher, no permission discipline applied at the tool boundary. Build 21 (Bottom Chat) needs that foundation. Build 20 builds it: define every tool's JSON schema in one place, wire ONE real handler (`create_journal_entry`) end-to-end to prove the pattern, and leave the other tools as schema + permission-checked stub. Also verifies the AI Permission Guard still covers every sensitive source we've added in v1.1.
+
+#### Scope
+
+**1. Create `app/ai/tools.py` with OpenAI function-calling schemas for all 16 tools.**
+(Roadmap row 1539 said "14" originally — that was an approximation. Final count is 16; the row + AI_TOOLS_REGISTRY.md are updated to match.)
+
+The tool list (matches `AI_TOOLS_REGISTRY.md`):
+
+| # | Tool | Why it exists |
+|---|------|---------------|
+| 1 | `create_journal_entry(project_id, entry_text, entry_type)` | The one tool actually wired in v1.1 — AI can capture a journal entry from chat |
+| 2 | `summarize_journal_entry(entry_id)` | AI summary on demand for journal entries |
+| 3 | `extract_thesis_from_business_plan(project_id, file_id)` | Thesis extraction from uploaded plan |
+| 4 | `create_variant(project_id, variant_name, sku, ...)` | Add a new SKU variant |
+| 5 | `update_variant(variant_id, fields)` | Edit a variant's fields |
+| 6 | `set_primary_variant(project_id, variant_id)` | Mark one variant as primary |
+| 7 | `delete_variant(variant_id)` | Admin-only |
+| 8 | `create_variant_component(project_id, variant_id, ...)` | Add packaging/accessory component |
+| 9 | `update_variant_component(component_id, fields)` | Edit component |
+| 10 | `delete_variant_component(component_id)` | Admin-only |
+| 11 | `finish_phase(project_id, phase_id)` | Mark current phase done + advance next |
+| 12 | `adjust_phase_plan(phase_id, planned_*_date, reason)` | Plan-date shift with mandatory reason |
+| 13 | `update_file_comment(project_id, file_id, comment)` | Per-file annotation |
+| 14 | `update_project_field(project_id, field_name, new_value)` | **NEW** — generic field edit, allowlist-gated |
+| 15 | `link_idea_to_project(project_id, idea_id, note)` | **NEW** — wire a Good Idea to a project |
+| 16 | `create_idea(name, description, idea_type, source)` | **NEW** — create a Good Idea entry |
+
+Each entry is `{"type": "function", "function": {"name", "description", "parameters": {...JSON Schema...}}}` — the format OpenAI's `chat.completions.create(..., tools=[...])` expects.
+
+Module structure (high-level):
+
+```python
+# app/ai/tools.py
+TOOL_SCHEMAS = [...]  # 16 OpenAI tool objects
+
+TOOL_PERMISSIONS = {
+    "create_journal_entry": {"require_role": ("admin", "pm"), "needs_project": True, "needs_journal": True},
+    "update_project_field": {"require_role": ("admin", "pm"), "needs_project": True, "field_allowlist": "UPDATE_PROJECT_FIELD_ALLOWED"},
+    "delete_variant": {"require_role": ("admin",), ...},
+    ...
+}
+
+# Deliberately conservative; EXCLUDES current_stage (derived per CLAUDE.md §5)
+# and status (operationally consequential — dedicated change tool later).
+UPDATE_PROJECT_FIELD_ALLOWED = {"name", "brand", "sku", "product_type", "project_owner",
+                                "product_manager", "planned_launch_date", "project_thesis",
+                                "notes"}
+
+def dispatch(tool_name, args, db, user) -> dict:
+    """
+    Order of checks (security-first; never skipped, even for unwired tools):
+      1. Tool exists in TOOL_SCHEMAS              → else {"ok": False, "error": "unknown_tool"}
+      2. User passes role check per TOOL_PERMISSIONS → else {"ok": False, "error": "forbidden"}
+      3. Field allowlist (for update_project_field) → else {"ok": False, "error": "field_not_allowlisted"}
+      4. Handler exists in v1.1                    → else {"ok": False, "error": "not_wired_until_build_21"}
+      5. Call handler                              → return its result
+    """
+    ...
+```
+
+**2. Wire `create_journal_entry` end-to-end.**
+Reuses the existing `crud.create_journal_entry` service function (Build 14). Validates args → checks `can_edit_project` + `can_view_journal` → calls the service (which writes the change log) → returns `{"ok": True, "entry_id": ...}`.
+
+**3. Verify the AI Permission Guard.**
+`_VIEWER_FORBIDDEN` in `app/dependencies.py:92` is already comprehensive. Verification only — no additions for Build 18 (renderings/prototype photos aren't sensitive) or Build 19 (`/my-projects` is server-gated). Quick audit of `sanitize_project_for_user` to confirm variant costs / quotation file lists are never returned for viewers.
+
+**4. Update `AI_TOOLS_REGISTRY.md`.**
+- Move `update_project_field`, `link_idea_to_project`, `create_idea` from "Planned" to "Current Tools" with status `implemented (schema only; handler stub in app/ai/tools.py; full wiring in Build 21)`.
+- Update existing "Current Tools" status strings from `route implemented (Build NN); bottom-chat tool wiring lands in Build 20/21` → `route + schema implemented (Build NN/20); handler wiring lands in Build 21`.
+- The §Sensitive Field Allowlist already corrected pre-Build-20 (no `current_stage`, no `status`).
+- Add a short "How the dispatcher works" subsection mirroring the 5-step order from `dispatch()`.
+
+**5. Tests — `test_build20.py`.**
+
+*Schema & dispatcher correctness:*
+- `from app.ai.tools import TOOL_SCHEMAS, TOOL_PERMISSIONS, dispatch` imports cleanly.
+- `len(TOOL_SCHEMAS) == 16` and every entry has shape `{"type": "function", "function": {"name", "description", "parameters"}}` with a matching key in `TOOL_PERMISSIONS`.
+
+*The one real handler:*
+- `dispatch("create_journal_entry", {"project_id": <pid>, "entry_text": "test entry", "entry_type": "general"}, db, admin_user)` returns `{"ok": True, "entry_id": <int>}`; a new row exists in `project_journal_entries`. (If `entry_type="general"` is not a valid enum value, swap to the correct one during implementation.)
+- `dispatch("create_journal_entry", ..., viewer_user)` → `{"ok": False, "error": "forbidden"}`; NO row added.
+
+*Permission-before-stub discipline:*
+- `dispatch("delete_variant", {...}, pm_user)` → `{"ok": False, "error": "forbidden"}` (PM ≠ admin; permission check fires BEFORE the stub).
+- `dispatch("delete_variant", {...}, admin_user)` → `{"ok": False, "error": "not_wired_until_build_21"}`.
+- Neither is a 500.
+
+*Field allowlist:*
+- `dispatch("update_project_field", {"field_name": "factory", ...}, admin_user)` → `field_not_allowlisted`.
+- `dispatch("update_project_field", {"field_name": "current_stage", ...}, admin_user)` → `field_not_allowlisted` (derived field).
+- `dispatch("update_project_field", {"field_name": "status", ...}, admin_user)` → `field_not_allowlisted` (conservative-allowlist decision).
+- `dispatch("update_project_field", {"field_name": "brand", ...}, admin_user)` → `not_wired_until_build_21` (handler stub, but field IS allowed).
+
+*AI Permission Guard — one explicit case per v1.1 sensitive source:*
+- viewer asking "summarize the business plan" → True
+- viewer asking "what's in the journal entries" → True
+- viewer asking "variant cost for the small SKU" → True
+- viewer asking "packaging cost breakdown" → True
+- viewer asking "quotation totals" → True
+- pm asking "what factory does this use" → False (PM has factory access)
+- admin asking "show the journal entries" → False
+
+#### Affected files
+- New: `app/ai/tools.py`, `test_build20.py`
+- Modify: `AI_TOOLS_REGISTRY.md`, `app/dependencies.py` (verification only; likely no real changes), `app/version.py`, `VERSION.md`, `CHANGELOG.md`
+
+#### Verification
+- `python3 test_build20.py` — all assertions pass.
+- Regression: `python3 test_build19.py` 15/15, `python3 test_build18.py` 17/17.
+- `python -c "from app.ai.tools import TOOL_SCHEMAS; import json; print(json.dumps(TOOL_SCHEMAS[0], indent=2))"` prints a valid OpenAI function-call schema.
+- Footer + Help modal show `v1.1.0-build20`.
+
+#### Out of scope (deferred to Build 21)
+- The actual Bottom Chat UI that *calls* these tools.
+- Confirmation cards (mandatory for destructive tools like `delete_variant`, `update_project_field`).
+- The 13 stub handlers becoming real (only `create_journal_entry` ships wired in v1.1).
+- AI conversation history persistence (`ai_conversations` table exists from Build 13 — Build 21 uses it).
 
 ---
 
