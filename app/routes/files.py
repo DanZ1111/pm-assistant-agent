@@ -1,7 +1,7 @@
 import os
 import uuid
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, FileResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -87,6 +87,29 @@ async def file_upload(
     )
 
     return RedirectResponse(url=f"/projects/{project_id}#files", status_code=303)
+
+
+@router.get("/projects/{project_id}/files/{file_id}/download")
+def file_download(request: Request, project_id: int, file_id: int, db: Session = Depends(get_db)):
+    """Build 16 — guarded download route. Used by Quotation section so
+    viewers can't grab files whose category requires PM+. For non-quotation
+    files this just redirects to the existing /uploads/<name> static URL."""
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+    pf = db.query(ProjectFile).filter(
+        ProjectFile.id == file_id, ProjectFile.project_id == project_id,
+    ).first()
+    if not pf:
+        raise HTTPException(status_code=404, detail="File not found")
+    if pf.file_category == "quotation" and current_user.role not in ("admin", "pm"):
+        return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+    disk_path = os.path.join(UPLOAD_DIR, pf.filename)
+    if not os.path.exists(disk_path):
+        raise HTTPException(status_code=404, detail="File missing on disk")
+    return FileResponse(disk_path, filename=pf.original_filename or pf.filename)
 
 
 @router.post("/projects/{project_id}/files/{file_id}/delete")

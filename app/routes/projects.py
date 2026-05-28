@@ -13,7 +13,7 @@ from app.ai.parser import extract_thesis_and_inspirations
 from app.ai.matching import find_best_match, MATCH_THRESHOLD
 from app.dependencies import (
     get_current_user, require_auth, require_admin,
-    can_edit_project, can_view_sensitive_fields, can_view_journal,
+    can_edit_project, can_view_sensitive_fields, can_view_journal, can_view_costs,
     _RedirectException
 )
 
@@ -288,6 +288,13 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
     business_plan_file = crud.get_latest_business_plan_file(db, project_id)
     thesis_error = request.query_params.get("thesis_error")
 
+    # Build 16 — variants, packaging/accessory components, quotation files
+    variants = crud.get_variants_for_project(db, project_id)
+    primary_variant = next((v for v in variants if v.is_primary), None)
+    components = crud.get_components_for_project(db, project_id)
+    quotation_files = crud.get_quotation_files_for_project(db, project_id)
+    can_costs = can_view_costs(current_user)
+
     return templates.TemplateResponse(request, "project_detail.html", {
         "project": project,
         "phases": phases,
@@ -307,6 +314,11 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
         "journal_error_entry_id": journal_error_entry_id,
         "business_plan_file": business_plan_file,
         "thesis_error": thesis_error,
+        "variants": variants,
+        "primary_variant": primary_variant,
+        "components": components,
+        "quotation_files": quotation_files,
+        "can_view_costs": can_costs,
     })
 
 

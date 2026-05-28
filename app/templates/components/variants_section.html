@@ -1,0 +1,210 @@
+{# Build 16 — Variants section.
+   Expects in context: variants, can_edit, can_view_costs, project, current_user. #}
+<section class="detail-section" id="variants">
+  <div class="section-header">
+    <h2 class="section-title">
+      <i class="bi bi-collection me-2"></i>Variants
+      <span class="text-muted small ms-2">({{ variants|length }})</span>
+    </h2>
+    {% if can_edit %}
+    <button type="button" class="btn btn-sm btn-primary" onclick="toggleVariantAddForm()">
+      <i class="bi bi-plus-lg me-1"></i>Add Variant
+    </button>
+    {% endif %}
+  </div>
+
+  {% if can_edit %}
+  <form id="variantAddForm" method="post" action="/projects/{{ project.id }}/variants"
+        class="d-none variant-add-form mb-3 p-3 border rounded bg-light">
+    <div class="row g-2">
+      <div class="col-md-5">
+        <label class="form-label small fw-bold">Variant name <span class="text-danger">*</span></label>
+        <input type="text" name="variant_name" class="form-control form-control-sm" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-bold">SKU</label>
+        <input type="text" name="sku" class="form-control form-control-sm">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-bold">Status</label>
+        <select name="status" class="form-select form-select-sm">
+          {% for s in ['idea','evaluating','selected','rejected','launched'] %}
+          <option value="{{ s }}" {% if s == 'evaluating' %}selected{% endif %}>{{ s | title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="is_primary" value="1" id="newVarPrimary">
+          <label class="form-check-label small" for="newVarPrimary">Primary</label>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-bold">Target factory cost</label>
+        <input type="text" name="target_factory_cost" class="form-control form-control-sm" placeholder="0.00">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-bold">Actual factory cost</label>
+        <input type="text" name="actual_factory_cost" class="form-control form-control-sm" placeholder="0.00">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-bold">Target MSRP</label>
+        <input type="text" name="target_msrp" class="form-control form-control-sm" placeholder="0.00">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-bold">Material</label>
+        <input type="text" name="material_summary" class="form-control form-control-sm">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-bold">Size / color</label>
+        <input type="text" name="size_color_summary" class="form-control form-control-sm">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-bold">Packaging</label>
+        <input type="text" name="packaging_summary" class="form-control form-control-sm">
+      </div>
+      <div class="col-12">
+        <label class="form-label small fw-bold">Notes</label>
+        <textarea name="notes" class="form-control form-control-sm" rows="2"></textarea>
+      </div>
+    </div>
+    <div class="d-flex gap-2 mt-2">
+      <button type="submit" class="btn btn-primary btn-sm">Save Variant</button>
+      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleVariantAddForm()">Cancel</button>
+    </div>
+  </form>
+  {% endif %}
+
+  {% if variants %}
+  <div class="variant-grid">
+    {% for v in variants %}
+    <div class="variant-card {% if v.is_primary %}variant-card-primary{% endif %}" id="variant-{{ v.id }}">
+      <div class="variant-card-head">
+        <div>
+          {% if v.is_primary %}<span class="variant-primary-star" title="Primary variant">★</span>{% endif %}
+          <span class="variant-name">{{ v.variant_name }}</span>
+          {% if v.sku %}<span class="variant-sku text-muted ms-1">{{ v.sku }}</span>{% endif %}
+        </div>
+        <span class="badge variant-status-badge status-{{ v.status }}">{{ v.status | title }}</span>
+      </div>
+      <dl class="variant-fields">
+        {% if can_view_costs %}
+        <div><dt>Target cost</dt><dd>{% if v.target_factory_cost %}${{ "%.2f"|format(v.target_factory_cost) }}{% else %}—{% endif %}</dd></div>
+        <div><dt>Actual cost</dt><dd>{% if v.actual_factory_cost %}${{ "%.2f"|format(v.actual_factory_cost) }}{% else %}—{% endif %}</dd></div>
+        <div><dt>Target MSRP</dt><dd>{% if v.target_msrp %}${{ "%.2f"|format(v.target_msrp) }}{% else %}—{% endif %}</dd></div>
+        {% endif %}
+        {% if v.material_summary %}<div><dt>Material</dt><dd>{{ v.material_summary }}</dd></div>{% endif %}
+        {% if v.size_color_summary %}<div><dt>Size/color</dt><dd>{{ v.size_color_summary }}</dd></div>{% endif %}
+        {% if v.packaging_summary %}<div><dt>Packaging</dt><dd>{{ v.packaging_summary }}</dd></div>{% endif %}
+      </dl>
+      {% if v.notes %}<p class="variant-notes small text-muted">{{ v.notes }}</p>{% endif %}
+      {% if can_edit %}
+      <div class="variant-actions">
+        {% if not v.is_primary %}
+        <form method="post" action="/projects/{{ project.id }}/variants/{{ v.id }}/set-primary" class="d-inline">
+          <button class="btn btn-sm btn-outline-warning" title="Set as primary variant">
+            <i class="bi bi-star me-1"></i>Set Primary
+          </button>
+        </form>
+        {% endif %}
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                onclick="toggleVariantEdit({{ v.id }})">
+          <i class="bi bi-pencil me-1"></i>Edit
+        </button>
+        {% if current_user.role == 'admin' %}
+        <form method="post" action="/projects/{{ project.id }}/variants/{{ v.id }}/delete"
+              class="d-inline" onsubmit="return confirm('Delete variant {{ v.variant_name|e }}? This cannot be undone.')">
+          <button class="btn btn-sm btn-outline-danger" title="Delete variant (admin only)">
+            <i class="bi bi-x-lg me-1"></i>Delete
+          </button>
+        </form>
+        {% endif %}
+      </div>
+      <form id="variant-edit-{{ v.id }}" method="post"
+            action="/projects/{{ project.id }}/variants/{{ v.id }}/edit"
+            class="d-none variant-edit-form mt-2 p-3 border rounded bg-light">
+        <div class="row g-2">
+          <div class="col-md-5">
+            <label class="form-label small fw-bold">Variant name</label>
+            <input type="text" name="variant_name" class="form-control form-control-sm" required value="{{ v.variant_name }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small fw-bold">SKU</label>
+            <input type="text" name="sku" class="form-control form-control-sm" value="{{ v.sku or '' }}">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small fw-bold">Status</label>
+            <select name="status" class="form-select form-select-sm">
+              {% for s in ['idea','evaluating','selected','rejected','launched'] %}
+              <option value="{{ s }}" {% if v.status == s %}selected{% endif %}>{{ s|title }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2 d-flex align-items-end">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="is_primary" value="1" {% if v.is_primary %}checked{% endif %} id="editPrim{{ v.id }}">
+              <label class="form-check-label small" for="editPrim{{ v.id }}">Primary</label>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-bold">Target factory cost</label>
+            <input type="text" name="target_factory_cost" class="form-control form-control-sm" value="{{ v.target_factory_cost or '' }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-bold">Actual factory cost</label>
+            <input type="text" name="actual_factory_cost" class="form-control form-control-sm" value="{{ v.actual_factory_cost or '' }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-bold">Target MSRP</label>
+            <input type="text" name="target_msrp" class="form-control form-control-sm" value="{{ v.target_msrp or '' }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-bold">Material</label>
+            <input type="text" name="material_summary" class="form-control form-control-sm" value="{{ v.material_summary or '' }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-bold">Size / color</label>
+            <input type="text" name="size_color_summary" class="form-control form-control-sm" value="{{ v.size_color_summary or '' }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-bold">Packaging</label>
+            <input type="text" name="packaging_summary" class="form-control form-control-sm" value="{{ v.packaging_summary or '' }}">
+          </div>
+          <div class="col-12">
+            <label class="form-label small fw-bold">Notes</label>
+            <textarea name="notes" class="form-control form-control-sm" rows="2">{{ v.notes or '' }}</textarea>
+          </div>
+        </div>
+        <div class="d-flex gap-2 mt-2">
+          <button type="submit" class="btn btn-primary btn-sm">Save</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleVariantEdit({{ v.id }})">Cancel</button>
+        </div>
+      </form>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-muted small mb-0">
+    No variants yet.
+    {% if can_edit %}Click "Add Variant" to create the first SKU.{% endif %}
+  </p>
+  {% endif %}
+</section>
+
+<script>
+function toggleVariantAddForm() {
+  var f = document.getElementById('variantAddForm');
+  if (!f) return;
+  f.classList.toggle('d-none');
+  if (!f.classList.contains('d-none')) {
+    var i = f.querySelector('input[name=variant_name]');
+    if (i) i.focus();
+  }
+}
+function toggleVariantEdit(id) {
+  var f = document.getElementById('variant-edit-' + id);
+  if (!f) return;
+  f.classList.toggle('d-none');
+}
+</script>

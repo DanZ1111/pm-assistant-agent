@@ -64,6 +64,12 @@ def can_use_ai_intake(user: User) -> bool:
     return user.role in ("admin", "pm")
 
 
+def can_view_costs(user: User | None) -> bool:
+    """Build 16: viewers see variants/components but not the cost columns.
+    Same rule as factory/engineer visibility — admin + PM only."""
+    return bool(user) and user.role in ("admin", "pm")
+
+
 def can_view_journal(user: User | None) -> bool:
     """Project Journal contains product reasoning, factory discussions, cost
     discoveries, abandoned directions — strictly internal. Viewers cannot see."""
@@ -93,6 +99,8 @@ _VIEWER_FORBIDDEN = [
     # v1.1 Build 15: Business plan / thesis extraction sources can contain
     # margin/pricing strategy — viewers must not be able to AI-summarize them
     "business plan", "thesis extraction", "margin target", "pricing strategy",
+    # v1.1 Build 16: Variant + packaging + quotation costs are sensitive
+    "variant cost", "actual cost", "quotation", "packaging cost", "component cost",
 ]
 
 

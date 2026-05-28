@@ -1073,3 +1073,256 @@ def apply_thesis_extraction(
         db.commit()
 
     return summary
+
+
+# ---------------------------------------------------------------------------
+# Build 16 — Multi-SKU Variants + Packaging/Accessories + Quotation files
+# ---------------------------------------------------------------------------
+
+from app.models import ProjectVariant, ProjectVariantComponent  # late import
+
+VARIANT_STATUSES = ("idea", "evaluating", "selected", "rejected", "launched")
+COMPONENT_TYPES = ("packaging", "accessory")
+
+
+def _parse_float_safe(v):
+    if v is None or v == "":
+        return None
+    try:
+        return float(str(v).replace(",", "").strip())
+    except (ValueError, TypeError):
+        return None
+
+
+def get_variants_for_project(db: Session, project_id: int) -> list[ProjectVariant]:
+    """Primary first, then by id ascending."""
+    return (
+        db.query(ProjectVariant)
+        .filter(ProjectVariant.project_id == project_id)
+        .order_by(ProjectVariant.is_primary.desc(), ProjectVariant.id.asc())
+        .all()
+    )
+
+
+def get_variant(db: Session, variant_id: int) -> ProjectVariant | None:
+    return db.query(ProjectVariant).filter(ProjectVariant.id == variant_id).first()
+
+
+def get_primary_variant(db: Session, project_id: int) -> ProjectVariant | None:
+    return (
+        db.query(ProjectVariant)
+        .filter(ProjectVariant.project_id == project_id, ProjectVariant.is_primary == True)
+        .first()
+    )
+
+
+def _clear_primary_variants(db: Session, project_id: int) -> None:
+    """Service-layer enforcement: only one variant per project may be primary.
+    No DB unique constraint (too risky for migrations)."""
+    db.query(ProjectVariant).filter(
+        ProjectVariant.project_id == project_id,
+        ProjectVariant.is_primary == True,
+    ).update({"is_primary": False})
+
+
+def create_variant(db: Session, project_id: int, data: dict) -> ProjectVariant:
+    status = data.get("status") or "evaluating"
+    if status not in VARIANT_STATUSES:
+        status = "evaluating"
+    is_primary = bool(data.get("is_primary"))
+    if is_primary:
+        _clear_primary_variants(db, project_id)
+    v = ProjectVariant(
+        project_id=project_id,
+        variant_name=(data.get("variant_name") or "").strip() or "(untitled)",
+        sku=(data.get("sku") or "").strip() or None,
+        status=status,
+        is_primary=is_primary,
+        target_factory_cost=_parse_float_safe(data.get("target_factory_cost")),
+        actual_factory_cost=_parse_float_safe(data.get("actual_factory_cost")),
+        target_msrp=_parse_float_safe(data.get("target_msrp")),
+        material_summary=(data.get("material_summary") or "").strip() or None,
+        size_color_summary=(data.get("size_color_summary") or "").strip() or None,
+        packaging_summary=(data.get("packaging_summary") or "").strip() or None,
+        notes=(data.get("notes") or "").strip() or None,
+    )
+    db.add(v)
+    db.commit()
+    db.refresh(v)
+    write_change(
+        db, project_id=project_id, change_type="event_note",
+        summary=f"Variant created: {v.variant_name}" + (f" (SKU {v.sku})" if v.sku else ""),
+    )
+    return v
+
+
+def update_variant(db: Session, variant_id: int, data: dict) -> ProjectVariant | None:
+    v = get_variant(db, variant_id)
+    if not v:
+        return None
+    if "is_primary" in data and bool(data["is_primary"]) and not v.is_primary:
+        _clear_primary_variants(db, v.project_id)
+        v.is_primary = True
+    elif "is_primary" in data and not bool(data["is_primary"]):
+        v.is_primary = False
+    for field in ("variant_name", "sku", "material_summary", "size_color_summary",
+                  "packaging_summary", "notes"):
+        if field in data:
+            val = (data.get(field) or "").strip()
+            setattr(v, field, val or None)
+    if "status" in data:
+        s = data["status"]
+        v.status = s if s in VARIANT_STATUSES else v.status
+    for field in ("target_factory_cost", "actual_factory_cost", "target_msrp"):
+        if field in data:
+            setattr(v, field, _parse_float_safe(data.get(field)))
+    v.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(v)
+    write_change(
+        db, project_id=v.project_id, change_type="event_note",
+        summary=f"Variant updated: {v.variant_name}",
+    )
+    return v
+
+
+def delete_variant(db: Session, variant_id: int) -> bool:
+    v = get_variant(db, variant_id)
+    if not v:
+        return False
+    label = v.variant_name
+    pid = v.project_id
+    db.delete(v)
+    db.commit()
+    write_change(
+        db, project_id=pid, change_type="event_note",
+        summary=f"Variant deleted: {label}",
+    )
+    return True
+
+
+def set_primary_variant(db: Session, project_id: int, variant_id: int) -> bool:
+    v = get_variant(db, variant_id)
+    if not v or v.project_id != project_id:
+        return False
+    _clear_primary_variants(db, project_id)
+    v.is_primary = True
+    v.updated_at = datetime.utcnow()
+    db.commit()
+    write_change(
+        db, project_id=project_id, change_type="event_note",
+        summary=f"Set primary variant: {v.variant_name}",
+    )
+    return True
+
+
+# --- Components (packaging / accessories) ---
+
+def get_components_for_project(db: Session, project_id: int) -> list[ProjectVariantComponent]:
+    """Project-wide first (variant_id NULL), then per-variant by variant_id."""
+    rows = (
+        db.query(ProjectVariantComponent)
+        .filter(ProjectVariantComponent.project_id == project_id)
+        .order_by(ProjectVariantComponent.id.asc())
+        .all()
+    )
+    # Sort in Python — SQLite/PostgreSQL NULLs-first behavior differs
+    rows.sort(key=lambda c: (c.variant_id is not None, c.variant_id or 0, c.id))
+    return rows
+
+
+def get_component(db: Session, component_id: int) -> ProjectVariantComponent | None:
+    return db.query(ProjectVariantComponent).filter(
+        ProjectVariantComponent.id == component_id).first()
+
+
+def create_variant_component(db: Session, project_id: int, data: dict) -> ProjectVariantComponent:
+    ctype = data.get("component_type") or "accessory"
+    if ctype not in COMPONENT_TYPES:
+        ctype = "accessory"
+    variant_id = data.get("variant_id")
+    if variant_id in ("", "0", 0, None):
+        variant_id = None
+    else:
+        try:
+            variant_id = int(variant_id)
+        except (ValueError, TypeError):
+            variant_id = None
+    c = ProjectVariantComponent(
+        project_id=project_id,
+        variant_id=variant_id,
+        component_type=ctype,
+        name=(data.get("name") or "").strip() or "(untitled)",
+        target_cost=_parse_float_safe(data.get("target_cost")),
+        actual_cost=_parse_float_safe(data.get("actual_cost")),
+        notes=(data.get("notes") or "").strip() or None,
+    )
+    db.add(c)
+    db.commit()
+    db.refresh(c)
+    write_change(
+        db, project_id=project_id, change_type="event_note",
+        summary=f"{ctype.title()} added: {c.name}",
+    )
+    return c
+
+
+def update_variant_component(db: Session, component_id: int, data: dict) -> ProjectVariantComponent | None:
+    c = get_component(db, component_id)
+    if not c:
+        return None
+    if "component_type" in data and data["component_type"] in COMPONENT_TYPES:
+        c.component_type = data["component_type"]
+    if "name" in data:
+        c.name = (data.get("name") or "").strip() or c.name
+    if "notes" in data:
+        c.notes = (data.get("notes") or "").strip() or None
+    for field in ("target_cost", "actual_cost"):
+        if field in data:
+            setattr(c, field, _parse_float_safe(data.get(field)))
+    if "variant_id" in data:
+        vid = data.get("variant_id")
+        if vid in ("", "0", 0, None):
+            c.variant_id = None
+        else:
+            try:
+                c.variant_id = int(vid)
+            except (ValueError, TypeError):
+                pass
+    c.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(c)
+    write_change(
+        db, project_id=c.project_id, change_type="event_note",
+        summary=f"Component updated: {c.name}",
+    )
+    return c
+
+
+def delete_variant_component(db: Session, component_id: int) -> bool:
+    c = get_component(db, component_id)
+    if not c:
+        return False
+    label = c.name
+    pid = c.project_id
+    db.delete(c)
+    db.commit()
+    write_change(
+        db, project_id=pid, change_type="event_note",
+        summary=f"Component deleted: {label}",
+    )
+    return True
+
+
+# --- Quotation files (filtered view of project_files) ---
+
+def get_quotation_files_for_project(db: Session, project_id: int) -> list[ProjectFile]:
+    return (
+        db.query(ProjectFile)
+        .filter(
+            ProjectFile.project_id == project_id,
+            ProjectFile.file_category == "quotation",
+        )
+        .order_by(ProjectFile.uploaded_at.desc())
+        .all()
+    )

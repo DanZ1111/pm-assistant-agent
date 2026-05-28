@@ -1,0 +1,60 @@
+{# Build 16 — Quotation Files section.
+   Filtered view of project_files where file_category='quotation'.
+   Viewers see filenames but cannot download (route-guarded).
+   Expects in context: quotation_files, can_edit, current_user, project. #}
+<section class="detail-section" id="quotations">
+  <div class="section-header">
+    <h2 class="section-title">
+      <i class="bi bi-receipt me-2"></i>Quotation Files
+      <span class="text-muted small ms-2">({{ quotation_files|length }})</span>
+    </h2>
+    {% if can_edit %}
+    <a href="#files" class="btn btn-sm btn-outline-primary">
+      <i class="bi bi-upload me-1"></i>Upload (Files section ↓)
+    </a>
+    {% endif %}
+  </div>
+
+  {% if quotation_files %}
+  <ul class="quotation-list list-unstyled mb-0">
+    {% for f in quotation_files %}
+    <li class="quotation-item d-flex justify-content-between align-items-center py-2 border-bottom">
+      <div>
+        <i class="bi bi-file-earmark-text me-2 text-muted"></i>
+        <strong>{{ f.original_filename or f.filename }}</strong>
+        <div class="small text-muted">
+          {{ f.uploaded_at.strftime('%b %d, %Y') }}
+          {% if current_user.role in ('admin', 'pm') and f.source_note %}
+            · <span>{{ f.source_note }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        {% if current_user.role in ('admin', 'pm') %}
+        <a href="/projects/{{ project.id }}/files/{{ f.id }}/download" class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-download me-1"></i>Download
+        </a>
+        {% else %}
+        <span class="badge bg-secondary" title="Quotations are PM/admin only">
+          <i class="bi bi-lock me-1"></i>Not available
+        </span>
+        {% endif %}
+        {% if can_edit %}
+        <form method="post" action="/projects/{{ project.id }}/files/{{ f.id }}/delete" class="d-inline"
+              onsubmit="return confirm('Delete this quotation file?')">
+          <button class="btn btn-sm btn-ghost text-danger" title="Delete">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="text-muted small mb-0">
+    No quotation files yet.
+    {% if can_edit %}Use the Files section below to upload a factory quotation — pick "Quotation" as the category.{% endif %}
+  </p>
+  {% endif %}
+</section>

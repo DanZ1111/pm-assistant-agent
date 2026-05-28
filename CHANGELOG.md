@@ -1,5 +1,32 @@
 # PM Product Tracker — Changelog
 
+## v1.1.0-build16 — Variants + Packaging + Quotation + Profit Model placeholder (Build 16)
+_2026-05-27_
+
+**Goal:** real product development isn't one SKU. Build 16 adds the data scaffolding for multi-SKU projects: variants with per-SKU cost/MSRP, packaging/accessory components scoped per-variant or project-wide, a dedicated Quotation Files surface, and a Profit Model placeholder that documents the future v1.2 formula.
+
+**Variants** — new section on project detail (after Inspired By, before Timeline). Card grid with CRUD via inline form + per-card edit form. Fields: variant_name, sku, status (idea/evaluating/selected/rejected/launched), is_primary (★), target_factory_cost, actual_factory_cost, target_msrp, material/size/color/packaging summaries, notes. `is_primary` is enforced at the service layer — setting one to primary unsets the others (no DB unique constraint, safer for migrations).
+
+**Packaging & Accessories** — table-style section below Variants. Each component has type (packaging/accessory), name, scope (project-wide or per-variant), target_cost, actual_cost, notes. Per-variant components only apply to their variant; project-wide components apply to all.
+
+**Quotation Files** — filtered view of `project_files` where `file_category="quotation"`. Listed with friendly UI separately from the general Files area. Server-side guard on download: `GET /projects/{id}/files/{fid}/download` redirects viewers away from quotation files (other categories pass through to the existing static `/uploads/` path).
+
+**Profit Model placeholder** — surfaces the intended v1.2 formula in a callout, shows the primary variant's costs as a preview, and computes a naive per-unit margin if MSRP + factory_cost are both set. Costs hidden from viewers. Full model design in `PROFIT_MODEL_INTENT.md`.
+
+**Permissions** —
+- View variants/components (no costs): all roles
+- View cost columns: admin + PM only (new `can_view_costs()` helper)
+- Create/edit variant or component: admin + PM on own project
+- Delete variant or component: admin only
+- Download quotation file: admin + PM only (server-side route guard)
+
+**AI Permission Guard** — `_VIEWER_FORBIDDEN` extended with `variant cost`, `actual cost`, `quotation`, `packaging cost`, `component cost`.
+
+**Files created:** `app/routes/variants.py`, `app/templates/components/variants_section.html`, `app/templates/components/packaging_section.html`, `app/templates/components/quotation_section.html`, `app/templates/components/profit_model_section.html`, `PROFIT_MODEL_INTENT.md`, `test_build16.py`
+**Files modified:** `app/crud.py` (10 new helpers), `app/dependencies.py` (`can_view_costs`, `_VIEWER_FORBIDDEN`), `app/main.py` (mount router), `app/routes/projects.py` (detail context), `app/routes/files.py` (quotation download guard), `app/templates/project_detail.html` (4 new section includes), `app/static/css/styles.css`, `app/version.py`, `VERSION.md`, `AI_TOOLS_REGISTRY.md`
+
+**No schema migration** — tables (`project_variants`, `project_variant_components`) already created in Build 13.
+
 ## v1.1.0-build15 — Business Plan Upload + Thesis Extraction (Build 15)
 _2026-05-27_
 

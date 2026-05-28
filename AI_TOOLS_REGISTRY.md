@@ -31,6 +31,12 @@ Status legend:
 | `create_journal_entry` (HTTP route) | project_id, entry_text, entry_type | auth + `can_view_journal` + `can_edit_project` | No (low-stakes capture) | **route implemented (Build 14)**; bottom-chat tool wiring lands in Build 20/21 |
 | `summarize_journal_entry` (HTTP route) | entry_id (via URL) | auth + `can_view_journal` + `can_edit_project` | No (preserves existing on failure) | **route implemented (Build 14)**; bottom-chat tool wiring lands in Build 20/21 |
 | `extract_thesis_from_business_plan` (HTTP route) | project_id, business_plan file (or file_id) | auth + `can_edit_project` | YES — preview/confirm screen before write | **route implemented (Build 15)**; one-time AI call persisted to `ai_messages` for refresh-safe preview; bottom-chat tool wiring lands in Build 20/21 |
+| `create_variant` (HTTP route) | project_id, variant_name, sku, status, is_primary, costs, summaries, notes | auth + `can_edit_project` | No (additive) | **route implemented (Build 16)**; bottom-chat tool wiring lands in Build 20/21 |
+| `update_variant` / `set_primary_variant` (HTTP routes) | project_id, variant_id, fields | auth + `can_edit_project` | No (small fields); is_primary auto-unsets siblings via service layer | **route implemented (Build 16)** |
+| `delete_variant` (HTTP route) | project_id, variant_id | auth + admin only | YES — destructive, requires admin | **route implemented (Build 16)** |
+| `create_variant_component` (HTTP route) | project_id, variant_id (nullable), component_type, name, costs | auth + `can_edit_project` | No (cost-tracking only) | **route implemented (Build 16)** |
+| `update_variant_component` (HTTP route) | component_id, fields | auth + `can_edit_project` | No | **route implemented (Build 16)** |
+| `delete_variant_component` (HTTP route) | component_id | auth + admin only | YES — destructive | **route implemented (Build 16)** |
 
 ## Planned for v1.1.0 (priority order)
 
@@ -41,8 +47,6 @@ Status legend:
 | `link_idea_to_project(project_id, idea_id, note)` | Connect an existing idea to a project | auth + `can_edit_project` | YES | 20 |
 | `finish_phase(project_id, phase_id)` | Mark current phase done; advance next phase | auth + `can_edit_project` | YES — irreversible state transition | 17 (Timeline 2.0) / 20 |
 | `create_idea(name, description, idea_type, source, ...)` | Create a Good Idea entry | auth (all roles) | No — idea creation is low-stakes | 20 |
-| `create_variant(project_id, variant_name, sku, ...)` | Add a new SKU/variant to a project | auth + `can_edit_project` | YES | 16 (Variants) / 20 |
-| `create_packaging_component(project_id, variant_id, ...)` | Add packaging/accessory cost line | auth + `can_edit_project` | No (cost-tracking only) | 16 / 20 |
 | `add_rendering_note(file_id, note)` | Annotate an uploaded rendering | auth + `can_edit_project` | No | 18 (Rendering history) |
 | `add_prototype_photo_note(file_id, note)` | Annotate a prototype photo | auth + `can_edit_project` | No | 18 |
 | `adjust_phase_plan(phase_id, new_planned_end_date, reason)` | Change a planned date; require reason | auth + `can_edit_project` | YES — reason is mandatory | 17 |

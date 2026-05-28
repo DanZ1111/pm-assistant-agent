@@ -1,9 +1,19 @@
 # PM Product Tracker — Version
 
-**Current Version:** v1.1.0-build15
-**Current Build:** Build 15 — Business Plan Upload + Thesis Extraction
+**Current Version:** v1.1.0-build16
+**Current Build:** Build 16 — Variants + Packaging + Quotation + Profit Model placeholder
 **Status:** v1.1.0 in progress (build-by-build per roadmap)
 **Last Updated:** 2026-05-27
+
+## What's new in v1.1.0-build16
+
+- **Variants section** on every project detail page — track multiple SKUs (sizes, colors, materials, budget vs premium) with per-SKU target/actual cost and target MSRP.
+- **One variant per project can be flagged as Primary** (★). Setting a new primary automatically unsets the previous one.
+- **Packaging & Accessories section** — record packaging components and accessories that ship with the product. Each component can apply to all variants (project-wide) or only one specific variant.
+- **Quotation Files section** — surfaces files uploaded with category `Quotation` separately from the general Files area. Viewers can see filenames but cannot download (server-side guard).
+- **Profit Model placeholder** — shows the inputs a future Profit Model will use, the intended formula, and a naive per-unit margin preview if the data is present. Full model arrives in v1.2; see `PROFIT_MODEL_INTENT.md` for the design.
+- **AI Permission Guard** extended — viewers cannot use AI bottom-chat (Build 21) to surface variant costs, packaging costs, or quotation content.
+- **Permissions** — all roles can view variants/components (cost columns hidden from viewers); PM+ can create/edit on their own projects; admin only deletes variants and components.
 
 ## What's new in v1.1.0-build15
 

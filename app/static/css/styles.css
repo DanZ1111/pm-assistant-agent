@@ -568,6 +568,98 @@ body {
 .inspiration-card { background: #fff; transition: border-color 0.15s; }
 .inspiration-card:hover { border-color: var(--color-accent, #6c8eef) !important; }
 
+/* Build 16 — Variants grid + cards */
+.variant-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+.variant-card {
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.variant-card-primary {
+  border-color: #f0b400;
+  background: #fffdf3;
+}
+.variant-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+.variant-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+.variant-sku {
+  font-family: monospace;
+  font-size: 12px;
+}
+.variant-primary-star {
+  color: #f0b400;
+  font-size: 16px;
+  margin-right: 4px;
+}
+.variant-status-badge {
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.variant-status-badge.status-idea { background: #e0e0e0; color: #555; }
+.variant-status-badge.status-evaluating { background: #b3d4ff; color: #0050a0; }
+.variant-status-badge.status-selected { background: #c8e6c9; color: #1b5e20; }
+.variant-status-badge.status-rejected { background: #ffcdd2; color: #b71c1c; }
+.variant-status-badge.status-launched { background: #d1c4e9; color: #4527a0; }
+.variant-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 12px;
+}
+.variant-fields > div { display: contents; }
+.variant-fields dt {
+  color: var(--color-text-muted);
+  font-weight: normal;
+}
+.variant-fields dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.variant-notes {
+  border-top: 1px solid var(--color-border);
+  padding-top: 6px;
+  margin: 0;
+}
+.variant-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-border);
+}
+
+/* Build 16 — Component table */
+.component-table thead th {
+  background: #f7f7f7;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* Build 16 — Quotation list */
+.quotation-list { background: #fff; }
+.quotation-item:last-child { border-bottom: none !important; }
+
+/* Build 16 — Profit Model placeholder */
+.profit-snapshot { background: #fafafa; }
+
 /* Timeline table */
 .timeline-table-wrap { overflow-x: auto; }
 .timeline-table {
