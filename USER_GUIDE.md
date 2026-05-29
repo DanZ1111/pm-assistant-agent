@@ -181,6 +181,21 @@ A history of every change made to the project, newest first. Includes:
 
 ---
 
+## Bottom AI Chat (Build 21)
+
+A fixed chat bar at the bottom of every page (when you're logged in). Two toggles:
+
+- **Intake / Ask** — Intake lets the AI capture or change things on your behalf (currently only `create_journal_entry` is wired). Ask is read-only Q&A.
+- **Project / Global** (only on project detail pages) — Project scope tells the AI which project you mean; Global asks across everything.
+
+Type and hit Enter. A panel slides in from the right showing the conversation. The history dropdown at the top of the panel lets you jump back to previous conversations; the archive button removes the current one from the history.
+
+What works in v1.1: capture journal entries by saying things like _"log a journal entry: factory pushed back on the gasket spec, want to discuss with engineer Tuesday."_ Other tools (variants, phase shifts, etc.) are stubbed and will land in follow-up builds — for now they'll respond with "not yet wired."
+
+Viewers cannot see the chat surface ask about sensitive topics (factory, costs, journal content, business plans, variant costs, packaging costs, quotations) — those questions are blocked before any AI call.
+
+---
+
 ## AI Intake
 
 The AI Intake page lets you create a new project from unstructured information.

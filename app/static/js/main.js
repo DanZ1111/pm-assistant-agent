@@ -166,3 +166,191 @@
   };
 
 })();
+
+
+// ========================================================================
+// Build 21 — Bottom AI Chat + Right-Side Panel
+// ========================================================================
+(function () {
+  var bar = document.getElementById('bottomChatBar');
+  if (!bar) return;  // anonymous page, no chat
+
+  document.body.classList.add('has-bottom-chat');
+
+  var form        = document.getElementById('bottomChatForm');
+  var textarea    = document.getElementById('chatInputTextarea');
+  var submitBtn   = document.getElementById('chatSubmitBtn');
+  var modeSelect  = document.getElementById('chatModeSelect');
+  var scopeSelect = document.getElementById('chatScopeSelect');  // may be null
+  var panel       = document.getElementById('aiSidePanel');
+  var msgList     = document.getElementById('aiPanelMessages');
+  var titleEl     = document.getElementById('aiPanelTitle');
+  var historySel  = document.getElementById('conversationHistorySelect');
+  var archiveBtn  = document.getElementById('aiPanelArchiveBtn');
+  var closeBtn    = document.getElementById('aiPanelCloseBtn');
+
+  var projectIdAttr = bar.getAttribute('data-project-id') || '';
+  var defaultProjectId = projectIdAttr ? parseInt(projectIdAttr, 10) : null;
+  var currentConversationId = null;
+
+  // ── Textarea auto-grow + submit-button gate ──
+  function resizeTextarea() {
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+  }
+  textarea.addEventListener('input', function () {
+    resizeTextarea();
+    submitBtn.disabled = !textarea.value.trim();
+  });
+  textarea.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (!submitBtn.disabled) form.requestSubmit();
+    }
+  });
+
+  // ── Panel open/close ──
+  function openPanel() {
+    panel.classList.add('open');
+    panel.setAttribute('aria-hidden', 'false');
+  }
+  function closePanel() {
+    panel.classList.remove('open');
+    panel.setAttribute('aria-hidden', 'true');
+  }
+  closeBtn.addEventListener('click', closePanel);
+
+  // ── Message rendering ──
+  function renderUserMessage(text) {
+    var d = document.createElement('div');
+    d.className = 'chat-msg chat-msg-user';
+    d.textContent = text;
+    msgList.appendChild(d);
+    msgList.scrollTop = msgList.scrollHeight;
+  }
+  function renderAssistantMessage(text) {
+    var d = document.createElement('div');
+    d.className = 'chat-msg chat-msg-assistant';
+    d.textContent = text;
+    msgList.appendChild(d);
+    msgList.scrollTop = msgList.scrollHeight;
+  }
+  function renderToolCallCard(tc) {
+    var ok = tc.result && tc.result.ok;
+    var d = document.createElement('div');
+    d.className = 'chat-tool-call-card ' + (ok ? 'ok' : 'err');
+    var name = document.createElement('div');
+    name.className = 'chat-tool-call-card-name';
+    name.textContent = (ok ? '✓ ' : '⚠ ') + tc.name;
+    d.appendChild(name);
+    var result = document.createElement('div');
+    result.className = 'chat-tool-call-card-result';
+    if (ok) {
+      result.textContent = 'Success' + (tc.result.entry_id ? ' (id ' + tc.result.entry_id + ')' : '');
+    } else {
+      result.textContent = (tc.result && tc.result.error) || 'unknown error';
+    }
+    d.appendChild(result);
+    msgList.appendChild(d);
+    msgList.scrollTop = msgList.scrollHeight;
+  }
+
+  // ── Submit ──
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var text = textarea.value.trim();
+    if (!text) return;
+    var mode = modeSelect.value;
+    var sendProjectId = defaultProjectId;
+    if (scopeSelect && scopeSelect.value === 'global') sendProjectId = null;
+
+    openPanel();
+    renderUserMessage(text);
+    textarea.value = '';
+    resizeTextarea();
+    submitBtn.disabled = true;
+
+    try {
+      var body = {message: text, mode: mode, conversation_id: currentConversationId};
+      if (sendProjectId) body.project_id = sendProjectId;
+      var res = await fetch('/ai/chat', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body),
+      });
+      var data = await res.json();
+      if (!data.ok && data.error === 'question_blocked_by_permission_guard') {
+        renderAssistantMessage(data.message || "I can't answer that based on your access level.");
+        return;
+      }
+      if (!data.ok) {
+        renderAssistantMessage('(Error: ' + (data.error || 'unknown') + ')');
+        return;
+      }
+      currentConversationId = data.conversation_id;
+      renderAssistantMessage(data.assistant_message || '(no response)');
+      (data.tool_calls || []).forEach(renderToolCallCard);
+      refreshHistory();
+    } catch (err) {
+      renderAssistantMessage('(Request failed: ' + err.message + ')');
+    }
+  });
+
+  // ── Conversation history dropdown ──
+  async function refreshHistory() {
+    try {
+      var res = await fetch('/ai/conversations');
+      var data = await res.json();
+      if (!data.ok) return;
+      historySel.innerHTML = '<option value="">— history —</option>';
+      data.conversations.forEach(function (c) {
+        var opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = (c.title || '(untitled)') + (c.project_name ? ' · ' + c.project_name : '');
+        if (c.id === currentConversationId) {
+          opt.selected = true;
+          titleEl.textContent = c.title || 'AI Chat';
+        }
+        historySel.appendChild(opt);
+      });
+    } catch (_) { /* ignore */ }
+  }
+  historySel.addEventListener('change', async function () {
+    var id = parseInt(historySel.value, 10);
+    if (!id) return;
+    try {
+      var res = await fetch('/ai/chat/' + id);
+      var data = await res.json();
+      if (!data.ok) return;
+      currentConversationId = id;
+      titleEl.textContent = data.conversation.title || 'AI Chat';
+      msgList.innerHTML = '';
+      data.messages.forEach(function (m) {
+        if (m.role === 'user') renderUserMessage(m.message);
+        else if (m.role === 'assistant') {
+          renderAssistantMessage(m.message);
+          var tcs = (m.metadata && m.metadata.tool_calls) || [];
+          tcs.forEach(renderToolCallCard);
+        }
+      });
+      openPanel();
+    } catch (_) { /* ignore */ }
+  });
+
+  // ── Archive button ──
+  archiveBtn.addEventListener('click', async function () {
+    if (!currentConversationId) return;
+    if (!confirm('Archive this conversation? It will disappear from the history dropdown.')) return;
+    try {
+      await fetch('/ai/conversations/' + currentConversationId + '/archive', {method: 'POST'});
+      currentConversationId = null;
+      msgList.innerHTML = '';
+      titleEl.textContent = 'AI Chat';
+      refreshHistory();
+      closePanel();
+    } catch (_) { /* ignore */ }
+  });
+
+  // Initial history fetch (so the dropdown is populated on page load).
+  refreshHistory();
+})();

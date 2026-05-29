@@ -19,6 +19,7 @@ from app.routes.calendar import router as calendar_router
 from app.routes.ideas import router as ideas_router
 from app.routes.journal import router as journal_router
 from app.routes.variants import router as variants_router
+from app.routes.ai_chat import router as ai_chat_router
 
 
 def _bootstrap_admin_from_env():
@@ -108,6 +109,7 @@ app.include_router(calendar_router)
 app.include_router(ideas_router)
 app.include_router(journal_router)
 app.include_router(variants_router)
+app.include_router(ai_chat_router)
 
 
 @app.get("/healthz")

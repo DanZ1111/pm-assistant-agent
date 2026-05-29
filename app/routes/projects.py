@@ -369,6 +369,8 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
         "current_phase": current_phase,
         "renderings": renderings,
         "prototype_photos": prototype_photos,
+        # Build 21 — for bottom chat scope toggle
+        "current_project_id": project.id,
     })
 
 

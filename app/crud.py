@@ -695,15 +695,101 @@ def save_ai_message(
     message: str,
     metadata: dict | None,
 ) -> AIMessage:
+    conversation_id = None
+    if metadata and isinstance(metadata, dict):
+        conversation_id = metadata.get("conversation_id")
     msg = AIMessage(
         project_id=project_id,
+        conversation_id=conversation_id,
         role=role,
         message=message,
         metadata_json=metadata,
     )
     db.add(msg)
+    # Build 21 — bump the conversation's updated_at so the history dropdown
+    # shows the most-recently-active threads first.
+    if conversation_id:
+        from app.models import AIConversation  # local — keeps top of file unchanged
+        conv = db.query(AIConversation).filter(AIConversation.id == conversation_id).first()
+        if conv:
+            conv.updated_at = datetime.utcnow()
     db.commit()
     return msg
+
+
+# ---------------------------------------------------------------------------
+# Build 21 — AI Conversations
+# ---------------------------------------------------------------------------
+
+def create_ai_conversation(
+    db: Session,
+    user_id: int,
+    project_id: int | None = None,
+    title: str | None = None,
+):
+    """Auto-titles based on project context if no title supplied."""
+    from app.models import AIConversation  # local import keeps top of file unchanged
+    if not title:
+        if project_id:
+            proj = db.query(Project).filter(Project.id == project_id).first()
+            title = proj.name if proj else "(new conversation)"
+        else:
+            title = "(global chat)"
+    conv = AIConversation(
+        user_id=user_id,
+        project_id=project_id,
+        title=title.strip()[:200],
+        status="active",
+    )
+    db.add(conv)
+    db.commit()
+    db.refresh(conv)
+    return conv
+
+
+def list_ai_conversations(db: Session, user_id: int, include_archived: bool = False):
+    from app.models import AIConversation
+    q = db.query(AIConversation).filter(AIConversation.user_id == user_id)
+    if not include_archived:
+        q = q.filter(AIConversation.status == "active")
+    return q.order_by(AIConversation.updated_at.desc()).all()
+
+
+def get_ai_conversation(db: Session, conversation_id: int, user_id: int):
+    """Returns None if the conversation isn't owned by the user (ownership-enforced)."""
+    from app.models import AIConversation
+    return (
+        db.query(AIConversation)
+        .filter(AIConversation.id == conversation_id, AIConversation.user_id == user_id)
+        .first()
+    )
+
+
+def get_ai_messages_for_conversation(
+    db: Session,
+    conversation_id: int,
+    limit: int | None = None,
+):
+    q = (
+        db.query(AIMessage)
+        .filter(AIMessage.conversation_id == conversation_id)
+        .order_by(AIMessage.created_at.asc())
+    )
+    if limit:
+        # Take the LAST N messages (most recent), still chronological.
+        all_msgs = q.all()
+        return all_msgs[-limit:] if len(all_msgs) > limit else all_msgs
+    return q.all()
+
+
+def archive_ai_conversation(db: Session, conversation_id: int, user_id: int) -> bool:
+    """Idempotent. Returns False if conversation doesn't exist or isn't user's."""
+    conv = get_ai_conversation(db, conversation_id, user_id)
+    if not conv:
+        return False
+    conv.status = "archived"
+    db.commit()
+    return True
 
 
 # ---------------------------------------------------------------------------

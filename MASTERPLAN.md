@@ -2588,7 +2588,7 @@ Reuses the existing `crud.create_journal_entry` service function (Build 14). Val
 
 ---
 
-### Build 21 — Bottom AI Chat + Side Panel + Conversation History ← CURRENT BUILD
+### Build 21 — Bottom AI Chat + Side Panel + Conversation History ✓ SHIPPED v1.1.0-build21
 
 #### Context
 Build 20 shipped the tool schemas + dispatcher; nothing actually invokes them yet. Build 21 is where users meet the AI: a ChatGPT-style bottom chat bar visible on every authenticated page, a right-side panel that slides in when the user submits, and persistent conversation history backed by the `ai_conversations` table (created in Build 13). The only AI tool that actually mutates anything in v1.1 is `create_journal_entry` (per Build 20); the other 15 tools return `not_wired_until_build_21` and the chat surface renders that response as a friendly "I can't do that yet" card.

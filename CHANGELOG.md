@@ -1,5 +1,69 @@
 # PM Product Tracker — Changelog
 
+## v1.1.0-build21 — Bottom AI Chat + Side Panel + Conversation History (Build 21)
+_2026-05-29_
+
+**Goal:** Build 20 shipped the AI tool schemas + dispatcher; nothing called them. Build 21 puts a ChatGPT-style chat bar on every authenticated page so users can actually invoke the one wired tool (`create_journal_entry`) — and lays the UI groundwork for the other 15 tools to come online in follow-ups without UI rework.
+
+**Bottom chat bar** (`app/templates/components/bottom_chat.html` included from `base.html` inside `{% if current_user %}` so anonymous pages don't render it):
+- Fixed-position bar at the viewport bottom, dark accent.
+- Mode toggle: `Intake` (AI can call tools) / `Ask` (read-only Q&A; no tools passed to the model).
+- Scope toggle (only on project detail pages): `Project` (passes `project_id` so AI has project context) / `Global`.
+- Textarea auto-grows from 38px up to 200px on `input`; `Enter` submits, `Shift+Enter` inserts a newline.
+- Body gets `.has-bottom-chat` class so `.main-content` adds `padding-bottom: 80px` (no footer overlap).
+
+**Right-side panel** slides in from the right when the user submits:
+- Header: conversation title + history dropdown + archive button + close button.
+- Message thread: user bubbles right-aligned (primary blue), assistant bubbles left-aligned (gray).
+- Tool-call cards rendered inline beneath the assistant message:
+  - `ok` (green): "✓ create_journal_entry — Success (id 47)"
+  - `not_wired_until_build_21` (yellow): "⚠ delete_variant — not_wired_until_build_21"
+  - other errors (red): "⚠ tool_name — error_string"
+- Close button collapses the panel but leaves the bar in place.
+
+**Backend — new file `app/routes/ai_chat.py`:**
+- `POST /ai/chat` — accepts `{message, mode, conversation_id?, project_id?}`. Flow:
+  1. `require_auth`.
+  2. Reject early with `question_blocked_by_permission_guard` if `is_forbidden_ai_question(user, message)` returns True (NO OpenAI call).
+  3. Load or create `AIConversation` (idempotent if `conversation_id` is supplied and owned; else create new).
+  4. Persist the user message via `crud.save_ai_message(...)` with `metadata={"conversation_id": ..., "mode": ...}`.
+  5. Build OpenAI `messages` list: mode-specific system prompt + last 10 history messages.
+  6. Call `gpt-5.4`. In `intake` mode, pass `tools=TOOL_SCHEMAS, tool_choice="auto"`.
+  7. If `tool_calls` present, run each through `app.ai.tools.dispatch(...)` and capture results.
+  8. Persist the assistant message with `metadata={"tool_calls": [...]}`.
+  9. Return `{ok, conversation_id, assistant_message, tool_calls}`.
+- `GET /ai/conversations` — returns user's active (non-archived) conversations, newest-first.
+- `GET /ai/chat/{conversation_id}` — returns full thread; 404 if not user's.
+- `POST /ai/conversations/{id}/archive` — flips status; idempotent.
+
+**Backend — new crud functions in `app/crud.py`:**
+- `create_ai_conversation(db, user_id, project_id=None, title=None)` — auto-titles `"{project.name}"` or `"(global chat)"`.
+- `list_ai_conversations(db, user_id, include_archived=False)` — ordered by `updated_at desc`.
+- `get_ai_conversation(db, conversation_id, user_id)` — enforces ownership (returns None if not user's).
+- `get_ai_messages_for_conversation(db, conversation_id, limit=None)` — chronological order; `limit=N` returns the last N still chronologically.
+- `archive_ai_conversation(db, conversation_id, user_id) -> bool` — idempotent.
+- **`save_ai_message` was modified** to also set `conversation_id` from metadata AND bump `AIConversation.updated_at` (so the history dropdown shows most-recently-active threads at top).
+
+**Backend — 2 new system prompts in `app/ai/prompts.py`:** `CHAT_ASK_SYSTEM_PROMPT` (read-only Q&A; no tools), `CHAT_INTAKE_SYSTEM_PROMPT` (knows it has 16 tools but only `create_journal_entry` is wired; politely defers when other tools fail).
+
+**Permission discipline:**
+- Chat bar gated by `{% if current_user %}` in `base.html` — never renders for anonymous users.
+- `POST /ai/chat` re-checks `require_auth`, then `is_forbidden_ai_question` BEFORE any OpenAI call.
+- Tool calls run through `app.ai.tools.dispatch(...)` which already enforces role + project ownership per Build 20.
+
+**No schema migration.** `ai_conversations` + `ai_messages` (with `conversation_id` column) have existed since Build 13.
+
+**Out of scope (deferred):**
+- Drag-and-drop file/image upload into chat → defers to Build 22 (AI-Assisted Create Project).
+- Streaming responses (SSE/chunked) — v1.1 returns the full response.
+- Two-turn tool follow-up (feeding result back to model for a natural-language wrap-up).
+- Confirmation cards for destructive tools (none of those are wired in v1.1 anyway).
+- Per-conversation title editing — titles are auto-generated only.
+
+**Files modified:** `app/crud.py`, `app/ai/prompts.py`, `app/main.py`, `app/routes/projects.py` (added `current_project_id` to context), `app/templates/base.html`, `app/static/css/styles.css`, `app/static/js/main.js`, `app/version.py`, `VERSION.md`, `USER_GUIDE.md`
+
+**Files created:** `app/routes/ai_chat.py`, `app/templates/components/bottom_chat.html`, `test_build21.py`
+
 ## v1.1.0-build20 — AI Tools Architecture + Permission Guard (Build 20)
 _2026-05-28_
 

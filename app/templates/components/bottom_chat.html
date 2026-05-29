@@ -1,0 +1,51 @@
+{# Build 21 — Bottom AI chat bar + right-side panel.
+   Requires: current_user (auth) and optionally current_project_id (set in project_detail route).
+   Hidden for anonymous users by the {% if current_user %} guard in base.html. #}
+<div id="bottomChatBar" class="bottom-chat-bar"
+     data-project-id="{{ current_project_id or '' }}">
+  <form id="bottomChatForm" class="bottom-chat-form" autocomplete="off">
+    <div class="bottom-chat-toggles">
+      <label class="bottom-chat-mode" title="Ask = read-only Q&A. Intake = AI can capture / create.">
+        <select id="chatModeSelect" class="form-select form-select-sm">
+          <option value="intake" selected>Intake</option>
+          <option value="ask">Ask</option>
+        </select>
+      </label>
+      {% if current_project_id %}
+      <label class="bottom-chat-scope" title="Project scope = AI knows about this project. Global = no project context.">
+        <select id="chatScopeSelect" class="form-select form-select-sm">
+          <option value="project" selected>Project</option>
+          <option value="global">Global</option>
+        </select>
+      </label>
+      {% endif %}
+    </div>
+    <textarea id="chatInputTextarea"
+              class="bottom-chat-input"
+              placeholder="{% if current_project_id %}Ask about this project, or tell me to log a journal entry…{% else %}Ask anything about your projects…{% endif %}"
+              rows="1"></textarea>
+    <button type="submit" id="chatSubmitBtn" class="bottom-chat-submit" disabled>
+      <i class="bi bi-send"></i>
+    </button>
+  </form>
+</div>
+
+<div id="aiSidePanel" class="ai-side-panel" aria-hidden="true">
+  <div class="ai-side-panel-header">
+    <div class="ai-side-panel-title-row">
+      <h2 class="ai-side-panel-title" id="aiPanelTitle">AI Chat</h2>
+      <div class="ai-side-panel-actions">
+        <select id="conversationHistorySelect" class="form-select form-select-sm" title="Switch conversation">
+          <option value="">— history —</option>
+        </select>
+        <button type="button" id="aiPanelArchiveBtn" class="btn btn-sm btn-outline-secondary" title="Archive this conversation">
+          <i class="bi bi-archive"></i>
+        </button>
+        <button type="button" id="aiPanelCloseBtn" class="btn btn-sm btn-outline-secondary" title="Close panel (chat stays at bottom)">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div id="aiPanelMessages" class="ai-side-panel-messages"></div>
+</div>

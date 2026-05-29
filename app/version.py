@@ -8,6 +8,6 @@ When bumping the version: update these three constants AND VERSION.md AND
 add a CHANGELOG entry. The canonical mapping lives in VERSION.md.
 """
 
-CURRENT_VERSION = "1.1.0-build20"
-CURRENT_BUILD_NAME = "Build 20 — AI Tools Architecture + Permission Guard"
-LAST_UPDATED = "2026-05-28"
+CURRENT_VERSION = "1.1.0-build21"
+CURRENT_BUILD_NAME = "Build 21 — Bottom AI Chat + Side Panel + Conversation History"
+LAST_UPDATED = "2026-05-29"

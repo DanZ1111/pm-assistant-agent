@@ -1,9 +1,18 @@
 # PM Product Tracker — Version
 
-**Current Version:** v1.1.0-build20
-**Current Build:** Build 20 — AI Tools Architecture + Permission Guard
+**Current Version:** v1.1.0-build21
+**Current Build:** Build 21 — Bottom AI Chat + Side Panel + Conversation History
 **Status:** v1.1.0 in progress (build-by-build per roadmap)
-**Last Updated:** 2026-05-28
+**Last Updated:** 2026-05-29
+
+## What's new in v1.1.0-build21
+
+- **Bottom AI chat bar** on every authenticated page (hidden when logged out). ChatGPT-style: a single-line textarea that auto-grows up to 6 lines, an Intake/Ask mode toggle, and (on project detail pages) a Project/Global scope toggle. `Enter` submits; `Shift+Enter` newline.
+- **Right-side panel** slides in when you submit. Shows the conversation thread with user bubbles (right-aligned blue) and assistant bubbles (left-aligned gray). Tool calls render as small colored cards (green when successful, yellow for "not wired yet," red for errors).
+- **Conversation persistence** — every conversation is stored in `ai_conversations` (table existed since Build 13). The panel header has a history dropdown to switch between past conversations, plus an archive button.
+- **One real tool wired**: `create_journal_entry`. Switch the chat to Intake mode on a project detail page and say "log a journal entry: tested the new gasket at 80°C, holds up well" — AI calls the tool and a new entry appears in the project's Journal section. The other 15 tools registered in Build 20 are still stubbed and surface as "not yet wired" cards.
+- **Permission guard fires before any OpenAI call.** If a viewer asks about factory / costs / journal / business plan / variant cost / packaging cost / quotation, the request is short-circuited and no model call happens.
+- **No new database schema.** Uses pre-existing `ai_conversations` + `ai_messages` from Build 13.
 
 ## What's new in v1.1.0-build20
 
