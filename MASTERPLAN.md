@@ -2588,6 +2588,107 @@ Reuses the existing `crud.create_journal_entry` service function (Build 14). Val
 
 ---
 
+### Build 21 — Bottom AI Chat + Side Panel + Conversation History ← CURRENT BUILD
+
+#### Context
+Build 20 shipped the tool schemas + dispatcher; nothing actually invokes them yet. Build 21 is where users meet the AI: a ChatGPT-style bottom chat bar visible on every authenticated page, a right-side panel that slides in when the user submits, and persistent conversation history backed by the `ai_conversations` table (created in Build 13). The only AI tool that actually mutates anything in v1.1 is `create_journal_entry` (per Build 20); the other 15 tools return `not_wired_until_build_21` and the chat surface renders that response as a friendly "I can't do that yet" card.
+
+This is "size: L" but kept shippable in one session by deferring drag-drop file upload and streaming to follow-ups.
+
+#### Scope
+
+**1. Backend — new routes in `app/routes/ai_chat.py` (new file).**
+- `POST /ai/chat` — Body: `{conversation_id?: int, message: str, mode: "ask"|"intake", project_id?: int}`. Server flow:
+  1. `require_auth(current_user)`.
+  2. Reject early with 400 if `is_forbidden_ai_question(user, message)` returns True (return JSON `{ok: false, error: "question_blocked_by_permission_guard"}`).
+  3. Load or create `AIConversation` (new if `conversation_id` is null; tie to `user_id` + optional `project_id`).
+  4. Append user message via `crud.save_ai_message(db, project_id=<conv.project_id>, role="user", message=<text>, metadata={"conversation_id": conv.id, "mode": mode})`.
+  5. Build OpenAI messages list: system prompt (mode-specific) + recent N messages from conversation (newest first, capped at ~10 for token discipline) + the new user message.
+  6. Call `openai.chat.completions.create(model="gpt-5.4", messages=..., tools=TOOL_SCHEMAS if mode=="intake" else None)`.
+  7. If response contains `tool_calls`: for each, call `app.ai.tools.dispatch(name, args, db, user)` and capture results. Append assistant message + a follow-up assistant message describing each tool result. (Two-turn pattern — tool result fed back to AI in a final summarizing turn is a v1.2 enhancement; v1.1 just echoes the dispatcher response.)
+  8. Append assistant message via `crud.save_ai_message(...)` with `metadata={"conversation_id": conv.id, "tool_calls": [...]}`.
+  9. Return JSON `{ok: true, conversation_id: conv.id, messages: [latest user + assistant turn(s) with tool_call cards if any]}`.
+- `GET /ai/conversations` — Returns list of user's active conversations `[{id, title, project_id, project_name?, updated_at}]` ordered by `updated_at desc`. Excludes archived.
+- `GET /ai/chat/{conversation_id}` — Returns full message thread `{id, project_id, title, messages: [...]}`. 404 if conversation doesn't belong to current user.
+- `POST /ai/conversations/{id}/archive` — Flips `status='archived'`. Idempotent.
+
+**2. Service layer — new crud functions in `app/crud.py`.**
+- `create_ai_conversation(db, user_id, project_id=None, title=None) -> AIConversation` — Auto-titles to "{project.name}" or "(global chat)" if no project, or "(new conversation)" if title-blank.
+- `list_ai_conversations(db, user_id, include_archived=False) -> list[AIConversation]` — Ordered by `updated_at desc`.
+- `get_ai_conversation(db, conversation_id, user_id) -> AIConversation | None` — Enforces ownership; returns None if not user's.
+- `get_ai_messages_for_conversation(db, conversation_id, limit=None) -> list[AIMessage]` — Ordered by `created_at asc`.
+- `archive_ai_conversation(db, conversation_id, user_id) -> bool` — Returns False if not user's.
+- Modify `crud.save_ai_message` (already exists) — Already supports `metadata`; verify it bumps `conversation.updated_at` if `metadata["conversation_id"]` is set. If not, add a small `conversation.updated_at = datetime.utcnow()` write.
+
+**3. AI prompts — extend `app/ai/prompts.py`.**
+Two new system prompts:
+- `CHAT_ASK_SYSTEM_PROMPT` — "You are an assistant for a PM tracker. Answer questions about the project/data. You CANNOT modify anything in this mode. If the user asks you to write/create/update something, tell them to switch to Intake mode."
+- `CHAT_INTAKE_SYSTEM_PROMPT` — "You can help capture journal entries via the `create_journal_entry` tool. The other 15 tools are defined but not wired in this release; if you try to call them, you'll get back `not_wired_until_build_21` and you should tell the user the feature is coming. Always confirm important details with the user before calling a tool."
+
+**4. Frontend — new partial `app/templates/components/bottom_chat.html`.**
+- Renders fixed at viewport bottom. Wrapped in `{% if current_user %}` in `base.html` so anonymous pages don't show it.
+- Two-row collapsed layout (~64px tall): mode toggle (Ask/Intake) + scope toggle (Project/Global, only when on a project detail page) + textarea + submit button.
+- Textarea auto-grows up to ~6 lines (CSS + a small JS handler on `input`).
+- Right-side panel (`<div id="aiSidePanel">`) starts off-screen (`transform: translateX(100%)`), slides in (`transform: translateX(0)`) when first message submitted.
+- Panel header: conversation title (editable on click) + conversation history dropdown + archive button + close (collapses panel; chat bar stays).
+- Panel body: scrollable message list. User bubbles (right-aligned, plain text). Assistant bubbles (left-aligned, rendered as markdown via the existing approach — or just plain text for v1.1). Tool-call cards render as a small bordered box showing `tool_name(args) → result.error_or_summary`.
+
+**5. Frontend — wire it up in `app/templates/base.html` + `app/static/css/styles.css` + `app/static/js/main.js`.**
+- `base.html`: include the partial inside `{% if current_user %}` block after the help modal (around line 320). Pass `project_id` from context if on a project detail page (use `request.url.path` parsing — or read from a template variable already in context like `current_project_id`; need to add it to project_detail.html's context).
+- `styles.css`: append Build 21 CSS — `.bottom-chat-bar` (fixed bottom, full width, dark accent), `.ai-side-panel` (fixed right, 420px wide, slide-in transition), `.chat-message-user/.chat-message-assistant` (bubble styling), `.chat-tool-call-card`.
+- `main.js`: append Build 21 IIFE — textarea auto-grow, submit handler (fetch POST `/ai/chat`, render messages, slide panel in), history dropdown handler, archive button handler, close button handler.
+
+**6. Permission guard — verify no leak.**
+The chat input is gated by `{% if current_user %}` in base.html. The `/ai/chat` route additionally:
+- Checks `require_auth`.
+- Checks `is_forbidden_ai_question` BEFORE calling OpenAI (so viewer-forbidden questions never reach the model).
+- Calls `dispatch()` which already enforces role + project ownership per Build 20.
+
+No new sources of sensitive data. The `_VIEWER_FORBIDDEN` list from `app/dependencies.py:92` already covers everything chat could ask about.
+
+**7. Tests — `test_build21.py`.**
+
+*Conversation CRUD:*
+- Admin creates a conversation via POST `/ai/chat`, gets back `conversation_id`. Same `conversation_id` works on follow-up.
+- Listing conversations excludes archived; archive endpoint flips status.
+
+*Round-trip with the real tool:*
+- Admin posts: "Please log a journal entry that says 'Build 21 round-trip test'" with `mode="intake"` and a valid `project_id`. AI calls `create_journal_entry`. Verify a new `project_journal_entries` row exists with that text.
+- Viewer posts the same → response contains `forbidden` or guard rejection; no new journal row.
+
+*Permission guard:*
+- Viewer asks "what factory is this project using" → response is `question_blocked_by_permission_guard`; no OpenAI call (verify by absence of new ai_messages row beyond the user message that triggered the block — or just check the response error code).
+
+*Mode discipline:*
+- Same journal-write prompt with `mode="ask"` → AI does NOT call any tool (no journal row created); response is text only.
+
+*Stubbed tools:*
+- Admin asks chat to delete a variant → AI calls `delete_variant` → dispatcher returns `not_wired_until_build_21` → response renders the tool-call card with that error string. No deletion.
+
+*UI smoke (HTTP only — no Playwright):*
+- GET `/projects` for an authenticated user contains the `bottom-chat-bar` markup.
+- GET `/auth/login` (anonymous) does NOT contain `bottom-chat-bar`.
+
+#### Affected files
+- New: `app/routes/ai_chat.py`, `app/templates/components/bottom_chat.html`, `test_build21.py`
+- Modify: `app/crud.py` (5 new functions + `save_ai_message` updated_at bump), `app/ai/prompts.py` (2 new system prompts), `app/main.py` (register the new router), `app/templates/base.html` (include partial + side panel), `app/static/css/styles.css` (chat-bar + panel styles), `app/static/js/main.js` (chat IIFE), `app/routes/projects.py` (add `current_project_id` to context if not already present), `AI_TOOLS_REGISTRY.md` (mark `create_journal_entry` "Status" as fully wired via /ai/chat), `app/version.py`, `VERSION.md`, `CHANGELOG.md`, `USER_GUIDE.md`
+
+#### Verification
+- `python3 test_build21.py` — all assertions pass.
+- Regression: `python3 test_build20.py` 23/23, `python3 test_build19.py` 15/15.
+- Manual smoke: load `/projects` while logged in — bottom chat bar visible. Type "log an entry that says hello", submit in Intake mode → side panel slides in, AI calls tool, journal entry appears in the project's Journal section after refresh.
+- Manual smoke: load `/auth/login` (logged out) — no chat bar present.
+- Footer + Help modal show `v1.1.0-build21`.
+
+#### Out of scope (deferred)
+- **Drag-and-drop file/image upload into chat.** Mentioned in original roadmap row 1540 but defers to Build 22 (AI-Assisted Create Project), which is naturally where file intake belongs.
+- **Streaming responses** (SSE/chunked). v1.1 returns the full response after `dispatch()` completes.
+- **Two-turn tool follow-up** (feeding tool result back to the model for a natural-language wrap-up). v1.1 just echoes the dispatcher response as a tool-call card.
+- **Confirmation cards for destructive tools.** None of the destructive tools are wired in v1.1, so this is unnecessary until Build 22+.
+- **Per-conversation title editing.** Auto-titles only in v1.1.
+
+---
+
 ## Requirements (Build 1)
 
 ```
