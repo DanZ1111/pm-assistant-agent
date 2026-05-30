@@ -41,18 +41,23 @@ def main():
     print("\n── Runtime version source ──")
     from app.version import CURRENT_BUILD_NAME, CURRENT_VERSION, LAST_UPDATED
 
-    if CURRENT_VERSION == "1.1.0":
-        ok("app.version CURRENT_VERSION is final v1.1.0")
+    # Build 24's purpose was to release v1.1.0. We keep this check tolerant
+    # of post-release patch / extension builds (e.g. v1.1.0-build25) so that
+    # adding a follow-up build doesn't invalidate the "v1.1.0 shipped" proof.
+    if CURRENT_VERSION.startswith("1.1.0"):
+        ok(f"app.version CURRENT_VERSION is on the v1.1.0 line ({CURRENT_VERSION})")
     else:
         fail("CURRENT_VERSION", CURRENT_VERSION)
 
-    if "Build 24" in CURRENT_BUILD_NAME and "release" in CURRENT_BUILD_NAME.lower():
-        ok("app.version CURRENT_BUILD_NAME identifies Build 24 release")
+    # Build name is point-in-time; just sanity check it's non-empty.
+    if CURRENT_BUILD_NAME:
+        ok(f"app.version CURRENT_BUILD_NAME is set ({CURRENT_BUILD_NAME!r})")
     else:
         fail("CURRENT_BUILD_NAME", CURRENT_BUILD_NAME)
 
-    if LAST_UPDATED == "2026-05-30":
-        ok("app.version LAST_UPDATED is 2026-05-30")
+    # LAST_UPDATED moves on every release; just sanity check the format.
+    if LAST_UPDATED and len(LAST_UPDATED) == 10 and LAST_UPDATED.count("-") == 2:
+        ok(f"app.version LAST_UPDATED is ISO date format ({LAST_UPDATED})")
     else:
         fail("LAST_UPDATED", LAST_UPDATED)
 
@@ -62,13 +67,15 @@ def main():
     user_guide = read("USER_GUIDE.md")
     masterplan = read("MASTERPLAN.md")
 
+    # v1.1.0 release proof: the "What's new in v1.1.0" block and the
+    # "v1.1.0 released" status line must persist even as later builds
+    # (25, 26, ...) update the Current Version / Current Build header.
     contains_all(
-        "VERSION.md reflects final release",
+        "VERSION.md still documents the v1.1.0 release",
         version_md,
         [
             "**Current Version:** v1.1.0",
-            "**Current Build:** Build 24",
-            "**Status:** v1.1.0 released",
+            "v1.1.0 released",
             "## What's new in v1.1.0",
         ],
     )
@@ -157,6 +164,7 @@ def main():
         "test_build22.py",
         "test_build23.py",
         "test_build24.py",
+        "test_build25.py",
         "test_ai_e2e.py",
     ]
     missing = [name for name in expected_tests if not (ROOT / name).exists()]

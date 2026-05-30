@@ -1,9 +1,21 @@
 # PM Product Tracker — Version
 
-**Current Version:** v1.1.0
-**Current Build:** Build 24 — v1.1.0 release
-**Status:** v1.1.0 released
+**Current Version:** v1.1.0-build25
+**Current Build:** Build 25 — Beauty Department isolated deployment
+**Status:** v1.1.0 released; Build 25 is a post-release infra extension
 **Last Updated:** 2026-05-30
+
+## What's new in v1.1.0-build25
+
+The tracker can now be deployed as **multiple independent instances**, one per department. PM dept and Beauty dept get full data isolation by running separate app + DB instances from the same git repo.
+
+- **New `DEPLOYMENT.md`** at the project root — step-by-step Railway runbook for provisioning a new department instance (service creation, PostgreSQL plugin, env vars, custom domain, verification checklist, multi-instance operations).
+- **Zero code change.** Isolation comes from the existing env-var-driven `DATABASE_URL` (`app/database.py`), `OPENAI_API_KEY`, and `INITIAL_ADMIN_USERNAME` / `INITIAL_ADMIN_PASSWORD` bootstrap (`app/main.py:_bootstrap_admin_from_env`). The app doesn't need to know about departments.
+- **Per-instance independence.** Each instance has its own DB, its own user pool, its own OpenAI billing (or share a key — your call), its own bootstrap admin, its own SECRET_KEY.
+- **Same code on every instance.** A single `git push` to `main` auto-deploys to all instances, so they always run identical features. Migrations are idempotent and per-instance.
+- **Adding the 3rd/4th/Nth department** is the same runbook. If you hit ~4+ departments or need cross-department features (org-wide search, shared idea board), revisit the architecture — see `MASTERPLAN.md` Build 25 section + `~/.claude/plans/can-you-still-find-nested-cook.md`.
+
+> **User action required:** the Railway provisioning steps in `DEPLOYMENT.md` must be performed manually in the Railway dashboard. The code side of Build 25 is complete; the infra side is on you.
 
 ## What's new in v1.1.0
 

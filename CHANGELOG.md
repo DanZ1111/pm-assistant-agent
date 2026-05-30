@@ -1,5 +1,37 @@
 # PM Product Tracker — Changelog
 
+## v1.1.0-build25 — Beauty Department isolated deployment (Build 25)
+_2026-05-30_
+
+**Goal:** unblock the Beauty department's adoption of the tracker without disrupting the existing PM department's data. Architectural review (recorded in `~/.claude/plans/can-you-still-find-nested-cook.md`) chose **separate-deployment-per-department** (multi-tenancy Option 4) over row-level multi-tenancy: hard isolation, zero code-change risk, ships in hours of devops work. The trade-off (no cross-department views) is acceptable since none are planned.
+
+**Code changes: none.** Per-instance isolation comes for free from existing patterns:
+- `app/database.py` reads `DATABASE_URL` from env (Railway PostgreSQL plugin auto-provides it).
+- `app/main.py:_bootstrap_admin_from_env()` (shipped in Build 9) lets each instance bootstrap its own first admin from env vars.
+- `OPENAI_API_KEY` is read from env, so each instance can have its own.
+
+**New file: `DEPLOYMENT.md`** at the project root — canonical runbook covering Railway service creation, PostgreSQL plugin attachment, per-instance env vars (`INITIAL_ADMIN_USERNAME`, `INITIAL_ADMIN_PASSWORD`, `OPENAI_API_KEY`, `SECRET_KEY`, `DISABLE_RELOAD`), custom domain CNAME setup (subdomain convention: `pm.tracker.example.com`, `beauty.tracker.example.com`), 5-step post-deploy verification checklist (health check, version string, first admin login, cross-instance isolation check, bootstrap-cleanup), and multi-instance operating guidance (migrations, backups, code changes, user accounts, OpenAI spend, file uploads).
+
+**Bumps:**
+- `app/version.py` → `1.1.0-build25`
+- `VERSION.md` → "What's new" block at top.
+- `MASTERPLAN.md` → Build 25 detail section (FDR + scope + verification).
+
+**Test — `test_build25.py`** verifies what Claude can verify remotely:
+- `DEPLOYMENT.md` exists at project root with the required runbook sections.
+- `app/version.py` is bumped to `1.1.0-build25` with the right build name.
+- `VERSION.md` has a `v1.1.0-build25` "What's new" block.
+- `CHANGELOG.md` has a Build 25 entry.
+- The existing v1.1.0 PM instance still passes its health check and serves the bumped version string.
+
+The actual Railway provisioning is on the user (Claude can't reach into your Railway account); the runbook is the deliverable.
+
+**Out of scope (deferred to v1.2 if needed):** cross-department views, shared Good Ideas board, org-wide AI search, SSO across departments, per-department branding, auto-provisioning script. All of these would require row-level multi-tenancy (Option 1) — a v1.2-scoped conversation.
+
+**Files created:** `DEPLOYMENT.md`, `test_build25.py`
+
+**Files modified:** `app/version.py`, `VERSION.md`, `MASTERPLAN.md`, `CHANGELOG.md`, `CURRENT_TASK.md`
+
 ## v1.1.0 — Product Development Workspace Release (Build 24)
 _2026-05-30_
 

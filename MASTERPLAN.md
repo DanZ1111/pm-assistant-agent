@@ -2943,6 +2943,73 @@ No new sources of sensitive data. The `_VIEWER_FORBIDDEN` list from `app/depende
 
 ---
 
+### Build 25 — Beauty Department isolated deployment ← CURRENT BUILD
+
+#### Context
+The Beauty department wants to use the PM tracker but with full data isolation from the existing PM dept. Architectural review (recorded in `~/.claude/plans/can-you-still-find-nested-cook.md`) chose **Option 4: separate deployment per department** — same git repo, same image, different database + different env vars. The trade-off: hard isolation with zero code-change risk vs. no cross-dept features (acceptable since none are planned).
+
+This is a post-v1.1.0 extension build. It ships AFTER the v1.1.0 release (which is `2cf4610` on `main` as of this writing). Version bumps to `1.1.0-build25` — patch-level since there's no new feature code.
+
+#### Feature Design Review
+1. **Real workflow problem?** Yes — Beauty needs to use the tracker today without seeing or being seen by PM dept's data.
+2. **Repeated or edge case?** Repeated — every future department adoption follows the same pattern.
+3. **Structured data?** No new schema. Uses the existing per-instance DB.
+4. **Could live in notes / thesis / change log?** No — this is infrastructure, not project data.
+5. **Bypass service layer?** No — service layer is per-instance and unchanged.
+6. **Change-log recording?** N/A — no DB mutation introduced by this build.
+7. **Rollback plan?** Trivial — delete the Railway service + its DB plugin. No effect on the PM instance.
+8. **Display/reminder payoff?** Beauty dept gets its own clean tracker. PM dept's data stays clean of beauty-product noise.
+9. **Migration impact?** None on the existing PM instance. The new Beauty instance gets a fresh DB via `Base.metadata.create_all` at first boot.
+10. **Minimal UI change?** None.
+11. **Defer?** Cross-department views / shared idea board / org-wide AI search → row-level multi-tenancy (Option 1) in v1.2+ if needed.
+
+#### Scope
+
+**1. New `DEPLOYMENT.md` at project root** — the canonical runbook for spinning up a new department instance on Railway. Covers:
+- Creating a second Railway service from the same GitHub repo.
+- Attaching a fresh PostgreSQL plugin to the new service (auto-provisioned `DATABASE_URL`).
+- Setting per-instance env vars: `OPENAI_API_KEY`, `INITIAL_ADMIN_USERNAME`, `INITIAL_ADMIN_PASSWORD`, `DISABLE_RELOAD=1`, `SECRET_KEY`.
+- Custom domain setup (subdomain pattern: `beauty.tracker.app`, `pm.tracker.app`).
+- First-boot bootstrap admin (uses existing `_bootstrap_admin_from_env` in `app/main.py:26-59`).
+- Post-deploy verification checklist.
+- "Adding a 3rd / 4th department" — short version of the same steps.
+
+**2. No code changes.** The existing app already reads `DATABASE_URL` from env (per `app/database.py`), already has the `INITIAL_ADMIN_*` bootstrap path (Build 9), already loads `OPENAI_API_KEY` from env. Per-instance isolation comes for free from these existing patterns. Verified by reading `app/main.py:32-58` (bootstrap) and `app/database.py` (env-driven DB URL).
+
+**3. Version + docs.**
+- `app/version.py` → `1.1.0-build25`, build name "Build 25 — Beauty Department isolated deployment".
+- `VERSION.md` adds a "What's new in v1.1.0-build25" block at the top describing the multi-instance pattern + the user-action required (Railway provisioning).
+- `CHANGELOG.md` adds a Build 25 entry below v1.1.0.
+- `USER_GUIDE.md` — no change (this is devops, not user-facing).
+
+**4. Test — `test_build25.py`** verifies what Claude CAN verify remotely:
+- `DEPLOYMENT.md` exists at project root.
+- Contains the required runbook sections (Railway service, env vars, DB plugin, custom domain, verification checklist, multi-department).
+- `app/version.py` bumped to `1.1.0-build25`.
+- `VERSION.md` has a `v1.1.0-build25` "What's new" block.
+- `CHANGELOG.md` has a Build 25 entry.
+- The existing v1.1.0 PM instance is still fully functional (sanity smoke against current server: GET `/healthz` → 200, version string in HTML matches).
+
+The actual Railway provisioning is on the user — Claude can't reach into your Railway account.
+
+#### Affected files
+- New: `DEPLOYMENT.md`, `test_build25.py`
+- Modify: `MASTERPLAN.md` (this section), `app/version.py`, `VERSION.md`, `CHANGELOG.md`, `CURRENT_TASK.md`
+
+#### Verification
+- `python3 test_build25.py` — all assertions pass.
+- Regression: `python3 test_build24.py` 11/11 (sanity that nothing broke), `python3 test_build23.py` 24/24.
+- Manual user-action verification (post-Railway-provisioning): two browser windows on the two URLs, create one project in each, confirm zero cross-instance visibility.
+
+#### Out of scope (deferred to v1.2 if Beauty's needs grow)
+- Cross-department views / admin "see all depts" / shared Good Ideas board → row-level multi-tenancy (Option 1).
+- Auto-provisioning script (this build documents the manual runbook only).
+- Per-department branding / logos / theming.
+- SSO across departments.
+- Shared user table across instances.
+
+---
+
 ## Requirements (Build 1)
 
 ```
