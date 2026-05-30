@@ -2590,6 +2590,67 @@ Reuses the existing `crud.create_journal_entry` service function (Build 14). Val
 
 ### Build 21 — Bottom AI Chat + Side Panel + Conversation History ✓ SHIPPED v1.1.0-build21
 
+---
+
+### Build 22 — AI-Assisted Create Project (consolidate intake into /projects/new) ← CURRENT BUILD
+
+#### Context
+Today the app has two ways to create a project: `/projects/new` (manual form) and `/ai/intake` (paste text / upload file → AI extracts fields → confirm). Conceptually they're the same task, and the navbar carries both as separate destinations. Build 22 consolidates them: `/projects/new` becomes a two-tab page (Manual Form / AI-Assisted), the AI Intake link is removed from the navbar, and the `/ai/intake` route stays as a 303 redirect to `/projects/new?tab=ai` so old bookmarks and test fixtures keep working.
+
+This is "size: M" — UI relocation, not new logic. The AI parsing, extraction, idea classification, and confirmation flows are unchanged; only the page that hosts the input form moves.
+
+#### Scope
+
+**1. New tab structure on `/projects/new`.**
+- Modify [app/templates/project_form.html](app/templates/project_form.html) (the existing Create-Project template). Wrap the current form body in a `tab-pane` for "Manual Form" and add a second `tab-pane` for "AI-Assisted" using the **same Bootstrap tab pattern already used by the Help modal** in [base.html](app/templates/base.html) lines 75-312.
+- The `?tab=ai` query param picks the active tab on initial render. Default is Manual.
+- Tab switching is client-side (Bootstrap data attributes); no extra route work.
+
+**2. Move the AI Intake UI into the AI-Assisted tab.**
+- Extract the relevant parts of [app/templates/intake.html](app/templates/intake.html) into a new partial [app/templates/components/ai_intake_panel.html](app/templates/components/ai_intake_panel.html). The partial supports the two states intake already has:
+  - **State 1 (input):** textarea + file-upload zone, posting to `/ai/intake/extract` and `/ai/intake/extract-file` (unchanged endpoints).
+  - **State 2 (review/confirm):** project review form posting to `/ai/intake/confirm`, OR idea review form posting to `/ai/intake/confirm-idea`. Unchanged.
+- The "Manual Entry" cross-link inside intake.html (currently points to `/projects/new`) becomes a tab switch (`<a href="?tab=manual">` or a Bootstrap tab button trigger).
+- Both confirm endpoints continue to RedirectResponse to `/projects/{id}` or `/ideas?highlight=...` on success.
+
+**3. Server-side endpoints stay almost unchanged.**
+- [app/routes/intake.py](app/routes/intake.py) endpoints `/ai/intake/extract`, `/ai/intake/extract-file`, `/ai/intake/confirm`, `/ai/intake/confirm-idea` keep their paths and behavior. The HTML they return is rebuilt to fit inside the tab (i.e., they render `ai_intake_panel.html` instead of the full `intake.html`).
+- **The single GET `/ai/intake`** becomes a 303 redirect to `/projects/new?tab=ai`. This preserves old bookmarks and any test that POSTs to `/ai/intake/...` (those POSTs are unaffected).
+
+**4. Navbar cleanup.**
+- Remove the "AI Intake" link from [base.html](app/templates/base.html) lines 30-36.
+- The Bottom AI Chat (Build 21) is the daily AI entry point now; AI-Assisted Create lives where you'd expect it: inside the Create Project flow.
+
+**5. Routes/projects.py — GET /projects/new handles the new tab query param.**
+- Read `tab = request.query_params.get("tab")` and pass to template context as `initial_tab` (default `"manual"`). The template uses it to set the `active` class on the right tab + `show active` on the right pane.
+
+**6. Tests — `test_build22.py`.**
+- GET `/projects/new` (no tab) renders both tab buttons + the manual pane as active.
+- GET `/projects/new?tab=ai` renders the AI pane as active.
+- GET `/ai/intake` (legacy) returns 303 redirect to `/projects/new?tab=ai`.
+- POST `/ai/intake/extract` with a short text body returns the review HTML (smoke test — does NOT depend on full AI accuracy, just that the round-trip works).
+- POST `/ai/intake/confirm` with a minimal valid field set creates a project (regression — confirm flow still works after UI move).
+- Navbar smoke: GET `/projects` for admin/PM does NOT contain `href="/ai/intake"` in the navbar. Bottom chat bar (Build 21) is still present.
+- Viewer cannot access `/projects/new` AI tab (existing role guard; just confirm it didn't regress).
+
+#### Affected files
+- New: [app/templates/components/ai_intake_panel.html](app/templates/components/ai_intake_panel.html), `test_build22.py`
+- Modify: [app/templates/project_form.html](app/templates/project_form.html) (tab wrapper), [app/templates/intake.html](app/templates/intake.html) (shrink to redirect/legacy or remove), [app/routes/intake.py](app/routes/intake.py) (GET /ai/intake → 303 redirect; extract/confirm now render the partial), [app/routes/projects.py](app/routes/projects.py) (initial_tab in context), [app/templates/base.html](app/templates/base.html) (remove AI Intake nav link), `app/version.py`, `VERSION.md`, `CHANGELOG.md`, `USER_GUIDE.md`
+
+#### Verification
+- `python3 test_build22.py` — all assertions pass.
+- Regression: `python3 test_build21.py` 20/20, `python3 test_build20.py` 23/23, `python3 test_build19.py` 15/15.
+- Manual smoke: navbar no longer has AI Intake; `/ai/intake` redirects to `/projects/new?tab=ai`; both tabs render correctly; AI Extract round-trip still creates a project; idea-classification path still creates an idea.
+- Footer + Help modal show `v1.1.0-build22`.
+
+#### Out of scope
+- Changes to the AI extraction logic itself (parser, prompts, dual-mode classification). Just relocating UI.
+- Changes to the Bottom AI Chat (Build 21). Untouched.
+- Renaming or restructuring `/ai/intake/...` POST endpoints.
+- Mobile-specific tab styling — the existing Bootstrap tab pattern is fine.
+
+---
+
 #### Context
 Build 20 shipped the tool schemas + dispatcher; nothing actually invokes them yet. Build 21 is where users meet the AI: a ChatGPT-style bottom chat bar visible on every authenticated page, a right-side panel that slides in when the user submits, and persistent conversation history backed by the `ai_conversations` table (created in Build 13). The only AI tool that actually mutates anything in v1.1 is `create_journal_entry` (per Build 20); the other 15 tools return `not_wired_until_build_21` and the chat surface renders that response as a friendly "I can't do that yet" card.
 
