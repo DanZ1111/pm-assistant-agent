@@ -2594,6 +2594,170 @@ Reuses the existing `crud.create_journal_entry` service function (Build 14). Val
 
 ### Build 22 — AI-Assisted Create Project (consolidate intake into /projects/new) ✓ SHIPPED v1.1.0-build22
 
+---
+
+### Build 23 — Chinese i18n ← CURRENT BUILD
+
+#### Context
+The PM tracker is used by Chinese-speaking PMs. Today every label is English; switching the UI to Chinese requires translating ~150 user-facing strings (navbar / page titles / section headers / buttons / form labels / badges / alerts / empty-state copy) and adding a language switcher with persistence.
+
+**Backend is ready** — Build 13 added `users.language` (String, default `"en"`, NOT NULL). No migration needed.
+
+**Out of i18n scope (stays English):**
+- AI prompts in `app/ai/prompts.py` (instructions to the model — English performs better; not user-visible).
+- Deep docs: `USER_GUIDE.md`, `CHANGELOG.md`, `ARCHITECTURE.md`, `MASTERPLAN.md`, `CLAUDE.md`, `AGENTS.md`.
+- Help modal body (~240 lines in `base.html`) — too much surface for v1.1, audience small; defer to v1.2 if needed.
+- Admin-only pages (`/admin/database`, `/admin/users`) — internal tools.
+- Changelog / version history strings.
+
+This is "size: L" because of the breadth of template touches, not because of architectural complexity.
+
+#### Scope
+
+**1. New module `app/i18n.py`** —
+```python
+# Loads bundles at import time.
+# Locale resolution order: user.language → "lang" cookie → "en" default.
+TRANSLATIONS: dict[str, dict[str, str]]  # {"en": {...}, "zh": {...}}
+
+def get_locale(request, current_user) -> str: ...
+
+@jinja2.pass_context
+def t(ctx, key: str, **kwargs) -> str:
+    """Jinja2 global. Looks up key in current locale's bundle; falls back to
+    English bundle; falls back to the literal key (so missing translations
+    are visible in dev, not silent)."""
+    locale = ctx.get("locale", "en")
+    s = TRANSLATIONS.get(locale, {}).get(key)
+    if s is None:
+        s = TRANSLATIONS["en"].get(key, key)
+    return s.format(**kwargs) if kwargs else s
+```
+
+Register `t` as a Jinja2 global in `app/main.py` (existing `_GLOBALS` injection pattern — add `t` to the dict).
+
+**2. New bundles** —
+- `app/i18n/en.json` — explicit English bundle (so `t('nav.projects')` works even when locale="en" instead of falling back to the raw key).
+- `app/i18n/zh.json` — Chinese translations.
+
+**Key convention:** dot-separated, scoped by area for scannability. ~150 keys total:
+- `nav.*` (8): projects, calendar, ideas, my_projects, database, users, help, sign_out
+- `title.*` (~12): all_projects, calendar, ideas, new_project, edit_project, my_projects, login, register, ai_intake, …
+- `section.*` (~30): thesis, timeline, files, change_log, inspired_by, rendering_history, prototype_photos, variants, packaging, quotation, profit_model, journal, planned_launches, actually_launched, …
+- `btn.*` (~25): save, cancel, create, edit, delete, archive, upload, extract_fields, analyze_file, confirm_create, …
+- `form.*` (~40): project_name, brand, sku, product_manager, engineer, factory, target_factory_cost, target_msrp, planned_launch_date, project_thesis, phase_name, …
+- `badge.*` / `status.*` (~15): required, critical, recommended, active, completed, paused, cancelled, archived, delayed, needs_info, on_track, not_started, in_progress, done, skipped
+- `alert.*` (~12): needs_attention, days_late, critical_missing, no_projects, …
+- `empty.*` (~8): no_files, no_journal, no_variants, no_quotation_files, no_linked_ideas, no_changes, no_phases, …
+
+I'll seed all ~150 zh translations as a first pass. **Translations need user review** — I'm not a native Chinese speaker; I'll aim for natural product-management vocabulary but the user should sanity-check before shipping. The plan flags this as an explicit review step.
+
+**Translation philosophy — product language, not mechanical translation.** Keep mixed-language terms when the Chinese version would be less clear or industry usage is English. Specifically: **Thesis, MSRP, SKU, AI, PM** stay as-is (don't try to translate to 论点 / 建议零售价 / 库存单位 / 人工智能 / 项目经理 — these are clunky or ambiguous in product-development context). Also keep brand names, factory names, product codes untranslated. The goal is to read naturally to a Chinese-speaking PM who already works in this domain.
+
+**3. Locale resolution middleware** —
+Small FastAPI middleware that resolves locale once per request and stashes on `request.state.locale`:
+```python
+@app.middleware("http")
+async def i18n_middleware(request, call_next):
+    request.state.locale = get_locale(request, current_user=None)  # cookie / default fallback
+    response = await call_next(request)
+    return response
+```
+For authenticated users, the locale is re-resolved inside each route's `get_current_user` step (or we layer a second helper that reads user.language first). Simplest: `get_locale(request, current_user)` is called by each TemplateResponse and the result is added to context as `locale`.
+
+**Cleanest implementation chosen**: routes pass `"locale": get_locale(request, current_user)` to every TemplateResponse. Most routes already pass `"current_user": current_user` — same pattern. This is explicit + avoids middleware mutation of state that Jinja relies on.
+
+**4. Language switcher partial** —
+New `app/templates/components/lang_switcher.html`: a small `<form method="post" action="/lang/set">` with hidden `lang` field and `next` URL. Renders two buttons (EN / 中文) in the navbar; the current locale's button is disabled. Included from `base.html` inside the user-info span.
+
+**5. New route `POST /lang/set`** in a new `app/routes/i18n.py`:
+- Accepts `lang` (must be in `{"en", "zh"}`, default to "en" if invalid).
+- Sets `lang` cookie (1-year max-age, samesite=lax).
+- If `current_user` is authenticated, updates `user.language = lang` and commits.
+- Redirects to `next` (or `/projects` if no next provided).
+
+**6. Template sweep** — replace English literals with `{{ t('key') }}` calls across:
+- `app/templates/base.html` (navbar)
+- `app/templates/projects_list.html` (page title, filter tabs, attention banner labels, table headers, badges)
+- `app/templates/project_detail.html` (every section header, action buttons, empty-state copy)
+- `app/templates/project_form.html` (every form label, button)
+- `app/templates/intake.html` / `app/templates/components/ai_intake_panel.html` (state-1 and state-2 labels)
+- `app/templates/my_projects.html` (Build 19)
+- `app/templates/components/*.html` (journal, quotation, media_history, bottom_chat — labels only, not AI prompts)
+- `app/templates/calendar.html`, `app/templates/ideas.html` etc.
+- `app/templates/auth_*.html` (login/register pages)
+
+**NOT swept:** admin templates, `app/templates/intake.html` only if it's still rendered (we keep the file as legacy artifact), help modal content.
+
+**Strategy to avoid breaking existing tests:** every test_buildNN.py that asserts a literal string is run AGAINST the English default (since default lang is "en" and tests don't set the cookie). So the sweep should only change template SOURCE — the rendered English output stays identical to current behavior. Verified by running the full regression suite after the sweep.
+
+**7. Tests — `test_build23.py`:**
+
+*Bundle integrity:*
+- `from app.i18n import TRANSLATIONS, t, get_locale` imports cleanly.
+- `len(TRANSLATIONS["zh"]) >= 100` (sanity that we shipped substantial coverage).
+- Every key in `zh.json` exists in `en.json` (otherwise it's a typo we'd never catch).
+
+*Default English renders existing English labels:*
+- Anonymous GET `/auth/login` HTML contains the English label "Sign In" (or current equivalent) — proves the template sweep didn't break English rendering.
+- Admin GET `/projects` (no cookie set) HTML contains "Projects" in the navbar.
+
+*Switching to Chinese changes navbar labels:*
+- POST `/lang/set` with `lang=zh` then GET `/projects` → navbar contains `项目` (Chinese for Projects). No restart required.
+
+*Logged-in language switch updates `users.language`:*
+- Admin POST `/lang/set` with `lang=zh` → DB row `users WHERE username='admin'` has `language='zh'`.
+- Same for switching back to `en`.
+
+*Cookie fallback works (logged-out user):*
+- New `requests.Session()` (no login). Set cookie `lang=zh` manually. GET `/auth/login` → contains Chinese labels.
+- Same session WITHOUT the cookie → English labels.
+
+*Missing translation key does NOT crash:*
+- `t(ctx, 'this.key.does.not.exist')` returns the literal string `'this.key.does.not.exist'` and does NOT raise.
+- Render a template that calls `{{ t('this.key.does.not.exist') }}` → page returns 200 with the literal key visible (so devs see what's missing) — never 500.
+
+*Locale resolution chain:*
+- `get_locale(request, None)` with no cookie → `"en"`.
+- `get_locale(request, None)` with cookie `lang=zh` → `"zh"`.
+- `get_locale(request, user_with_zh_pref)` with no cookie → `"zh"` (user pref wins).
+- `get_locale(request, user_with_en_pref)` with cookie `lang=zh` → `"en"` (user pref still wins; cookie is fallback for logged-out only).
+
+*Regression — every prior build's English-asserting tests still pass:*
+- The plan's verification step runs `test_build18.py`, `test_build19.py`, `test_build20.py`, `test_build21.py`, `test_build22.py`, `test_ai_e2e.py`. All must stay green. This proves the template sweep didn't change any rendered English text.
+
+**8. Version + docs:**
+- `app/version.py` → `1.1.0-build23`.
+- `VERSION.md` "What's new in v1.1.0-build23" entry.
+- `CHANGELOG.md` Build 23 entry (English).
+- **`USER_GUIDE.md`** stays English; add a one-line note that Chinese UI is now available via the switcher.
+
+#### Affected files
+- New: `app/i18n.py`, `app/i18n/en.json`, `app/i18n/zh.json`, `app/routes/i18n.py`, `app/templates/components/lang_switcher.html`, `test_build23.py`
+- Modify: `app/main.py` (register `t` global, mount i18n router), `app/templates/base.html` (include lang_switcher), `app/templates/projects_list.html`, `app/templates/project_detail.html`, `app/templates/project_form.html`, `app/templates/my_projects.html`, `app/templates/calendar.html`, `app/templates/ideas.html`, `app/templates/auth_login.html`, `app/templates/auth_register.html`, `app/templates/components/ai_intake_panel.html`, `app/templates/components/journal_section.html`, `app/templates/components/quotation_section.html`, `app/templates/components/media_history_section.html`, `app/templates/components/bottom_chat.html`, all relevant routes (add `"locale": get_locale(request, current_user)` to every TemplateResponse context — could be ~30 call-sites; consider a small helper)
+- `app/version.py`, `VERSION.md`, `CHANGELOG.md`, `USER_GUIDE.md` (one-line note)
+
+#### Verification
+- `python3 test_build23.py` — all assertions pass.
+- Regression: every existing `test_buildNN.py` (8, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21, 22) still passes — confirms the template sweep didn't break any English-text assertions.
+- Manual smoke: load `/projects` → click 中文 → navbar shows Chinese labels → click EN → switches back. Both directions persist across reloads.
+- `test_ai_e2e.py` still 10P/7S/0F (no regression).
+- Footer + Help modal show `v1.1.0-build23`.
+
+#### Non-goals / safety rails (confirmed)
+- **No `Accept-Language` browser header.** Locale resolution stays `user.language → lang cookie → "en"`. Manual switcher is enough.
+- **No business logic, permission, AI behavior, or schema change.** Build 23 is UI i18n only. Permissions, routing, dispatcher, AI prompts, AI tool wiring all untouched.
+- **`t(key)` is fail-safe.** Missing key returns the literal key string (visible to devs in dev) — never raises, never 500s a page. Same for missing locale (falls back to "en"; if "en" also missing, returns the key).
+- **User reviews `zh.json` before merging.** I (Claude) write a first pass; user does a pass before this build is marked SHIPPED.
+
+#### Out of scope (deferred)
+- Translating the Help modal body, USER_GUIDE.md, AI prompts, admin pages, the changelog/version history strings.
+- Right-to-left languages.
+- Pluralization rules (Chinese doesn't need them; English uses N=1 vs N>1 in just a couple alert messages — handled inline if needed).
+- Translation memory tooling, .po files, gettext infrastructure — overkill for ~150 keys.
+
+---
+
 #### Context
 Today the app has two ways to create a project: `/projects/new` (manual form) and `/ai/intake` (paste text / upload file → AI extracts fields → confirm). Conceptually they're the same task, and the navbar carries both as separate destinations. Build 22 consolidates them: `/projects/new` becomes a two-tab page (Manual Form / AI-Assisted), the AI Intake link is removed from the navbar, and the `/ai/intake` route stays as a 303 redirect to `/projects/new?tab=ai` so old bookmarks and test fixtures keep working.
 
