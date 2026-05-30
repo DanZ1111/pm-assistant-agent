@@ -1,5 +1,55 @@
 # PM Product Tracker — Changelog
 
+## v1.1.0-build23 — Chinese i18n (Build 23)
+_2026-05-30_
+
+**Goal:** ship a Chinese UI option for the PM tracker. The architecture has been ready since Build 13 (which added `users.language` with default `"en"`); Build 23 is the actual translation layer + switcher.
+
+**New module `app/i18n`** (Python package):
+- `app/i18n/__init__.py` — `TRANSLATIONS` dict loaded from JSON bundles; `t(key, **kwargs)` Jinja2 `pass_context` global; `get_locale(request, current_user)` helper.
+- `app/i18n/en.json` and `app/i18n/zh.json` — 520 keys each, dot-namespaced by area (`nav.*`, `title.*`, `section.*`, `btn.*`, `form.*`, `badge.*`, `status.*`, `filter.*`, `alert.*`, `empty.*`, `chat.*`, `idea_*`, `timeline.*`, `files.*`, `journal.*`, `variant.*`, `component.*`, `profit.*`, `common.*`).
+- Locale resolution: authenticated `users.language` → `lang` cookie → `"en"`. No `Accept-Language` header (per agreed plan).
+- Fail-safe: missing key returns literal key string, missing locale falls back to en, format errors return the raw template. **Pages never 500 on i18n issues.**
+
+**New route `POST /lang/set`** (`app/routes/i18n.py`):
+- Accepts a `lang` form value; silently falls back to `"en"` if not in `SUPPORTED_LOCALES`.
+- Sets `lang` cookie (1-year, samesite=lax).
+- For authenticated users, also persists to `users.language` (durable across browser/cookie clears).
+- 303 redirect back to the `next` form value (sanitized to local paths only).
+
+**Switcher UI** — new partial `app/templates/components/lang_switcher.html`. Two small `EN | 中文` buttons in the navbar (visible to everyone). Active locale is styled distinctly. POSTs to `/lang/set` with `next=<current path>` so users stay on the same page after switching.
+
+**Template sweep — primary surfaces translated:**
+- `base.html` — navbar links, Help button, Sign Out button.
+- Auth pages — login/register labels, buttons, helper copy, and emergency reset labels.
+- `projects_list.html` / `my_projects.html` — page titles, counts, filters, table headers, badges, empty states, and primary actions.
+- `project_form.html` — page title, both tab labels (Manual / AI), section headers, form labels, required/critical/recommended badges, prototype controls, Thesis help, Cancel / Save / Create buttons.
+- `project_detail.html` — sidebar labels, Product Thesis controls, Inspired By, Timeline table/modals, Files & Renderings, Change Log, and file upload labels.
+- Detail sub-components — Project Journal, Variants, Packaging & Accessories, Quotation Files, Profit Model placeholder, Rendering History, Prototype Photos.
+- Calendar and Good Ideas board/form pages.
+- AI-assisted create panel — paste/upload states, review/confirm forms, classification banner, status copy, and actions.
+- `components/bottom_chat.html` — mode toggle (Intake/Ask), scope toggle (Project/Global), placeholder text, panel title, history/archive/close titles.
+- `components/lang_switcher.html` — uses i18n keys for its labels too.
+
+**Translation philosophy** (per agreed clarification): product language, not mechanical translation. Industry-standard terms stay as-is — `Thesis`, `MSRP`, `SKU`, `AI`, `PM`, brand names, factory names, product codes are not translated. Goal is to read naturally to a Chinese-speaking PM who already works in this domain.
+
+**Out of scope for this first pass** (deferred to a v1.2 i18n update):
+- Help modal body (~240 lines of deep doc).
+- AI prompts in `app/ai/prompts.py` (English performs better; not user-visible).
+- `/admin/*` pages (internal tools).
+- Legacy `app/templates/intake.html` (kept as historical artifact; no longer rendered).
+
+**Safety rails (confirmed):**
+- No business logic, permission, AI behavior, or schema change. UI i18n only.
+- No `Accept-Language` browser detection. Manual switcher only.
+- User reviews `zh.json` wording before final v1.1.0 release.
+
+**No schema migration.** `users.language` already exists (Build 13).
+
+**Files created:** `app/i18n/__init__.py`, `app/i18n/en.json`, `app/i18n/zh.json`, `app/routes/i18n.py`, `app/templates/components/lang_switcher.html`, `test_build23.py`
+
+**Files modified:** `app/main.py` (mount i18n router; register `t` and locale helper as Jinja2 globals), `app/routes/auth.py`, `app/routes/projects.py`, `app/routes/intake.py`, `app/routes/calendar.py`, `app/routes/ideas.py` (locale contexts), user-facing templates across projects/auth/calendar/ideas/detail components, `app/version.py`, `VERSION.md`, `USER_GUIDE.md` (one-line note), `CURRENT_TASK.md` (handoff status).
+
 ## v1.1.0-build22 — AI-Assisted Create Project (Build 22)
 _2026-05-30_
 

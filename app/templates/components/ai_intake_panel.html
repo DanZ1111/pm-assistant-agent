@@ -14,19 +14,19 @@
 {# Option A: Paste text #}
 <form method="post" action="/ai/intake/extract">
   <div class="form-section">
-    <h3 class="form-section-title"><i class="bi bi-chat-left-text me-2"></i>Paste Your Notes</h3>
-    <p class="text-muted small mb-3">Paste any raw notes, emails, WhatsApp messages, or meeting notes about the product. AI will pull out what it can.</p>
+    <h3 class="form-section-title"><i class="bi bi-chat-left-text me-2"></i>{{ t('section.paste_notes') }}</h3>
+    <p class="text-muted small mb-3">{{ t('intake.paste_help') }}</p>
     <textarea name="raw_text" class="form-control" rows="10" autofocus
-              placeholder="e.g. Hey, so we're working on a new chef knife for the Rblack line. Factory is Guangzhou Blade Co. Sarah Chen is PM, Mike Torres is on engineering. Target cost around $18, MSRP $129.99. Aiming for Q4 2026 launch. This knife is for home cooks who want a pro-feel blade without spending $300..."
+              placeholder="{{ t('placeholder.intake_notes') }}"
     >{{ raw_text }}</textarea>
   </div>
   <div class="d-flex gap-3 mt-3">
     <button type="submit" class="btn btn-primary">
-      <i class="bi bi-magic me-2"></i>Extract Fields
+      <i class="bi bi-magic me-2"></i>{{ t('btn.extract_fields') }}
     </button>
     <button type="button" class="btn btn-outline-secondary"
             data-bs-toggle="tab" data-bs-target="#pane-create-manual">
-      Switch to Manual Form
+      {{ t('btn.switch_to_manual') }}
     </button>
   </div>
 </form>
@@ -34,37 +34,37 @@
 {# Divider #}
 <div class="d-flex align-items-center gap-3 my-4">
   <hr style="flex:1;border-color:var(--color-border)">
-  <span class="text-muted small fw-semibold">OR</span>
+  <span class="text-muted small fw-semibold">{{ t('common.or') }}</span>
   <hr style="flex:1;border-color:var(--color-border)">
 </div>
 
 {# Option B: Upload file #}
 <form method="post" action="/ai/intake/extract-file" enctype="multipart/form-data">
   <div class="form-section">
-    <h3 class="form-section-title"><i class="bi bi-file-earmark-arrow-up me-2"></i>Upload a File</h3>
-    <p class="text-muted small mb-3">Upload a PDF (spec sheet, quotation, email export) or an image of the product. AI will extract fields and generate a summary.</p>
+    <h3 class="form-section-title"><i class="bi bi-file-earmark-arrow-up me-2"></i>{{ t('section.upload_file') }}</h3>
+    <p class="text-muted small mb-3">{{ t('intake.upload_help') }}</p>
     <div class="row g-3 align-items-end">
       <div class="col-sm-8">
-        <label class="form-label">File <small class="text-muted">(PDF or image)</small></label>
+        <label class="form-label">{{ t('form.file') }} <small class="text-muted">{{ t('intake.pdf_or_image') }}</small></label>
         <input type="file" name="file" id="intakeFileInput" class="form-control"
                accept=".pdf,.png,.jpg,.jpeg,.webp,.gif">
       </div>
       <div class="col-sm-4">
-        <label class="form-label">Category</label>
+        <label class="form-label">{{ t('form.category') }}</label>
         <select name="file_category" class="form-select">
-          <option value="rendering">Rendering</option>
-          <option value="reference" selected>Reference</option>
-          <option value="quotation">Quotation</option>
-          <option value="factory_feedback">Factory Feedback</option>
-          <option value="thesis">Thesis Doc</option>
-          <option value="other">Other</option>
+          <option value="rendering">{{ t('file_category.rendering') }}</option>
+          <option value="reference" selected>{{ t('file_category.reference') }}</option>
+          <option value="quotation">{{ t('file_category.quotation') }}</option>
+          <option value="factory_feedback">{{ t('file_category.factory_feedback') }}</option>
+          <option value="thesis">{{ t('file_category.thesis') }}</option>
+          <option value="other">{{ t('file_category.other') }}</option>
         </select>
       </div>
     </div>
   </div>
   <div class="mt-3">
     <button type="submit" class="btn btn-primary" id="intakeFileSubmit" disabled>
-      <i class="bi bi-magic me-2"></i>Analyze File
+      <i class="bi bi-magic me-2"></i>{{ t('btn.analyze_file') }}
     </button>
   </div>
 </form>
@@ -76,11 +76,11 @@
 {% if classification %}
 <div class="alert {% if classification == 'idea' %}alert-warning{% else %}alert-info{% endif %} mb-3" style="font-size:0.875rem">
   <i class="bi {% if classification == 'idea' %}bi-lightbulb{% else %}bi-folder2{% endif %} me-2"></i>
-  <strong>AI classified this as {% if classification == 'idea' %}an Idea 💡{% else %}a Project 📁{% endif %}.</strong>
+  <strong>{{ t('intake.classified_as') }} {% if classification == 'idea' %}{{ t('intake.idea') }}{% else %}{{ t('intake.project') }}{% endif %}.</strong>
   {% if classification == 'idea' %}
-  <a href="?tab=ai&as=project" class="ms-2 small">Actually this is a project →</a>
+  <a href="?tab=ai&as=project" class="ms-2 small">{{ t('intake.actually_project') }} →</a>
   {% else %}
-  <a href="?tab=ai&as=idea" class="ms-2 small">Actually this is an idea →</a>
+  <a href="?tab=ai&as=idea" class="ms-2 small">{{ t('intake.actually_idea') }} →</a>
   {% endif %}
 </div>
 {% endif %}
@@ -95,15 +95,15 @@
           {% if uploaded_filename %}
           <i class="bi bi-file-earmark me-2"></i>{{ uploaded_original_filename }}
           {% else %}
-          <i class="bi bi-chat-left-text me-2"></i>Your Notes
+          <i class="bi bi-chat-left-text me-2"></i>{{ t('intake.your_notes') }}
           {% endif %}
         </h2>
       </div>
       {% if uploaded_ai_summary %}
-      <p class="text-muted small mb-2" style="font-weight:600">AI Summary</p>
+      <p class="text-muted small mb-2" style="font-weight:600">{{ t('intake.ai_summary') }}</p>
       <p style="font-size:0.85rem;color:var(--color-text)">{{ uploaded_ai_summary }}</p>
       {% if raw_text %}
-      <p class="text-muted small mt-3 mb-1" style="font-weight:600">Extracted Text</p>
+      <p class="text-muted small mt-3 mb-1" style="font-weight:600">{{ t('intake.extracted_text') }}</p>
       <pre style="white-space:pre-wrap;font-size:0.75rem;color:var(--color-text-muted);max-height:30vh;overflow-y:auto;margin:0">{{ raw_text }}</pre>
       {% endif %}
       {% else %}
@@ -119,70 +119,70 @@
     {# ── Idea confirmation form ────────────────────────────────────────── #}
     <div class="detail-section mb-3">
       <div class="section-header">
-        <h2 class="section-title" style="font-size:1rem"><i class="bi bi-lightbulb me-2"></i>New Idea — Review &amp; Confirm</h2>
+        <h2 class="section-title" style="font-size:1rem"><i class="bi bi-lightbulb me-2"></i>{{ t('intake.new_idea_review') }}</h2>
       </div>
-      <p class="text-muted small mb-4">AI extracted these fields. Edit anything before confirming.</p>
+      <p class="text-muted small mb-4">{{ t('intake.extracted_edit_before_confirm') }}</p>
       <form method="post" action="/ai/intake/confirm-idea">
         <input type="hidden" name="raw_text" value="{{ raw_text | e }}">
 
         <div class="form-section">
-          <h3 class="form-section-title">Idea</h3>
+          <h3 class="form-section-title">{{ t('intake.idea') }}</h3>
           <div class="form-grid">
             <div class="form-group-full">
-              <label class="form-label">Name <span class="badge-required">Required</span></label>
+              <label class="form-label">{{ t('form.idea_name') }} <span class="badge-required">{{ t('badge.required') }}</span></label>
               <input type="text" name="name" class="form-control form-control-lg" required autofocus
                      value="{{ idea_fields.get('name', '') or '' }}"
-                     placeholder="Short label">
+                     placeholder="{{ t('placeholder.short_label') }}">
             </div>
             <div class="form-group-full">
-              <label class="form-label">Description</label>
+              <label class="form-label">{{ t('form.description') }}</label>
               <textarea name="description" class="form-control" rows="3"
-                        placeholder="Longer detail">{{ idea_fields.get('description', '') or '' }}</textarea>
+                        placeholder="{{ t('placeholder.longer_detail') }}">{{ idea_fields.get('description', '') or '' }}</textarea>
             </div>
           </div>
         </div>
 
         <div class="form-section">
-          <h3 class="form-section-title">Categorize</h3>
+          <h3 class="form-section-title">{{ t('section.categorize') }}</h3>
           <div class="form-grid">
             <div>
-              <label class="form-label">Type <span class="badge-required">Required</span></label>
+              <label class="form-label">{{ t('form.idea_type') }} <span class="badge-required">{{ t('badge.required') }}</span></label>
               <select name="idea_type" class="form-select" required>
-                {% for t in idea_types %}
-                <option value="{{ t }}" {% if idea_fields.get('idea_type') == t %}selected{% endif %}>{{ t | title }}</option>
+                {% for idea_type in idea_types %}
+                <option value="{{ idea_type }}" {% if idea_fields.get('idea_type') == idea_type %}selected{% endif %}>{{ t('idea_type.' ~ idea_type) }}</option>
                 {% endfor %}
               </select>
             </div>
             <div>
-              <label class="form-label">Source <span class="badge-required">Required</span></label>
+              <label class="form-label">{{ t('form.source') }} <span class="badge-required">{{ t('badge.required') }}</span></label>
               <select name="source" class="form-select" required>
                 {% for s in idea_sources %}
-                <option value="{{ s }}" {% if idea_fields.get('source') == s %}selected{% endif %}>{{ s | title }}</option>
+                <option value="{{ s }}" {% if idea_fields.get('source') == s %}selected{% endif %}>{{ t('idea_source.' ~ s) }}</option>
                 {% endfor %}
               </select>
             </div>
             <div class="form-group-full">
-              <label class="form-label">Source Detail</label>
+              <label class="form-label">{{ t('form.source_detail') }}</label>
               <input type="text" name="source_detail" class="form-control"
                      value="{{ idea_fields.get('source_detail', '') or '' }}"
-                     placeholder="Factory name, URL, tradeshow name…">
+                     placeholder="{{ t('placeholder.source_detail_short') }}">
             </div>
             <div class="form-group-full">
-              <label class="form-label">Contributor</label>
+              <label class="form-label">{{ t('form.contributor') }}</label>
               <input type="text" name="contributor" class="form-control"
                      value="{{ idea_fields.get('contributor', '') or (current_user.display_name or current_user.username) }}"
-                     placeholder="Who suggested it">
+                     placeholder="{{ t('placeholder.contributor_short') }}">
             </div>
           </div>
         </div>
 
         <div class="d-flex gap-3 mt-4 mb-2">
           <button type="submit" class="btn btn-primary btn-lg">
-            <i class="bi bi-lightbulb me-2"></i>Confirm &amp; Save Idea
+            <i class="bi bi-lightbulb me-2"></i>{{ t('btn.confirm_save_idea') }}
           </button>
-          <a href="/projects/new?tab=ai" class="btn btn-outline-secondary btn-lg">Start Over</a>
+          <a href="/projects/new?tab=ai" class="btn btn-outline-secondary btn-lg">{{ t('btn.start_over') }}</a>
         </div>
-        <p class="text-muted small">The idea will appear on the <a href="/ideas">Good Ideas board</a> in the {{ idea_fields.get('idea_type','other') | title }} column.</p>
+        <p class="text-muted small">{{ t('intake.idea_saved_hint') }} <a href="/ideas">{{ t('title.ideas') }}</a>.</p>
       </form>
     </div>
 
@@ -191,10 +191,10 @@
     {% if matched_project %}
     <div class="alert alert-info mb-4" style="font-size:0.875rem">
       <i class="bi bi-search me-2"></i>
-      <strong>Similar project found:</strong>
+      <strong>{{ t('intake.similar_project_found') }}:</strong>
       {{ matched_project.name }}{% if matched_project.brand %} · {{ matched_project.brand }}{% endif %}
-      <span class="badge bg-info text-dark ms-2">{{ (match_score * 100) | int }}% match</span>
-      <p class="mb-0 mt-1 text-muted small">You can <strong>update this project</strong> with the extracted fields, or <strong>create a new one</strong> below.</p>
+      <span class="badge bg-info text-dark ms-2">{{ t('intake.match_percent', percent=(match_score * 100) | int) }}</span>
+      <p class="mb-0 mt-1 text-muted small">{{ t('intake.update_or_create_hint') }}</p>
     </div>
     {% endif %}
 
@@ -202,23 +202,23 @@
     {% if health.critical_missing %}
     <div class="alert alert-warning mb-4" style="font-size:0.875rem">
       <i class="bi bi-exclamation-triangle me-2"></i>
-      <strong>Missing critical fields:</strong>
+      <strong>{{ t('intake.missing_critical_fields') }}:</strong>
       {{ health.critical_missing | join(', ') | replace('_', ' ') }}
-      — fill them in below or add later.
+      — {{ t('intake.fill_now_or_later') }}
     </div>
     {% endif %}
     {% if not health.critical_missing %}
     <div class="alert alert-success mb-4" style="font-size:0.875rem">
-      <i class="bi bi-check-circle me-2"></i>All critical fields extracted — looking good.
+      <i class="bi bi-check-circle me-2"></i>{{ t('intake.all_critical_extracted') }}
     </div>
     {% endif %}
     {% endif %}
 
     <div class="detail-section mb-3">
       <div class="section-header">
-        <h2 class="section-title" style="font-size:1rem"><i class="bi bi-pencil-square me-2"></i>Proposed Fields — Review &amp; Edit</h2>
+        <h2 class="section-title" style="font-size:1rem"><i class="bi bi-pencil-square me-2"></i>{{ t('intake.proposed_fields') }}</h2>
       </div>
-      <p class="text-muted small mb-4">Review what AI extracted. Edit any field before confirming. Nothing is saved until you click "Confirm &amp; Create".</p>
+      <p class="text-muted small mb-4">{{ t('intake.review_before_save') }}</p>
 
       <form method="post" action="/ai/intake/confirm">
         <input type="hidden" name="raw_text" value="{{ raw_text | e }}">
@@ -231,66 +231,66 @@
 
         <!-- Identity -->
         <div class="form-section">
-          <h3 class="form-section-title">Project Identity</h3>
+          <h3 class="form-section-title">{{ t('section.identity') }}</h3>
           <div class="form-grid">
             <div class="form-group-full">
-              <label class="form-label">Project Name <span class="badge-required">Required</span></label>
+              <label class="form-label">{{ t('form.project_name') }} <span class="badge-required">{{ t('badge.required') }}</span></label>
               <input type="text" name="name" class="form-control form-control-lg"
                      value="{{ proposed.get('name', '') or '' }}"
-                     placeholder="Product or project name" required autofocus>
+                     placeholder="{{ t('placeholder.project_or_product_name') }}" required autofocus>
             </div>
             <div>
-              <label class="form-label">Brand <span class="badge-critical">Critical</span></label>
+              <label class="form-label">{{ t('form.brand') }} <span class="badge-critical">{{ t('badge.critical') }}</span></label>
               <input type="text" name="brand" class="form-control"
                      value="{{ proposed.get('brand', '') or '' }}"
-                     placeholder="e.g. Rblack">
+                     placeholder="{{ t('placeholder.brand_example_short') }}">
             </div>
             <div>
-              <label class="form-label">SKU <span class="badge-recommended">Recommended</span></label>
+              <label class="form-label">{{ t('form.sku') }} <span class="badge-recommended">{{ t('badge.recommended') }}</span></label>
               <input type="text" name="sku" class="form-control"
                      value="{{ proposed.get('sku', '') or '' }}"
                      placeholder="e.g. RB-2024-001">
             </div>
             <div>
-              <label class="form-label">Product Type</label>
+              <label class="form-label">{{ t('form.product_type') }}</label>
               <input type="text" name="product_type" class="form-control"
                      value="{{ proposed.get('product_type', '') or '' }}"
-                     placeholder="e.g. chef's knife, folding knife">
+                     placeholder="{{ t('placeholder.product_type_example_short') }}">
             </div>
           </div>
         </div>
 
         <!-- Team -->
         <div class="form-section">
-          <h3 class="form-section-title">Team</h3>
+          <h3 class="form-section-title">{{ t('section.team') }}</h3>
           <div class="form-grid">
             <div>
-              <label class="form-label">Product Manager <span class="badge-critical">Critical</span></label>
+              <label class="form-label">{{ t('form.product_manager') }} <span class="badge-critical">{{ t('badge.critical') }}</span></label>
               <input type="text" name="product_manager" class="form-control"
                      value="{{ proposed.get('product_manager', '') or '' }}"
-                     placeholder="Name">
+                     placeholder="{{ t('placeholder.name') }}">
             </div>
             <div>
-              <label class="form-label">Engineer <span class="badge-critical">Critical</span></label>
+              <label class="form-label">{{ t('form.engineer') }} <span class="badge-critical">{{ t('badge.critical') }}</span></label>
               <input type="text" name="engineer" class="form-control"
                      value="{{ proposed.get('engineer', '') or '' }}"
-                     placeholder="Name">
+                     placeholder="{{ t('placeholder.name') }}">
             </div>
           </div>
         </div>
 
         <!-- Supply Chain & Pricing -->
         <div class="form-section">
-          <h3 class="form-section-title">Supply Chain &amp; Pricing</h3>
+          <h3 class="form-section-title">{{ t('section.supply_chain') }}</h3>
           <div class="form-grid">
             <div>
-              <label class="form-label">Factory <span class="badge-critical">Critical</span></label>
+              <label class="form-label">{{ t('form.factory') }} <span class="badge-critical">{{ t('badge.critical') }}</span></label>
               <input type="text" name="factory" class="form-control"
                      value="{{ proposed.get('factory', '') or '' }}"
-                     placeholder="Supplier / factory name">
+                     placeholder="{{ t('placeholder.supplier_factory') }}">
             </div>
             <div>
-              <label class="form-label">Target Factory Cost <span class="badge-critical">Critical</span></label>
+              <label class="form-label">{{ t('form.target_factory_cost') }} <span class="badge-critical">{{ t('badge.critical') }}</span></label>
               <div class="input-group">
                 <span class="input-group-text">USD</span>
                 <input type="number" name="target_factory_cost" class="form-control"
@@ -299,7 +299,7 @@
               </div>
             </div>
             <div>
-              <label class="form-label">Target MSRP <span class="badge-critical">Critical</span></label>
+              <label class="form-label">{{ t('form.target_msrp') }} <span class="badge-critical">{{ t('badge.critical') }}</span></label>
               <div class="input-group">
                 <span class="input-group-text">USD</span>
                 <input type="number" name="target_msrp" class="form-control"
@@ -312,23 +312,23 @@
 
         <!-- Timeline -->
         <div class="form-section">
-          <h3 class="form-section-title">Timeline</h3>
+          <h3 class="form-section-title">{{ t('section.timeline') }}</h3>
           <div class="form-grid">
             <div>
-              <label class="form-label">Planned Launch Date <span class="badge-critical">Critical</span></label>
+              <label class="form-label">{{ t('form.planned_launch_date') }} <span class="badge-critical">{{ t('badge.critical') }}</span></label>
               <input type="date" name="planned_launch_date" class="form-control"
                      value="{{ proposed.get('planned_launch_date', '') or '' }}">
             </div>
             <div>
-              <label class="form-label">Prototype Rounds</label>
+              <label class="form-label">{{ t('form.prototype_rounds') }}</label>
               <div class="d-flex gap-3 pt-2">
                 <div class="form-check">
                   <input class="form-check-input" type="radio" name="prototype_rounds" id="pr_single" value="single" checked>
-                  <label class="form-check-label" for="pr_single">Single (8 phases)</label>
+                  <label class="form-check-label" for="pr_single">{{ t('form.prototype_single') }}</label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="radio" name="prototype_rounds" id="pr_double" value="double">
-                  <label class="form-check-label" for="pr_double">Double (10 phases)</label>
+                  <label class="form-check-label" for="pr_double">{{ t('form.prototype_double') }}</label>
                 </div>
               </div>
             </div>
@@ -337,14 +337,14 @@
 
         <!-- Product Thesis -->
         <div class="form-section">
-          <h3 class="form-section-title">Product Thesis</h3>
+          <h3 class="form-section-title">{{ t('section.thesis') }}</h3>
           <div class="form-group-full">
-            <label class="form-label">Thesis <span class="badge-critical">Critical</span>
-              <small class="text-muted ms-2">(≥ 80 characters)</small>
+            <label class="form-label">{{ t('form.project_thesis') }} <span class="badge-critical">{{ t('badge.critical') }}</span>
+              <small class="text-muted ms-2">{{ t('form.thesis_min_parenthetical') }}</small>
             </label>
             <textarea name="project_thesis" class="form-control" rows="5"
                       id="intakeThesisInput"
-                      placeholder="Why does this product exist? Who is it for? What problem does it solve?">{{ proposed.get('project_thesis', '') or '' }}</textarea>
+                      placeholder="{{ t('placeholder.thesis_short_question') }}">{{ proposed.get('project_thesis', '') or '' }}</textarea>
             <div class="thesis-counter mt-1" id="intakeThesisCounter"></div>
           </div>
         </div>
@@ -352,20 +352,20 @@
         <!-- Actions -->
         <div class="d-flex gap-3 mt-4 mb-2">
           <button type="submit" class="btn btn-primary btn-lg">
-            <i class="bi bi-check-lg me-2"></i>Confirm &amp; Create Project
+            <i class="bi bi-check-lg me-2"></i>{{ t('btn.confirm_create_project') }}
           </button>
           {% if matched_project %}
           <button type="submit" name="action" value="update" class="btn btn-warning btn-lg">
-            <i class="bi bi-arrow-repeat me-2"></i>Update "{{ matched_project.name }}"
+            <i class="bi bi-arrow-repeat me-2"></i>{{ t('btn.update') }} "{{ matched_project.name }}"
           </button>
           {% endif %}
-          <a href="/projects/new?tab=ai" class="btn btn-outline-secondary btn-lg">Start Over</a>
+          <a href="/projects/new?tab=ai" class="btn btn-outline-secondary btn-lg">{{ t('btn.start_over') }}</a>
         </div>
         <p class="text-muted small">
           {% if matched_project %}
-          "Confirm &amp; Create" creates a new project. "Update" applies extracted fields to the existing match (only non-empty fields are changed).
+          {{ t('intake.confirm_or_update_hint') }}
           {% else %}
-          Project will be created with a single-prototype phase template. You can adjust phases on the project detail page.
+          {{ t('intake.new_project_hint') }}
           {% endif %}
         </p>
 
@@ -395,9 +395,9 @@
   function updateCounter() {
     var len = ta.value.length;
     if (len >= 80) {
-      counter.innerHTML = '<span style="color:var(--color-success)"><i class="bi bi-check-circle me-1"></i>Good (' + len + ' chars)</span>';
+      counter.innerHTML = '<span style="color:var(--color-success)"><i class="bi bi-check-circle me-1"></i>{{ t('common.good') }} (' + len + ' {{ t('common.chars') }})</span>';
     } else {
-      counter.innerHTML = '<span style="color:var(--color-warning)">' + (80 - len) + ' more characters to go</span>';
+      counter.innerHTML = '<span style="color:var(--color-warning)">' + '{{ t('common.more_chars_to_go') }}'.replace('{count}', 80 - len) + '</span>';
     }
   }
   ta.addEventListener('input', updateCounter);

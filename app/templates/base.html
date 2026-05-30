@@ -17,33 +17,35 @@
     </a>
     <div class="navbar-nav flex-row gap-1 align-items-center">
       <a class="nav-link px-3 {% if request.url.path.startswith('/projects') %}active{% endif %}" href="/projects" id="navProjectsLink">
-        <i class="bi bi-folder2 me-1"></i>Projects
+        <i class="bi bi-folder2 me-1"></i>{{ t('nav.projects') }}
       </a>
       {% if current_user %}
       <a class="nav-link px-3 {% if request.url.path.startswith('/calendar') %}active{% endif %}" href="/calendar">
-        <i class="bi bi-calendar3 me-1"></i>Calendar
+        <i class="bi bi-calendar3 me-1"></i>{{ t('nav.calendar') }}
       </a>
       <a class="nav-link px-3 {% if request.url.path.startswith('/ideas') %}active{% endif %}" href="/ideas">
-        <i class="bi bi-lightbulb me-1"></i>Good Ideas
+        <i class="bi bi-lightbulb me-1"></i>{{ t('nav.ideas') }}
       </a>
       {% endif %}
       {% if current_user and current_user.role in ('admin', 'pm') %}
       <a class="nav-link px-3 {% if request.url.path.startswith('/my-projects') %}active{% endif %}" href="/my-projects">
-        <i class="bi bi-person-circle me-1"></i>My Projects
+        <i class="bi bi-person-circle me-1"></i>{{ t('nav.my_projects') }}
       </a>
       {# Build 22 — AI Intake link removed; AI-Assisted Create lives as a tab on /projects/new.
          Bottom AI Chat (Build 21) is the daily AI entry point. #}
       {% endif %}
       {% if current_user and current_user.role == 'admin' %}
       <a class="nav-link px-3 {% if request.url.path == '/admin/database' %}active{% endif %}" href="/admin/database">
-        <i class="bi bi-database me-1"></i>Database
+        <i class="bi bi-database me-1"></i>{{ t('nav.database') }}
       </a>
       <a class="nav-link px-3 {% if request.url.path.startswith('/admin/users') %}active{% endif %}" href="/admin/users">
-        <i class="bi bi-people me-1"></i>Users
+        <i class="bi bi-people me-1"></i>{{ t('nav.users') }}
       </a>
       {% endif %}
+      {# Build 23 — language switcher (visible to everyone, anon or logged-in) #}
+      {% include "components/lang_switcher.html" %}
       <button class="btn btn-sm nav-help-btn ms-1" data-bs-toggle="modal" data-bs-target="#helpModal">
-        <i class="bi bi-question-circle me-1"></i>v{{ APP_VERSION }} Help
+        <i class="bi bi-question-circle me-1"></i>v{{ APP_VERSION }} {{ t('nav.help') }}
       </button>
       {% if current_user %}
       <span class="nav-link px-2 text-white-50 small" style="cursor:default">
@@ -52,7 +54,7 @@
       </span>
       <form method="post" action="/auth/logout" class="d-inline">
         <button type="submit" class="btn btn-sm nav-help-btn">
-          <i class="bi bi-box-arrow-right me-1"></i>Sign Out
+          <i class="bi bi-box-arrow-right me-1"></i>{{ t('nav.sign_out') }}
         </button>
       </form>
       {% endif %}

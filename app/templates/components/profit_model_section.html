@@ -5,44 +5,44 @@
 <section class="detail-section" id="profit-model">
   <div class="section-header">
     <h2 class="section-title">
-      <i class="bi bi-calculator me-2"></i>Profit Model
-      <span class="badge bg-light text-dark ms-2">Placeholder · coming in v1.2</span>
+      <i class="bi bi-calculator me-2"></i>{{ t('section.profit_model') }}
+      <span class="badge bg-light text-dark ms-2">{{ t('profit.placeholder_badge') }}</span>
     </h2>
   </div>
 
   <div class="alert alert-secondary small mb-3">
-    <strong>Intended formula:</strong>
+    <strong>{{ t('profit.intended_formula') }}:</strong>
     <code>Margin per unit = MSRP − factory_cost − (sum of packaging/accessory unit costs)</code><br>
-    <strong>Total profit:</strong>
+    <strong>{{ t('profit.total_profit') }}:</strong>
     <code>Margin per unit × forecast volume − overhead</code><br>
     <span class="text-muted">
-      The model will use the primary variant's costs by default. Per-variant components apply only to their variant; project-wide components apply to every variant. See <code>PROFIT_MODEL_INTENT.md</code> for the full design.
+      {{ t('profit.design_note') }} <code>PROFIT_MODEL_INTENT.md</code>.
     </span>
   </div>
 
   {% if not can_view_costs %}
-  <p class="text-muted small mb-0"><i class="bi bi-lock me-1"></i>Cost figures are not visible at your access level.</p>
+  <p class="text-muted small mb-0"><i class="bi bi-lock me-1"></i>{{ t('profit.costs_hidden') }}</p>
   {% elif primary_variant %}
   <div class="profit-snapshot p-3 border rounded">
-    <div class="text-muted small mb-2">Snapshot — primary variant: <strong>{{ primary_variant.variant_name }}</strong>{% if primary_variant.sku %} ({{ primary_variant.sku }}){% endif %}</div>
+    <div class="text-muted small mb-2">{{ t('profit.snapshot_primary') }}: <strong>{{ primary_variant.variant_name }}</strong>{% if primary_variant.sku %} ({{ primary_variant.sku }}){% endif %}</div>
     <div class="row g-2">
       <div class="col-sm-3">
-        <div class="text-muted small">Target factory cost</div>
+        <div class="text-muted small">{{ t('form.target_factory_cost') }}</div>
         <div class="fw-bold">{% if primary_variant.target_factory_cost %}${{ "%.2f"|format(primary_variant.target_factory_cost) }}{% else %}—{% endif %}</div>
       </div>
       <div class="col-sm-3">
-        <div class="text-muted small">Actual factory cost</div>
+        <div class="text-muted small">{{ t('variant.actual_factory_cost') }}</div>
         <div class="fw-bold">{% if primary_variant.actual_factory_cost %}${{ "%.2f"|format(primary_variant.actual_factory_cost) }}{% else %}—{% endif %}</div>
       </div>
       <div class="col-sm-3">
-        <div class="text-muted small">Target MSRP</div>
+        <div class="text-muted small">{{ t('form.target_msrp') }}</div>
         <div class="fw-bold">{% if primary_variant.target_msrp %}${{ "%.2f"|format(primary_variant.target_msrp) }}{% else %}—{% endif %}</div>
       </div>
       <div class="col-sm-3">
-        <div class="text-muted small">Components attached</div>
+        <div class="text-muted small">{{ t('profit.components_attached') }}</div>
         <div class="fw-bold">
           {% set count = components | length %}
-          {{ count }} {{ 'item' if count == 1 else 'items' }}
+          {{ t('profit.item_count', count=count) }}
         </div>
       </div>
     </div>
@@ -58,18 +58,18 @@
     {% endfor %}
     {% set margin = primary_variant.target_msrp - unit_cost - pkg_total.v %}
     <div class="mt-3 small">
-      <strong>Estimated per-unit margin (preview):</strong>
+      <strong>{{ t('profit.estimated_margin_preview') }}:</strong>
       ${{ "%.2f"|format(primary_variant.target_msrp) }} −
       ${{ "%.2f"|format(unit_cost) }} −
-      ${{ "%.2f"|format(pkg_total.v) }} (packaging) =
+      ${{ "%.2f"|format(pkg_total.v) }} ({{ t('variant.packaging') }}) =
       <strong>${{ "%.2f"|format(margin) }}</strong>
-      <div class="text-muted">This preview ignores overhead and forecast volume. v1.2 will add both.</div>
+      <div class="text-muted">{{ t('profit.preview_ignores') }}</div>
     </div>
     {% endif %}
   </div>
   {% else %}
   <p class="text-muted small mb-0">
-    Once a primary variant is set, this section will preview the per-unit margin. Set a variant as primary in the Variants section above.
+    {{ t('profit.no_primary_hint') }}
   </p>
   {% endif %}
 </section>

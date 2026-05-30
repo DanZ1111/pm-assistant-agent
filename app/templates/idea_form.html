@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}{% if is_edit %}Edit {{ idea.serial_number }}{% else %}New Idea{% endif %} — PM Tracker{% endblock %}
+{% block title %}{% if is_edit %}{{ t('title.edit_idea') }} {{ idea.serial_number }}{% else %}{{ t('title.new_idea') }}{% endif %} — PM Tracker{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div class="d-flex align-items-center gap-3">
     <a href="/ideas" class="btn-back"><i class="bi bi-arrow-left"></i></a>
     <div>
-      <h1 class="page-title">{% if is_edit %}Edit Idea{% else %}New Idea 💡{% endif %}</h1>
+      <h1 class="page-title">{% if is_edit %}{{ t('title.edit_idea') }}{% else %}{{ t('title.new_idea') }} 💡{% endif %}</h1>
       {% if is_edit %}<p class="page-subtitle">{{ idea.serial_number }} — {{ idea.name }}</p>{% endif %}
     </div>
   </div>
@@ -19,74 +19,74 @@
 
   <form method="post" action="{% if is_edit %}/ideas/{{ idea.id }}/edit{% else %}/ideas/new{% endif %}">
     <div class="form-section">
-      <h3 class="form-section-title">What's the idea?</h3>
+      <h3 class="form-section-title">{{ t('section.idea_basics') }}</h3>
       <div class="form-grid">
         <div class="form-group-full">
-          <label class="form-label">Idea Name <span class="badge-required">Required</span></label>
+          <label class="form-label">{{ t('form.idea_name') }} <span class="badge-required">{{ t('badge.required') }}</span></label>
           <input type="text" name="name" class="form-control form-control-lg" required autofocus
                  value="{{ idea.name if idea else '' }}"
-                 placeholder="e.g. Forged Damascus from XYZ Factory">
+                 placeholder="{{ t('placeholder.idea_name_example') }}">
         </div>
         <div class="form-group-full">
-          <label class="form-label">Description</label>
+          <label class="form-label">{{ t('form.description') }}</label>
           <textarea name="description" class="form-control" rows="3"
-                    placeholder="More detail. Why is this cool? How might we use it?">{{ idea.description if idea and idea.description else '' }}</textarea>
+                    placeholder="{{ t('placeholder.idea_description') }}">{{ idea.description if idea and idea.description else '' }}</textarea>
         </div>
       </div>
     </div>
 
     <div class="form-section">
-      <h3 class="form-section-title">Categorize</h3>
+      <h3 class="form-section-title">{{ t('section.categorize') }}</h3>
       <div class="form-grid">
         <div>
-          <label class="form-label">Type <span class="badge-required">Required</span></label>
+          <label class="form-label">{{ t('form.idea_type') }} <span class="badge-required">{{ t('badge.required') }}</span></label>
           <select name="idea_type" class="form-select" required>
-            {% for t in idea_types %}
-            <option value="{{ t }}" {% if idea and idea.idea_type == t %}selected{% endif %}>{{ t | title }}</option>
+            {% for idea_type in idea_types %}
+            <option value="{{ idea_type }}" {% if idea and idea.idea_type == idea_type %}selected{% endif %}>{{ t('idea_type.' ~ idea_type) }}</option>
             {% endfor %}
           </select>
-          <div class="form-text">What kind of idea is this — material, structure, feature…</div>
+          <div class="form-text">{{ t('ideas.type_help') }}</div>
         </div>
         <div>
-          <label class="form-label">Source <span class="badge-required">Required</span></label>
+          <label class="form-label">{{ t('form.source') }} <span class="badge-required">{{ t('badge.required') }}</span></label>
           <select name="source" class="form-select" required>
             {% for s in idea_sources %}
-            <option value="{{ s }}" {% if idea and idea.source == s %}selected{% endif %}>{{ s | title }}</option>
+            <option value="{{ s }}" {% if idea and idea.source == s %}selected{% endif %}>{{ t('idea_source.' ~ s) }}</option>
             {% endfor %}
           </select>
-          <div class="form-text">Where did you find it?</div>
+          <div class="form-text">{{ t('ideas.source_help') }}</div>
         </div>
         <div class="form-group-full">
-          <label class="form-label">Source Detail</label>
+          <label class="form-label">{{ t('form.source_detail') }}</label>
           <input type="text" name="source_detail" class="form-control"
                  value="{{ idea.source_detail if idea and idea.source_detail else '' }}"
-                 placeholder="Factory name, tradeshow, Amazon URL, etc.">
+                 placeholder="{{ t('placeholder.source_detail') }}">
         </div>
       </div>
     </div>
 
     <div class="form-section">
-      <h3 class="form-section-title">Attribution</h3>
+      <h3 class="form-section-title">{{ t('section.attribution') }}</h3>
       <div class="form-grid">
         <div class="form-group-full">
-          <label class="form-label">Contributor</label>
+          <label class="form-label">{{ t('form.contributor') }}</label>
           <input type="text" name="contributor" class="form-control"
                  value="{{ idea.contributor if idea and idea.contributor else (current_user.display_name or current_user.username) }}"
-                 placeholder="Who brought this idea in?">
-          <div class="form-text">Default: you. Change if you're logging on someone else's behalf.</div>
+                 placeholder="{{ t('placeholder.contributor') }}">
+          <div class="form-text">{{ t('ideas.contributor_help') }}</div>
         </div>
         <div class="form-group-full">
-          <label class="form-label">Notes</label>
+          <label class="form-label">{{ t('form.notes') }}</label>
           <textarea name="notes" class="form-control" rows="2"
-                    placeholder="Any other notes — pricing, contact, sample availability...">{{ idea.notes if idea and idea.notes else '' }}</textarea>
+                    placeholder="{{ t('placeholder.idea_notes') }}">{{ idea.notes if idea and idea.notes else '' }}</textarea>
         </div>
         {% if is_edit %}
         <div>
-          <label class="form-label">Status</label>
+          <label class="form-label">{{ t('form.phase_status') }}</label>
           <select name="status" class="form-select">
-            <option value="open" {% if idea.status == 'open' %}selected{% endif %}>Open — not yet used</option>
-            <option value="in_use" {% if idea.status == 'in_use' %}selected{% endif %}>In Use — linked to a project</option>
-            <option value="archived" {% if idea.status == 'archived' %}selected{% endif %}>Archived — set aside</option>
+            <option value="open" {% if idea.status == 'open' %}selected{% endif %}>{{ t('idea_status.open') }}</option>
+            <option value="in_use" {% if idea.status == 'in_use' %}selected{% endif %}>{{ t('idea_status.in_use') }}</option>
+            <option value="archived" {% if idea.status == 'archived' %}selected{% endif %}>{{ t('idea_status.archived') }}</option>
           </select>
         </div>
         {% endif %}
@@ -95,9 +95,9 @@
 
     <div class="d-flex gap-3 mt-4">
       <button type="submit" class="btn btn-primary btn-lg">
-        <i class="bi bi-check-lg me-2"></i>{% if is_edit %}Save Changes{% else %}Create Idea{% endif %}
+        <i class="bi bi-check-lg me-2"></i>{% if is_edit %}{{ t('btn.save_changes') }}{% else %}{{ t('btn.create_idea') }}{% endif %}
       </button>
-      <a href="/ideas" class="btn btn-outline-secondary btn-lg">Cancel</a>
+      <a href="/ideas" class="btn btn-outline-secondary btn-lg">{{ t('btn.cancel') }}</a>
     </div>
   </form>
 </div>

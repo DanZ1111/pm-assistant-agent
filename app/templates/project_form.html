@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{% if is_edit %}Edit {{ project.name }}{% else %}New Project{% endif %} — PM Tracker{% endblock %}
+{% block title %}{% if is_edit %}{{ t('title.edit_project') }} {{ project.name }}{% else %}{{ t('title.new_project') }}{% endif %} — PM Tracker{% endblock %}
 
 {% block content %}
 <div class="page-header">
@@ -8,7 +8,7 @@
       <i class="bi bi-arrow-left"></i>
     </a>
     <div>
-      <h1 class="page-title">{% if is_edit %}Edit Project{% else %}New Project{% endif %}</h1>
+      <h1 class="page-title">{% if is_edit %}{{ t('title.edit_project') }}{% else %}{{ t('title.new_project') }}{% endif %}</h1>
       {% if is_edit %}<p class="page-subtitle">{{ project.name }}</p>{% endif %}
     </div>
   </div>
@@ -23,13 +23,13 @@
   <li class="nav-item" role="presentation">
     <button class="nav-link {% if initial_tab == 'manual' %}active{% endif %}" id="tab-create-manual-btn"
             data-bs-toggle="tab" data-bs-target="#pane-create-manual" type="button" role="tab">
-      <i class="bi bi-pencil-square me-1"></i>Manual Form
+      <i class="bi bi-pencil-square me-1"></i>{{ t('tab.manual') }}
     </button>
   </li>
   <li class="nav-item" role="presentation">
     <button class="nav-link {% if initial_tab == 'ai' %}active{% endif %}" id="tab-create-ai-btn"
             data-bs-toggle="tab" data-bs-target="#pane-create-ai" type="button" role="tab">
-      <i class="bi bi-robot me-1"></i>AI-Assisted
+      <i class="bi bi-robot me-1"></i>{{ t('tab.ai') }}
     </button>
   </li>
 </ul>
@@ -45,45 +45,45 @@
 
     <!-- Project Identity -->
     <div class="form-section">
-      <h3 class="form-section-title">Project Identity</h3>
+      <h3 class="form-section-title">{{ t('section.identity') }}</h3>
       <div class="form-grid">
         <div class="form-group-full">
           <label class="form-label">
-            Project Name <span class="badge-required">Required</span>
+            {{ t('form.project_name') }} <span class="badge-required">{{ t('badge.required') }}</span>
           </label>
           <input type="text" name="name" class="form-control form-control-lg"
                  value="{{ project.name if project else '' }}"
-                 placeholder="e.g. Damascus Chef Knife, KlikTac Balisong, 8-bit EDC..."
+                 placeholder="{{ t('placeholder.project_name_example') }}"
                  required autofocus>
         </div>
         <div>
           <label class="form-label">
-            Brand <span class="badge-critical">Critical</span>
+            {{ t('form.brand') }} <span class="badge-critical">{{ t('badge.critical') }}</span>
           </label>
           <input type="text" name="brand" class="form-control"
                  value="{{ project.brand or '' if project else '' }}"
-                 placeholder="e.g. Rblack, Ferrum Forge...">
+                 placeholder="{{ t('placeholder.brand_example') }}">
         </div>
         <div>
           <label class="form-label">
-            SKU <span class="badge-recommended">Recommended</span>
+            {{ t('form.sku') }} <span class="badge-recommended">{{ t('badge.recommended') }}</span>
           </label>
           <input type="text" name="sku" class="form-control"
                  value="{{ project.sku or '' if project else '' }}"
                  placeholder="e.g. RB-2024-001">
         </div>
         <div>
-          <label class="form-label">Product Type</label>
+          <label class="form-label">{{ t('form.product_type') }}</label>
           <input type="text" name="product_type" class="form-control"
                  value="{{ project.product_type or '' if project else '' }}"
-                 placeholder="e.g. folding knife, EDC tool, balisong...">
+                 placeholder="{{ t('placeholder.product_type_example') }}">
         </div>
         {% if is_edit %}
         <div>
-          <label class="form-label">Status</label>
+          <label class="form-label">{{ t('form.phase_status') }}</label>
           <select name="status" class="form-select">
             {% for s in ['active', 'completed', 'paused', 'cancelled', 'archived'] %}
-            <option value="{{ s }}" {% if project.status == s %}selected{% endif %}>{{ s | title }}</option>
+            <option value="{{ s }}" {% if project.status == s %}selected{% endif %}>{{ t('status.' ~ s) }}</option>
             {% endfor %}
           </select>
         </div>
@@ -93,48 +93,48 @@
 
     <!-- Team -->
     <div class="form-section">
-      <h3 class="form-section-title">Team</h3>
+      <h3 class="form-section-title">{{ t('section.team') }}</h3>
       <div class="form-grid">
         <div>
           <label class="form-label">
-            Product Manager <span class="badge-critical">Critical</span>
+            {{ t('form.product_manager') }} <span class="badge-critical">{{ t('badge.critical') }}</span>
           </label>
           <input type="text" name="product_manager" class="form-control"
                  value="{{ project.product_manager or '' if project else '' }}"
-                 placeholder="Name">
+                 placeholder="{{ t('placeholder.name') }}">
         </div>
         <div>
           <label class="form-label">
-            Engineer <span class="badge-critical">Critical</span>
+            {{ t('form.engineer') }} <span class="badge-critical">{{ t('badge.critical') }}</span>
           </label>
           <input type="text" name="engineer" class="form-control"
                  value="{{ project.engineer or '' if project else '' }}"
-                 placeholder="Name">
+                 placeholder="{{ t('placeholder.name') }}">
         </div>
         <div>
-          <label class="form-label">Project Owner</label>
+          <label class="form-label">{{ t('form.project_owner') }}</label>
           <input type="text" name="project_owner" class="form-control"
                  value="{{ project.project_owner or '' if project else '' }}"
-                 placeholder="Name (if different from PM)">
+                 placeholder="{{ t('placeholder.owner_name') }}">
         </div>
       </div>
     </div>
 
     <!-- Supply Chain -->
     <div class="form-section">
-      <h3 class="form-section-title">Supply Chain & Pricing</h3>
+      <h3 class="form-section-title">{{ t('section.supply_chain') }}</h3>
       <div class="form-grid">
         <div>
           <label class="form-label">
-            Factory <span class="badge-critical">Critical</span>
+            {{ t('form.factory') }} <span class="badge-critical">{{ t('badge.critical') }}</span>
           </label>
           <input type="text" name="factory" class="form-control"
                  value="{{ project.factory or '' if project else '' }}"
-                 placeholder="Factory name or location">
+                 placeholder="{{ t('placeholder.factory') }}">
         </div>
         <div>
           <label class="form-label">
-            Target Factory Cost (USD) <span class="badge-critical">Critical</span>
+            {{ t('form.target_factory_cost') }} (USD) <span class="badge-critical">{{ t('badge.critical') }}</span>
           </label>
           <input type="number" name="target_factory_cost" class="form-control"
                  step="0.01" min="0"
@@ -143,7 +143,7 @@
         </div>
         <div>
           <label class="form-label">
-            Target MSRP (USD) <span class="badge-critical">Critical</span>
+            {{ t('form.target_msrp') }} (USD) <span class="badge-critical">{{ t('badge.critical') }}</span>
           </label>
           <input type="number" name="target_msrp" class="form-control"
                  step="0.01" min="0"
@@ -155,31 +155,31 @@
 
     <!-- Timeline -->
     <div class="form-section">
-      <h3 class="form-section-title">Timeline</h3>
+      <h3 class="form-section-title">{{ t('section.timeline') }}</h3>
       <div class="form-grid">
         <div>
           <label class="form-label">
-            Planned Launch Date <span class="badge-critical">Critical</span>
+            {{ t('form.planned_launch_date') }} <span class="badge-critical">{{ t('badge.critical') }}</span>
           </label>
           <input type="date" name="planned_launch_date" class="form-control"
                  value="{{ project.planned_launch_date.isoformat() if project and project.planned_launch_date else '' }}">
         </div>
         {% if not is_edit %}
         <div>
-          <label class="form-label">Prototype Rounds</label>
+          <label class="form-label">{{ t('form.prototype_rounds') }}</label>
           <div class="prototype-toggle">
             <label class="prototype-option">
               <input type="radio" name="prototype_rounds" value="single" checked>
               <span class="prototype-label">
-                <strong>Single prototype</strong>
-                <small>8 phases — standard flow</small>
+                <strong>{{ t('form.prototype_single_label') }}</strong>
+                <small>{{ t('form.prototype_single_help') }}</small>
               </span>
             </label>
             <label class="prototype-option">
               <input type="radio" name="prototype_rounds" value="double">
               <span class="prototype-label">
-                <strong>Double prototype</strong>
-                <small>10 phases — two rounds of sampling</small>
+                <strong>{{ t('form.prototype_double_label') }}</strong>
+                <small>{{ t('form.prototype_double_help') }}</small>
               </span>
             </label>
           </div>
@@ -192,10 +192,10 @@
     <!-- Build 15 — Business Plan upload (optional, create flow only) -->
     <div class="form-section" id="business-plan">
       <h3 class="form-section-title">
-        <i class="bi bi-file-earmark-text me-2"></i>Business Plan <span class="text-muted small">(optional)</span>
+        <i class="bi bi-file-earmark-text me-2"></i>{{ t('section.business_plan') }} <span class="text-muted small">{{ t('common.optional') }}</span>
       </h3>
       <p class="form-help-text">
-        Upload a business plan or product brief (PDF, Word, or image). After the project is created, AI will draft a Product Thesis from it for you to review before saving — much faster than typing one from scratch.
+        {{ t('form.business_plan_help') }}
       </p>
       <input type="file" name="business_plan" class="form-control"
              accept=".pdf,.docx,.doc,.png,.jpg,.jpeg,.webp,.gif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/*">
@@ -205,27 +205,27 @@
     <!-- Product Thesis -->
     <div class="form-section" id="thesis">
       <h3 class="form-section-title">
-        Product Thesis <span class="badge-critical">Critical</span>
-        <span class="thesis-hint">Needs at least 80 characters</span>
+        {{ t('section.thesis') }} <span class="badge-critical">{{ t('badge.critical') }}</span>
+        <span class="thesis-hint">{{ t('form.thesis_min_hint') }}</span>
       </h3>
       <p class="form-help-text">
-        This is the soul of the product. Answer: why does this product exist? Who is it for? What's the core problem? What makes it different? Why does it fit this brand? What's the target price logic? What are the main risks or unknowns?
+        {{ t('form.thesis_help') }}
       </p>
       <textarea name="project_thesis" class="form-control thesis-textarea" rows="8"
                 id="thesisField"
-                placeholder="Why does this product exist? Who is it for and what problem does it solve?&#10;What makes it different from existing products in this category?&#10;Why does this belong to this brand specifically?&#10;What's our target price logic — why will customers see value at $X?&#10;What are the main risks or unknowns we need to watch?">{{ project.project_thesis or '' if project else '' }}</textarea>
+                placeholder="{{ t('placeholder.thesis_long') }}">{{ project.project_thesis or '' if project else '' }}</textarea>
       <div class="thesis-counter" id="thesisCounter">
-        <span id="thesisCount">0</span> characters
+        <span id="thesisCount">0</span> {{ t('common.characters') }}
         <span id="thesisStatus" class="ms-2"></span>
       </div>
     </div>
 
     <div class="form-actions">
       <a href="{% if is_edit %}/projects/{{ project.id }}{% else %}/projects{% endif %}" class="btn btn-outline-secondary btn-lg">
-        Cancel
+        {{ t('btn.cancel') }}
       </a>
       <button type="submit" class="btn btn-primary btn-lg">
-        {% if is_edit %}Save Changes{% else %}Create Project{% endif %}
+        {% if is_edit %}{{ t('btn.save_changes') }}{% else %}{{ t('btn.create_project') }}{% endif %}
       </button>
     </div>
 
@@ -254,10 +254,10 @@
     var len = textarea.value.length;
     counter.textContent = len;
     if (len >= 80) {
-      status.textContent = '✓ Good';
+      status.textContent = '✓ {{ t('common.good') }}';
       status.className = 'ms-2 text-success';
     } else if (len > 0) {
-      status.textContent = (80 - len) + ' more to go';
+      status.textContent = '{{ t('common.more_to_go_prefix') }}'.replace('{count}', 80 - len);
       status.className = 'ms-2 text-warning';
     } else {
       status.textContent = '';

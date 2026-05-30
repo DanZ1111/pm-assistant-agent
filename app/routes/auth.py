@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User, UserSession, InvitePin
 from app.dependencies import get_current_user
+from app.i18n import i18n_context
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -46,7 +47,10 @@ def login_form(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if user:
         return RedirectResponse(url="/projects", status_code=303)
-    return templates.TemplateResponse(request, "auth/login.html", {"error": None})
+    return templates.TemplateResponse(request, "auth/login.html", {
+        "error": None,
+        **i18n_context(request),
+    })
 
 
 @router.post("/auth/login")
@@ -61,7 +65,8 @@ def login_submit(
 
     if not user or not pwd_ctx.verify(password, user.hashed_password):
         return templates.TemplateResponse(request, "auth/login.html", {
-            "error": "Invalid username or password."
+            "error": "Invalid username or password.",
+            **i18n_context(request),
         })
 
     token = _create_session(db, user)
@@ -87,7 +92,10 @@ def logout(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/auth/register", response_class=HTMLResponse)
 def register_form(request: Request):
-    return templates.TemplateResponse(request, "auth/register.html", {"error": None})
+    return templates.TemplateResponse(request, "auth/register.html", {
+        "error": None,
+        **i18n_context(request),
+    })
 
 
 @router.post("/auth/register")
@@ -107,7 +115,10 @@ def register_submit(
     pin_normalized = "".join(c for c in invite_pin_raw if c.isalnum())
 
     def err(msg):
-        return templates.TemplateResponse(request, "auth/register.html", {"error": msg})
+        return templates.TemplateResponse(request, "auth/register.html", {
+            "error": msg,
+            **i18n_context(request),
+        })
 
     if not username:
         return err("Username is required.")
@@ -177,6 +188,7 @@ def emergency_reset_form(request: Request):
         raise HTTPException(status_code=404, detail="Not found")
     return templates.TemplateResponse(request, "auth/emergency_reset.html", {
         "error": None,
+        **i18n_context(request),
     })
 
 
@@ -196,6 +208,7 @@ def emergency_reset_submit(
     def err(msg: str):
         return templates.TemplateResponse(request, "auth/emergency_reset.html", {
             "error": msg,
+            **i18n_context(request),
         })
 
     # Constant-time token comparison

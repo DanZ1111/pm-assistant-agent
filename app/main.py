@@ -20,6 +20,7 @@ from app.routes.ideas import router as ideas_router
 from app.routes.journal import router as journal_router
 from app.routes.variants import router as variants_router
 from app.routes.ai_chat import router as ai_chat_router
+from app.routes.i18n import router as i18n_router
 
 
 def _bootstrap_admin_from_env():
@@ -83,11 +84,14 @@ from app.version import CURRENT_VERSION, CURRENT_BUILD_NAME, LAST_UPDATED  # noq
 from app.routes import projects as _r_projects, admin as _r_admin, files as _r_files  # noqa: E402
 from app.routes import intake as _r_intake, help as _r_help, auth as _r_auth  # noqa: E402
 from app.routes import admin_users as _r_admin_users, calendar as _r_calendar, ideas as _r_ideas  # noqa: E402
+from app.i18n import t as _i18n_t, current_locale as _i18n_current_locale  # noqa: E402  Build 23 — Jinja2 globals
 
 _GLOBALS = {
     "APP_VERSION": CURRENT_VERSION,
     "APP_BUILD_NAME": CURRENT_BUILD_NAME,
     "APP_LAST_UPDATED": LAST_UPDATED,
+    "t": _i18n_t,  # Build 23 — i18n translation function
+    "current_locale": _i18n_current_locale,
 }
 for _mod in (_r_projects, _r_admin, _r_files, _r_intake, _r_help, _r_auth,
              _r_admin_users, _r_calendar, _r_ideas):
@@ -110,6 +114,7 @@ app.include_router(ideas_router)
 app.include_router(journal_router)
 app.include_router(variants_router)
 app.include_router(ai_chat_router)
+app.include_router(i18n_router)
 
 
 @app.get("/healthz")

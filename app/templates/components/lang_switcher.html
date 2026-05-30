@@ -1,0 +1,14 @@
+{# Build 23 — language switcher.
+   Renders two small buttons (EN | 中文). Posts to /lang/set with hidden next=current_path.
+   The button for the currently-active locale is given an `active` style.
+#}
+{% set active_locale = locale if locale is defined else current_locale() %}
+<form method="post" action="/lang/set" class="d-inline lang-switcher" style="margin:0">
+  <input type="hidden" name="next" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+  <button type="submit" name="lang" value="en"
+          class="btn btn-sm nav-help-btn lang-btn {% if active_locale == 'en' %}lang-btn-active{% endif %}"
+          title="{{ t('nav.lang_en_title') }}">{{ t('nav.lang_en') }}</button>
+  <button type="submit" name="lang" value="zh"
+          class="btn btn-sm nav-help-btn lang-btn {% if active_locale == 'zh' %}lang-btn-active{% endif %}"
+          title="{{ t('nav.lang_zh_title') }}">{{ t('nav.lang_zh') }}</button>
+</form>

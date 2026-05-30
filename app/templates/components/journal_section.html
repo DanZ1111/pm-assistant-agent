@@ -13,19 +13,19 @@
           aria-expanded="false" aria-controls="journal-section-body"
           onclick="toggleJournal()">
     <span class="journal-toggle-icon">↓</span>
-    <span class="journal-toggle-label">Show Project Journal</span>
-    <span class="journal-toggle-count">({{ journal_entries|length }} {{ 'entry' if journal_entries|length == 1 else 'entries' }})</span>
+    <span class="journal-toggle-label">{{ t('journal.show') }}</span>
+    <span class="journal-toggle-count">({{ t('journal.entry_count', count=journal_entries|length) }})</span>
   </button>
 
   <section id="journal-section-body" class="detail-section journal-body" style="display:none">
     <div class="section-header">
       <h2 class="section-title">
-        <i class="bi bi-journal-text me-2"></i>Project Journal
+        <i class="bi bi-journal-text me-2"></i>{{ t('section.journal') }}
         <span class="text-muted small ms-2">({{ journal_entries|length }})</span>
       </h2>
       {% if can_edit %}
       <button type="button" class="btn btn-sm btn-primary" onclick="toggleJournalAddForm()">
-        <i class="bi bi-plus-lg me-1"></i>Add Project Update
+        <i class="bi bi-plus-lg me-1"></i>{{ t('journal.add_update') }}
       </button>
       {% endif %}
     </div>
@@ -33,13 +33,13 @@
     {% if journal_error %}
     <div class="alert alert-warning mb-3" style="font-size:0.85rem">
       <i class="bi bi-exclamation-triangle me-2"></i>
-      {% if journal_error == 'summarize_failed' %}AI summary failed — try again in a moment.
-      {% elif journal_error == 'not_authorized' %}You don't have permission for that action.
-      {% elif journal_error == 'not_your_entry' %}You can only edit your own journal entries.
-      {% elif journal_error == 'delete_admin_only' %}Only an admin can delete journal entries.
-      {% elif journal_error == 'empty_entry' %}Journal entry can't be empty.
-      {% elif journal_error == 'entry_not_found' %}That journal entry no longer exists.
-      {% else %}Something went wrong.{% endif %}
+      {% if journal_error == 'summarize_failed' %}{{ t('journal.error_summarize_failed') }}
+      {% elif journal_error == 'not_authorized' %}{{ t('journal.error_not_authorized') }}
+      {% elif journal_error == 'not_your_entry' %}{{ t('journal.error_not_your_entry') }}
+      {% elif journal_error == 'delete_admin_only' %}{{ t('journal.error_delete_admin_only') }}
+      {% elif journal_error == 'empty_entry' %}{{ t('journal.error_empty_entry') }}
+      {% elif journal_error == 'entry_not_found' %}{{ t('journal.error_entry_not_found') }}
+      {% else %}{{ t('common.something_went_wrong') }}{% endif %}
     </div>
     {% endif %}
 
@@ -48,22 +48,22 @@
     <form method="post" action="/projects/{{ project.id }}/journal" id="journalAddForm" class="journal-add-form d-none">
       <div class="d-flex gap-2 mb-2">
         <select name="entry_type" class="form-select form-select-sm" style="width:200px">
-          <option value="general">General</option>
-          <option value="factory_discussion">Factory Discussion</option>
-          <option value="cost_discovery">Cost Discovery</option>
-          <option value="design_feedback">Design Feedback</option>
-          <option value="decision">Decision</option>
-          <option value="risk">Risk</option>
-          <option value="packaging">Packaging</option>
-          <option value="variant">Variant</option>
-          <option value="other">Other</option>
+          <option value="general">{{ t('journal_type.general') }}</option>
+          <option value="factory_discussion">{{ t('journal_type.factory_discussion') }}</option>
+          <option value="cost_discovery">{{ t('journal_type.cost_discovery') }}</option>
+          <option value="design_feedback">{{ t('journal_type.design_feedback') }}</option>
+          <option value="decision">{{ t('journal_type.decision') }}</option>
+          <option value="risk">{{ t('journal_type.risk') }}</option>
+          <option value="packaging">{{ t('journal_type.packaging') }}</option>
+          <option value="variant">{{ t('journal_type.variant') }}</option>
+          <option value="other">{{ t('journal_type.other') }}</option>
         </select>
       </div>
       <textarea name="entry_text" class="form-control" rows="4" required
-                placeholder="What happened today on this project? Factory discussion, cost surprise, design pivot, an open question you're sitting with..."></textarea>
+                placeholder="{{ t('journal.placeholder') }}"></textarea>
       <div class="d-flex gap-2 mt-2">
-        <button type="submit" class="btn btn-primary btn-sm">Save</button>
-        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleJournalAddForm()">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm">{{ t('btn.save') }}</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleJournalAddForm()">{{ t('btn.cancel') }}</button>
       </div>
     </form>
     {% endif %}
@@ -75,7 +75,7 @@
       {% set can_edit_entry = current_user.role == 'admin' or (can_edit and is_author) %}
       <div class="journal-entry{% if journal_error_entry_id and journal_error_entry_id == (entry.id | string) %} journal-entry-error{% endif %}" id="journal-{{ entry.id }}">
         <div class="journal-entry-head">
-          <span class="journal-type-badge type-{{ entry.entry_type }}">{{ entry.entry_type | replace('_', ' ') | title }}</span>
+          <span class="journal-type-badge type-{{ entry.entry_type }}">{{ t('journal_type.' ~ entry.entry_type) }}</span>
           <span class="journal-meta">
             {% if entry.author %}<i class="bi bi-person me-1"></i>{{ entry.author.display_name or entry.author.username }} ·{% endif %}
             <i class="bi bi-clock me-1"></i>{{ entry.created_at.strftime('%b %d, %Y · %H:%M') }}
@@ -91,7 +91,7 @@
 
         {% if entry.ai_summary %}
         <div class="journal-ai-summary">
-          <span class="ai-summary-label"><i class="bi bi-robot me-1"></i>AI summary:</span>
+          <span class="ai-summary-label"><i class="bi bi-robot me-1"></i>{{ t('journal.ai_summary') }}:</span>
           {{ entry.ai_summary }}
         </div>
         {% endif %}
@@ -99,20 +99,20 @@
         <div class="journal-entry-actions">
           {% if can_edit_entry %}
           <form method="post" action="/projects/{{ project.id }}/journal/{{ entry.id }}/summarize" class="d-inline">
-            <button class="journal-action-btn" title="Generate/refresh AI summary">
+            <button class="journal-action-btn" title="{{ t('journal.generate_summary_title') }}">
               <i class="bi bi-magic"></i>
-              {% if entry.title or entry.ai_summary %}Re-summarize{% else %}Summarize{% endif %}
+              {% if entry.title or entry.ai_summary %}{{ t('journal.resummarize') }}{% else %}{{ t('journal.summarize') }}{% endif %}
             </button>
           </form>
           <button type="button" class="journal-action-btn" onclick="toggleJournalEdit({{ entry.id }})">
-            <i class="bi bi-pencil"></i>Edit
+            <i class="bi bi-pencil"></i>{{ t('btn.edit') }}
           </button>
           {% endif %}
           {% if current_user.role == 'admin' %}
           <form method="post" action="/projects/{{ project.id }}/journal/{{ entry.id }}/delete" class="d-inline"
-                onsubmit="return confirm('Delete this journal entry? This cannot be undone.')">
-            <button class="journal-action-btn journal-action-danger" title="Delete entry (admin only)">
-              <i class="bi bi-x-lg"></i>Delete
+                onsubmit="return confirm('{{ t('journal.delete_confirm') }}')">
+            <button class="journal-action-btn journal-action-danger" title="{{ t('journal.delete_title') }}">
+              <i class="bi bi-x-lg"></i>{{ t('btn.delete') }}
             </button>
           </form>
           {% endif %}
@@ -124,15 +124,15 @@
               class="journal-edit-form d-none" id="journal-edit-{{ entry.id }}">
           <div class="d-flex gap-2 mb-2">
             <select name="entry_type" class="form-select form-select-sm" style="width:200px">
-              {% for t in ['general','factory_discussion','cost_discovery','design_feedback','decision','risk','packaging','variant','other'] %}
-              <option value="{{ t }}" {% if entry.entry_type == t %}selected{% endif %}>{{ t | replace('_',' ') | title }}</option>
+              {% for entry_type in ['general','factory_discussion','cost_discovery','design_feedback','decision','risk','packaging','variant','other'] %}
+              <option value="{{ entry_type }}" {% if entry.entry_type == entry_type %}selected{% endif %}>{{ t('journal_type.' ~ entry_type) }}</option>
               {% endfor %}
             </select>
           </div>
           <textarea name="entry_text" class="form-control" rows="4" required>{{ entry.entry_text }}</textarea>
           <div class="d-flex gap-2 mt-2">
-            <button type="submit" class="btn btn-primary btn-sm">Save</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleJournalEdit({{ entry.id }})">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm">{{ t('btn.save') }}</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleJournalEdit({{ entry.id }})">{{ t('btn.cancel') }}</button>
           </div>
         </form>
         {% endif %}
@@ -140,9 +140,9 @@
       {% endfor %}
     </div>
     {% elif can_edit %}
-    <p class="text-muted small mb-0">No journal entries yet. Click "Add Project Update" to log a factory discussion, decision, or open question.</p>
+    <p class="text-muted small mb-0">{{ t('journal.empty_editable') }}</p>
     {% else %}
-    <p class="text-muted small mb-0">No journal entries yet.</p>
+    <p class="text-muted small mb-0">{{ t('empty.no_journal') }}</p>
     {% endif %}
   </section>
 </div>
@@ -157,7 +157,7 @@ function toggleJournal() {
   body.style.display = open ? 'none' : 'block';
   btn.setAttribute('aria-expanded', open ? 'false' : 'true');
   icon.textContent = open ? '↓' : '↑';
-  label.textContent = open ? 'Show Project Journal' : 'Hide Project Journal';
+  label.textContent = open ? '{{ t('journal.show') }}' : '{{ t('journal.hide') }}';
 }
 function toggleJournalAddForm() {
   var f = document.getElementById('journalAddForm');

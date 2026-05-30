@@ -15,6 +15,7 @@ from app.ai.matching import find_best_match, MATCH_THRESHOLD
 from app.crud import IDEA_TYPES, IDEA_SOURCES
 from app.routes.files import detect_file_type
 from app.dependencies import get_current_user, require_auth, can_use_ai_intake, _RedirectException
+from app.i18n import i18n_context
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -97,6 +98,7 @@ def _ai_panel_response(request, current_user, **overrides):
         "idea_fields": None,
         "idea_types": IDEA_TYPES,
         "idea_sources": IDEA_SOURCES,
+        **i18n_context(request, current_user),
     }
     ctx.update(overrides)
     return templates.TemplateResponse(request, "project_form.html", ctx)

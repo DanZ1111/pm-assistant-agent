@@ -152,6 +152,17 @@ All AI writes that matter require explicit user confirmation and must be recorde
 
 ---
 
+## 8.5 UI Language
+
+Build 23 adds UI i18n only. Project data, AI prompts, change-log entries, and deep docs remain in their authored language.
+
+- Supported UI locales are `en` and `zh`.
+- Locale resolution order is `users.language` → `lang` cookie → `"en"`.
+- Because database defaults may not backfill every existing row uniformly, all reads must defensively use `user.language or "en"`.
+- Missing translation keys must fail soft by rendering the literal key, never by 500ing a page.
+
+---
+
 ## 9. Schema Evolution Rule
 
 Before adding a new column, ask:

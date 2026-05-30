@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 import app.crud as crud
 from app.dependencies import get_current_user, require_auth, _RedirectException
+from app.i18n import i18n_context
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -47,4 +48,5 @@ def calendar_view(
         "month_names": MONTH_NAMES,
         "min_year": min_year,
         "max_year": max_year,
+        **i18n_context(request, current_user),
     })

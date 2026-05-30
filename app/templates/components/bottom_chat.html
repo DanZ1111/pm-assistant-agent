@@ -5,24 +5,24 @@
      data-project-id="{{ current_project_id or '' }}">
   <form id="bottomChatForm" class="bottom-chat-form" autocomplete="off">
     <div class="bottom-chat-toggles">
-      <label class="bottom-chat-mode" title="Ask = read-only Q&A. Intake = AI can capture / create.">
+      <label class="bottom-chat-mode" title="{{ t('chat.mode_title') }}">
         <select id="chatModeSelect" class="form-select form-select-sm">
-          <option value="intake" selected>Intake</option>
-          <option value="ask">Ask</option>
+          <option value="intake" selected>{{ t('chat.mode.intake') }}</option>
+          <option value="ask">{{ t('chat.mode.ask') }}</option>
         </select>
       </label>
       {% if current_project_id %}
-      <label class="bottom-chat-scope" title="Project scope = AI knows about this project. Global = no project context.">
+      <label class="bottom-chat-scope" title="{{ t('chat.scope_title') }}">
         <select id="chatScopeSelect" class="form-select form-select-sm">
-          <option value="project" selected>Project</option>
-          <option value="global">Global</option>
+          <option value="project" selected>{{ t('chat.scope.project') }}</option>
+          <option value="global">{{ t('chat.scope.global') }}</option>
         </select>
       </label>
       {% endif %}
     </div>
     <textarea id="chatInputTextarea"
               class="bottom-chat-input"
-              placeholder="{% if current_project_id %}Ask about this project, or tell me to log a journal entry…{% else %}Ask anything about your projects…{% endif %}"
+              placeholder="{% if current_project_id %}{{ t('chat.placeholder.project') }}{% else %}{{ t('chat.placeholder.global') }}{% endif %}"
               rows="1"></textarea>
     <button type="submit" id="chatSubmitBtn" class="bottom-chat-submit" disabled>
       <i class="bi bi-send"></i>
@@ -33,15 +33,15 @@
 <div id="aiSidePanel" class="ai-side-panel" aria-hidden="true">
   <div class="ai-side-panel-header">
     <div class="ai-side-panel-title-row">
-      <h2 class="ai-side-panel-title" id="aiPanelTitle">AI Chat</h2>
+      <h2 class="ai-side-panel-title" id="aiPanelTitle">{{ t('chat.title') }}</h2>
       <div class="ai-side-panel-actions">
-        <select id="conversationHistorySelect" class="form-select form-select-sm" title="Switch conversation">
-          <option value="">— history —</option>
+        <select id="conversationHistorySelect" class="form-select form-select-sm" title="{{ t('chat.switch_conversation') }}">
+          <option value="">— {{ t('chat.history') }} —</option>
         </select>
-        <button type="button" id="aiPanelArchiveBtn" class="btn btn-sm btn-outline-secondary" title="Archive this conversation">
+        <button type="button" id="aiPanelArchiveBtn" class="btn btn-sm btn-outline-secondary" title="{{ t('chat.archive_conversation') }}">
           <i class="bi bi-archive"></i>
         </button>
-        <button type="button" id="aiPanelCloseBtn" class="btn btn-sm btn-outline-secondary" title="Close panel (chat stays at bottom)">
+        <button type="button" id="aiPanelCloseBtn" class="btn btn-sm btn-outline-secondary" title="{{ t('chat.close_panel') }}">
           <i class="bi bi-x-lg"></i>
         </button>
       </div>

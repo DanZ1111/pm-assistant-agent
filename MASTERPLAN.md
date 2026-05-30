@@ -2596,7 +2596,7 @@ Reuses the existing `crud.create_journal_entry` service function (Build 14). Val
 
 ---
 
-### Build 23 — Chinese i18n ← CURRENT BUILD
+### Build 23 — Chinese i18n ✓ SHIPPED v1.1.0-build23
 
 #### Context
 The PM tracker is used by Chinese-speaking PMs. Today every label is English; switching the UI to Chinese requires translating ~150 user-facing strings (navbar / page titles / section headers / buttons / form labels / badges / alerts / empty-state copy) and adding a language switcher with persistence.

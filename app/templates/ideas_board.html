@@ -1,38 +1,38 @@
 {% extends "base.html" %}
-{% block title %}Good Ideas — PM Tracker{% endblock %}
+{% block title %}{{ t('title.ideas') }} — PM Tracker{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div class="d-flex align-items-center gap-3 flex-wrap">
     <div>
-      <h1 class="page-title">💡 Good Ideas</h1>
-      <p class="page-subtitle">Materials, structures, features &amp; aesthetics from across the team — combine across columns to make new products.</p>
+      <h1 class="page-title">💡 {{ t('title.ideas') }}</h1>
+      <p class="page-subtitle">{{ t('ideas.subtitle') }}</p>
     </div>
     <div class="ms-auto d-flex align-items-center gap-2">
       <form method="get" action="/ideas" class="d-inline">
         <select name="source" class="form-select form-select-sm d-inline-block" style="width:auto"
                 onchange="this.form.submit()">
-          <option value="">All sources</option>
+          <option value="">{{ t('ideas.all_sources') }}</option>
           {% for s in idea_sources %}
           <option value="{{ s }}" {% if current_source == s %}selected{% endif %}>
-            {{ s | replace('_',' ') | title }}
+            {{ t('idea_source.' ~ s) }}
           </option>
           {% endfor %}
         </select>
       </form>
       <a href="/ideas/new" class="btn btn-primary btn-sm">
-        <i class="bi bi-plus-lg me-1"></i>New Idea
+        <i class="bi bi-plus-lg me-1"></i>{{ t('btn.new_idea') }}
       </a>
     </div>
   </div>
 </div>
 
 <div class="ideas-board">
-  {% for t in idea_types %}
-  {% set type_ideas = grouped[t] %}
+  {% for idea_type in idea_types %}
+  {% set type_ideas = grouped[idea_type] %}
   <div class="ideas-column">
     <div class="ideas-column-header">
-      <span class="ideas-column-title">{{ t | title }}</span>
+      <span class="ideas-column-title">{{ t('idea_type.' ~ idea_type) }}</span>
       <span class="ideas-column-count">{{ type_ideas|length }}</span>
     </div>
     <div class="ideas-column-body">
@@ -45,7 +45,7 @@
           <div class="idea-desc">{{ idea.description[:140] }}{% if idea.description|length > 140 %}…{% endif %}</div>
           {% endif %}
           <div class="idea-meta">
-            <span class="idea-source-badge source-{{ idea.source }}">{{ idea.source }}</span>
+            <span class="idea-source-badge source-{{ idea.source }}">{{ t('idea_source.' ~ idea.source) }}</span>
             {% if idea.source_detail %}<span class="idea-meta-detail">· {{ idea.source_detail }}</span>{% endif %}
           </div>
           {% if idea.contributor %}
@@ -55,7 +55,7 @@
           {% endif %}
           {% if idea.project_links %}
           <div class="idea-meta">
-            <i class="bi bi-link-45deg me-1"></i>Used in {{ idea.project_links|length }} project{% if idea.project_links|length != 1 %}s{% endif %}
+            <i class="bi bi-link-45deg me-1"></i>{{ t('ideas.used_in_projects', count=idea.project_links|length) }}
           </div>
           {% endif %}
           <div class="idea-actions">
@@ -65,15 +65,15 @@
             {% endif %}
             {% if current_user.role == 'admin' %}
             <form method="post" action="/ideas/{{ idea.id }}/delete" class="d-inline"
-                  onsubmit="return confirm('Delete {{ idea.serial_number }}?')">
-              <button class="idea-action-link" title="Delete idea"><i class="bi bi-x-lg"></i></button>
+                  onsubmit="return confirm('{{ t('ideas.delete_confirm', serial=idea.serial_number) }}')">
+              <button class="idea-action-link" title="{{ t('ideas.delete_title') }}"><i class="bi bi-x-lg"></i></button>
             </form>
             {% endif %}
           </div>
         </div>
         {% endfor %}
       {% else %}
-      <div class="idea-empty">No ideas yet.</div>
+      <div class="idea-empty">{{ t('empty.no_ideas') }}</div>
       {% endif %}
     </div>
   </div>

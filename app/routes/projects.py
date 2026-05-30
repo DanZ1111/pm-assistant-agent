@@ -16,6 +16,7 @@ from app.dependencies import (
     can_edit_project, can_view_sensitive_fields, can_view_journal, can_view_costs,
     _RedirectException
 )
+from app.i18n import i18n_context
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -152,6 +153,7 @@ def projects_list(
         "current_brand": brand or "",
         "search": search or "",
         "current_user": current_user,
+        **i18n_context(request, current_user),
     })
 
 
@@ -180,6 +182,7 @@ def my_projects(request: Request, db: Session = Depends(get_db)):
         "rows": rows,
         "current_user": current_user,
         "today": date.today(),
+        **i18n_context(request, current_user),
     })
 
 
@@ -219,6 +222,7 @@ def project_new_form(request: Request, tab: str = "manual", db: Session = Depend
         "match_score": 0.0,
         "classification": None,
         "idea_fields": None,
+        **i18n_context(request, current_user),
     })
 
 
@@ -255,6 +259,7 @@ async def project_new_submit(
             "project": None, "is_edit": False,
             "error": "Project name is required.",
             "current_user": current_user,
+            **i18n_context(request, current_user),
         })
 
     data = {
@@ -388,6 +393,7 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
         "prototype_photos": prototype_photos,
         # Build 21 — for bottom chat scope toggle
         "current_project_id": project.id,
+        **i18n_context(request, current_user),
     })
 
 
@@ -415,6 +421,7 @@ def project_edit_form(request: Request, project_id: int, db: Session = Depends(g
         "is_edit": True,
         "error": None,
         "current_user": current_user,
+        **i18n_context(request, current_user),
     })
 
 
@@ -453,6 +460,7 @@ def project_edit_submit(
             "project": project, "is_edit": True,
             "error": "Project name is required.",
             "current_user": current_user,
+            **i18n_context(request, current_user),
         })
 
     data = {
@@ -780,6 +788,7 @@ def thesis_preview(
         "inspirations_with_matches": inspirations_with_matches,
         "error": error,
         "current_user": current_user,
+        **i18n_context(request, current_user),
     })
 
 

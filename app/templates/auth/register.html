@@ -1,13 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Register — PM Tracker{% endblock %}
+{% block title %}{{ t('title.register') }} — PM Tracker{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-center align-items-center" style="min-height:80vh">
   <div style="width:100%;max-width:440px">
     <div class="text-center mb-4">
       <i class="bi bi-person-plus" style="font-size:2rem;color:var(--color-primary)"></i>
-      <h1 class="h4 fw-bold mt-2">Create Account</h1>
-      <p class="text-muted small">You need an invite PIN from your administrator</p>
+      <h1 class="h4 fw-bold mt-2">{{ t('auth.create_account') }}</h1>
+      <p class="text-muted small">{{ t('auth.invite_required') }}</p>
     </div>
 
     {% if error %}
@@ -20,43 +20,43 @@
       <div class="card-body p-4">
         <form method="post" action="/auth/register">
           <div class="mb-3">
-            <label class="form-label fw-semibold">Username <span class="text-danger">*</span></label>
+            <label class="form-label fw-semibold">{{ t('form.username') }} <span class="text-danger">*</span></label>
             <input type="text" name="username" class="form-control" autofocus autocomplete="username"
                    placeholder="e.g. sarahchen" minlength="3" required>
-            <div class="form-text">Lowercase, no spaces. Used to log in.</div>
+            <div class="form-text">{{ t('auth.username_help') }}</div>
           </div>
           <div class="mb-3">
-            <label class="form-label fw-semibold">Display Name</label>
+            <label class="form-label fw-semibold">{{ t('form.display_name') }}</label>
             <input type="text" name="display_name" class="form-control"
                    placeholder="e.g. Sarah Chen">
-            <div class="form-text">How your name appears in projects. Should match how you enter it in the PM field.</div>
+            <div class="form-text">{{ t('auth.display_name_help') }}</div>
           </div>
           <div class="mb-3">
-            <label class="form-label fw-semibold">Password <span class="text-danger">*</span></label>
+            <label class="form-label fw-semibold">{{ t('form.password') }} <span class="text-danger">*</span></label>
             <input type="password" name="password" class="form-control" autocomplete="new-password"
-                   placeholder="Min 8 characters" minlength="8" required>
+                   placeholder="{{ t('placeholder.min_8_chars') }}" minlength="8" required>
           </div>
           <div class="mb-3">
-            <label class="form-label fw-semibold">Confirm Password <span class="text-danger">*</span></label>
+            <label class="form-label fw-semibold">{{ t('form.confirm_password') }} <span class="text-danger">*</span></label>
             <input type="password" name="confirm_password" class="form-control" autocomplete="new-password"
                    placeholder="••••••••" required>
           </div>
           <div class="mb-4">
-            <label class="form-label fw-semibold">Invite PIN <span class="text-danger">*</span></label>
+            <label class="form-label fw-semibold">{{ t('form.invite_pin') }} <span class="text-danger">*</span></label>
             <input type="text" name="invite_pin" class="form-control" autocomplete="off"
                    placeholder="e.g. PM-X7KP2Q  or  VW-X7KP2Q" maxlength="12"
                    style="text-transform:uppercase;letter-spacing:0.15em;font-family:monospace" required>
-            <div class="form-text">Ask your administrator to generate a PIN for you.</div>
+            <div class="form-text">{{ t('auth.invite_pin_help') }}</div>
           </div>
           <button type="submit" class="btn btn-primary w-100">
-            <i class="bi bi-person-check me-2"></i>Create Account
+            <i class="bi bi-person-check me-2"></i>{{ t('auth.create_account') }}
           </button>
         </form>
       </div>
     </div>
 
     <p class="text-center text-muted small mt-3">
-      Already have an account? <a href="/auth/login">Sign in</a>
+      {{ t('auth.already_have_account') }} <a href="/auth/login">{{ t('btn.sign_in') }}</a>
     </p>
   </div>
 </div>

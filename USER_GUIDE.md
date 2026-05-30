@@ -1,5 +1,7 @@
 # PM Product Tracker — User Guide
 
+> **中文 UI is available** as of v1.1.0-build23 — click `中文` in the navbar to switch. Your preference is saved.
+
 This is a structured product project tracker for knife and product development. It manages projects from concept through mass production, with timeline tracking, delay warnings, file uploads, and AI-assisted intake.
 
 ---

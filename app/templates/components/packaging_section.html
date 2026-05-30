@@ -3,12 +3,12 @@
 <section class="detail-section" id="packaging">
   <div class="section-header">
     <h2 class="section-title">
-      <i class="bi bi-box-seam me-2"></i>Packaging & Accessories
+      <i class="bi bi-box-seam me-2"></i>{{ t('section.packaging') }}
       <span class="text-muted small ms-2">({{ components|length }})</span>
     </h2>
     {% if can_edit %}
     <button type="button" class="btn btn-sm btn-primary" onclick="toggleComponentAddForm()">
-      <i class="bi bi-plus-lg me-1"></i>Add Component
+      <i class="bi bi-plus-lg me-1"></i>{{ t('component.add') }}
     </button>
     {% endif %}
   </div>
@@ -18,42 +18,42 @@
         class="d-none mb-3 p-3 border rounded bg-light">
     <div class="row g-2">
       <div class="col-md-4">
-        <label class="form-label small fw-bold">Name <span class="text-danger">*</span></label>
+        <label class="form-label small fw-bold">{{ t('form.idea_name') }} <span class="text-danger">*</span></label>
         <input type="text" name="name" class="form-control form-control-sm" required
-               placeholder="e.g. Hard plastic case, Pouch, Sharpening stone">
+               placeholder="{{ t('placeholder.component_name') }}">
       </div>
       <div class="col-md-2">
-        <label class="form-label small fw-bold">Type</label>
+        <label class="form-label small fw-bold">{{ t('form.idea_type') }}</label>
         <select name="component_type" class="form-select form-select-sm">
-          <option value="packaging">Packaging</option>
-          <option value="accessory" selected>Accessory</option>
+          <option value="packaging">{{ t('component_type.packaging') }}</option>
+          <option value="accessory" selected>{{ t('component_type.accessory') }}</option>
         </select>
       </div>
       <div class="col-md-3">
-        <label class="form-label small fw-bold">Applies to</label>
+        <label class="form-label small fw-bold">{{ t('component.applies_to') }}</label>
         <select name="variant_id" class="form-select form-select-sm">
-          <option value="">All variants (project-wide)</option>
+          <option value="">{{ t('component.all_variants_project_wide') }}</option>
           {% for v in variants %}
           <option value="{{ v.id }}">{{ v.variant_name }}{% if v.sku %} ({{ v.sku }}){% endif %}</option>
           {% endfor %}
         </select>
       </div>
       <div class="col-md-3">
-        <label class="form-label small fw-bold">Target cost</label>
+        <label class="form-label small fw-bold">{{ t('variant.target_cost') }}</label>
         <input type="text" name="target_cost" class="form-control form-control-sm" placeholder="0.00">
       </div>
       <div class="col-md-3">
-        <label class="form-label small fw-bold">Actual cost</label>
+        <label class="form-label small fw-bold">{{ t('variant.actual_cost') }}</label>
         <input type="text" name="actual_cost" class="form-control form-control-sm" placeholder="0.00">
       </div>
       <div class="col-md-9">
-        <label class="form-label small fw-bold">Notes</label>
+        <label class="form-label small fw-bold">{{ t('form.notes') }}</label>
         <input type="text" name="notes" class="form-control form-control-sm">
       </div>
     </div>
     <div class="d-flex gap-2 mt-2">
-      <button type="submit" class="btn btn-primary btn-sm">Save Component</button>
-      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleComponentAddForm()">Cancel</button>
+      <button type="submit" class="btn btn-primary btn-sm">{{ t('component.save') }}</button>
+      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleComponentAddForm()">{{ t('btn.cancel') }}</button>
     </div>
   </form>
   {% endif %}
@@ -63,11 +63,11 @@
     <table class="table table-sm align-middle component-table">
       <thead>
         <tr>
-          <th>Type</th>
-          <th>Name</th>
-          <th>Applies to</th>
-          {% if can_view_costs %}<th class="text-end">Target</th><th class="text-end">Actual</th>{% endif %}
-          <th>Notes</th>
+          <th>{{ t('form.idea_type') }}</th>
+          <th>{{ t('form.idea_name') }}</th>
+          <th>{{ t('component.applies_to') }}</th>
+          {% if can_view_costs %}<th class="text-end">{{ t('component.target') }}</th><th class="text-end">{{ t('component.actual') }}</th>{% endif %}
+          <th>{{ t('form.notes') }}</th>
           {% if can_edit %}<th></th>{% endif %}
         </tr>
       </thead>
@@ -78,11 +78,11 @@
           {% for v in variants %}{% if v.id == c.variant_id %}{% set var = v %}{% endif %}{% endfor %}
         {% endif %}
         <tr id="component-{{ c.id }}">
-          <td><span class="badge bg-{% if c.component_type == 'packaging' %}info{% else %}secondary{% endif %}">{{ c.component_type|title }}</span></td>
+          <td><span class="badge bg-{% if c.component_type == 'packaging' %}info{% else %}secondary{% endif %}">{{ t('component_type.' ~ c.component_type) }}</span></td>
           <td><strong>{{ c.name }}</strong></td>
           <td>
             {% if var %}<span class="badge bg-light text-dark">{{ var.variant_name }}{% if var.sku %} · {{ var.sku }}{% endif %}</span>
-            {% else %}<span class="text-muted small">all variants</span>{% endif %}
+            {% else %}<span class="text-muted small">{{ t('component.all_variants') }}</span>{% endif %}
           </td>
           {% if can_view_costs %}
           <td class="text-end">{% if c.target_cost %}${{ "%.2f"|format(c.target_cost) }}{% else %}—{% endif %}</td>
@@ -91,13 +91,13 @@
           <td class="small text-muted">{{ c.notes or '' }}</td>
           {% if can_edit %}
           <td class="text-end">
-            <button type="button" class="btn btn-sm btn-ghost" onclick="toggleComponentEdit({{ c.id }})" title="Edit">
+            <button type="button" class="btn btn-sm btn-ghost" onclick="toggleComponentEdit({{ c.id }})" title="{{ t('btn.edit') }}">
               <i class="bi bi-pencil"></i>
             </button>
             {% if current_user.role == 'admin' %}
             <form method="post" action="/projects/{{ project.id }}/components/{{ c.id }}/delete" class="d-inline"
-                  onsubmit="return confirm('Delete this component?')">
-              <button class="btn btn-sm btn-ghost text-danger" title="Delete (admin only)">
+                  onsubmit="return confirm('{{ t('component.delete_confirm') }}')">
+              <button class="btn btn-sm btn-ghost text-danger" title="{{ t('common.delete_admin_only') }}">
                 <i class="bi bi-x-lg"></i>
               </button>
             </form>
@@ -111,41 +111,41 @@
             <form method="post" action="/projects/{{ project.id }}/components/{{ c.id }}/edit" class="p-2 bg-light rounded">
               <div class="row g-2">
                 <div class="col-md-4">
-                  <label class="form-label small fw-bold">Name</label>
+                  <label class="form-label small fw-bold">{{ t('form.idea_name') }}</label>
                   <input type="text" name="name" class="form-control form-control-sm" required value="{{ c.name }}">
                 </div>
                 <div class="col-md-2">
-                  <label class="form-label small fw-bold">Type</label>
+                  <label class="form-label small fw-bold">{{ t('form.idea_type') }}</label>
                   <select name="component_type" class="form-select form-select-sm">
-                    <option value="packaging" {% if c.component_type == 'packaging' %}selected{% endif %}>Packaging</option>
-                    <option value="accessory" {% if c.component_type == 'accessory' %}selected{% endif %}>Accessory</option>
+                    <option value="packaging" {% if c.component_type == 'packaging' %}selected{% endif %}>{{ t('component_type.packaging') }}</option>
+                    <option value="accessory" {% if c.component_type == 'accessory' %}selected{% endif %}>{{ t('component_type.accessory') }}</option>
                   </select>
                 </div>
                 <div class="col-md-3">
-                  <label class="form-label small fw-bold">Applies to</label>
+                  <label class="form-label small fw-bold">{{ t('component.applies_to') }}</label>
                   <select name="variant_id" class="form-select form-select-sm">
-                    <option value="" {% if not c.variant_id %}selected{% endif %}>All variants</option>
+                    <option value="" {% if not c.variant_id %}selected{% endif %}>{{ t('component.all_variants') }}</option>
                     {% for v in variants %}
                     <option value="{{ v.id }}" {% if c.variant_id == v.id %}selected{% endif %}>{{ v.variant_name }}</option>
                     {% endfor %}
                   </select>
                 </div>
                 <div class="col-md-3">
-                  <label class="form-label small fw-bold">Target cost</label>
+                  <label class="form-label small fw-bold">{{ t('variant.target_cost') }}</label>
                   <input type="text" name="target_cost" class="form-control form-control-sm" value="{{ c.target_cost or '' }}">
                 </div>
                 <div class="col-md-3">
-                  <label class="form-label small fw-bold">Actual cost</label>
+                  <label class="form-label small fw-bold">{{ t('variant.actual_cost') }}</label>
                   <input type="text" name="actual_cost" class="form-control form-control-sm" value="{{ c.actual_cost or '' }}">
                 </div>
                 <div class="col-md-12">
-                  <label class="form-label small fw-bold">Notes</label>
+                  <label class="form-label small fw-bold">{{ t('form.notes') }}</label>
                   <input type="text" name="notes" class="form-control form-control-sm" value="{{ c.notes or '' }}">
                 </div>
               </div>
               <div class="d-flex gap-2 mt-2">
-                <button type="submit" class="btn btn-primary btn-sm">Save</button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleComponentEdit({{ c.id }})">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-sm">{{ t('btn.save') }}</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleComponentEdit({{ c.id }})">{{ t('btn.cancel') }}</button>
               </div>
             </form>
           </td>
@@ -157,8 +157,8 @@
   </div>
   {% else %}
   <p class="text-muted small mb-0">
-    No components tracked yet.
-    {% if can_edit %}Click "Add Component" to record packaging, accessories, or anything that ships with the product.{% endif %}
+    {{ t('component.empty') }}
+    {% if can_edit %}{{ t('component.empty_hint') }}{% endif %}
   </p>
   {% endif %}
 </section>

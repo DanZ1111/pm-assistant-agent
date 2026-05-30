@@ -1,9 +1,18 @@
 # PM Product Tracker — Version
 
-**Current Version:** v1.1.0-build22
-**Current Build:** Build 22 — AI-Assisted Create Project
+**Current Version:** v1.1.0-build23
+**Current Build:** Build 23 — Chinese i18n
 **Status:** v1.1.0 in progress (build-by-build per roadmap)
 **Last Updated:** 2026-05-30
+
+## What's new in v1.1.0-build23
+
+- **中文 UI is now available.** A small EN / 中文 switcher sits in the navbar next to the Help button (visible to everyone, logged-in or not). Click to switch — the choice persists across visits.
+- **Language preference is durable.** For logged-in users it's stored on `users.language` (the column shipped in Build 13); for logged-out visitors a `lang` cookie remembers the choice. Locale resolution order: user pref → cookie → English default.
+- **First-pass translation coverage** (520 keys): navbar, auth screens, project list/table/card labels, My Projects, Create/Edit Project form, AI-assisted create panel, project-detail sidebar/Thesis/Inspired By/Timeline/Files/Change Log, Journal, Variants, Packaging, Quotation, Profit Model placeholder, Rendering History, Prototype Photos, Calendar, Good Ideas, status badges, alert banners, empty states, and bottom chat controls.
+- **Translation philosophy:** product language, not mechanical translation. Industry-standard terms stay as-is — `Thesis`, `MSRP`, `SKU`, `AI`, `PM`, brand names, factory names, product codes.
+- **Out of this first pass (deferred to a follow-up i18n update):** the Help modal body, AI prompts (they're instructions to the model — better in English), `/admin/*` pages, changelog/version-history strings, and the legacy `/ai/intake` artifact page.
+- **Fail-safe:** a missing translation key surfaces the literal key string (so missing translations are visible in dev) — pages never 500 on i18n issues.
 
 ## What's new in v1.1.0-build22
 

@@ -7,6 +7,7 @@ from app.database import get_db
 import app.crud as crud
 from app.crud import IDEA_TYPES, IDEA_SOURCES
 from app.dependencies import get_current_user, require_auth, _RedirectException
+from app.i18n import i18n_context
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -33,6 +34,7 @@ def ideas_board(
         "idea_types": IDEA_TYPES,
         "idea_sources": IDEA_SOURCES,
         "current_source": source or "",
+        **i18n_context(request, current_user),
     })
 
 
@@ -53,6 +55,7 @@ def idea_new_form(request: Request, db: Session = Depends(get_db)):
         "error": None,
         "idea_types": IDEA_TYPES,
         "idea_sources": IDEA_SOURCES,
+        **i18n_context(request, current_user),
     })
 
 
@@ -83,6 +86,7 @@ def idea_new_submit(
             "error": "Idea name is required.",
             "idea_types": IDEA_TYPES,
             "idea_sources": IDEA_SOURCES,
+            **i18n_context(request, current_user),
         })
 
     data = {
@@ -122,6 +126,7 @@ def idea_edit_form(request: Request, idea_id: int, db: Session = Depends(get_db)
         "error": None,
         "idea_types": IDEA_TYPES,
         "idea_sources": IDEA_SOURCES,
+        **i18n_context(request, current_user),
     })
 
 
