@@ -1,7 +1,7 @@
 # CURRENT_TASK.md
 
 ## Task
-Write `test_ai_e2e.py` — comprehensive AI end-to-end test (cross-cuts Builds 5/6/7/11/14/15/20/21/22)
+Build 23 — Chinese i18n
 
 ## Handoff rule
 Before editing, inspect:
@@ -12,33 +12,32 @@ Before editing, inspect:
 Git/code is the source of truth. This file is only a short task reminder. If anything here disagrees with git, trust git.
 
 ## Current state
-Build 22 is shipped (latest commit). Working tree is clean. No `test_ai_e2e.py` written yet.
+Build 22 is shipped. `test_ai_e2e.py` is in place (10 PASS / 7 SKIP / 0 FAIL — SKIPs flip to PASS once the server has a valid `OPENAI_API_KEY`). Working tree is clean. No Build 23 work started.
 
-This is a deliberate inter-build task — not numbered. It produces a single standalone test file that exercises every AI surface with real OpenAI calls. The test must skip gracefully (not fail) when the server's `OPENAI_API_KEY` is invalid, so it's safe to run any time without breaking CI.
+Roadmap scope (MASTERPLAN.md table row 1542, size: L): create `app/i18n.py` + `app/i18n/zh.json`. Add a `t(key)` Jinja2 global. Translate ALL visible UI strings: nav, page titles, section headers, button labels, badges, status labels, form labels. Thoughtful translations (not raw machine translate). Add a language switcher in the navbar. Persist user preference to `users.language` + a cookie fallback. **Deep docs (USER_GUIDE, CHANGELOG, ARCHITECTURE) stay English.**
 
-## Scope (per agreed plan)
-One file: `test_ai_e2e.py` at project root. Hits these endpoints with live OpenAI calls:
-1. POST `/ai/intake/extract` — text intake (project + idea classification both)
-2. POST `/ai/intake/extract-file` — file intake (PDF + image)
-3. POST `/ai/help/ask` — Help Q&A + viewer refusal
-4. POST `/journal/{id}/summarize` — Journal AI summary
-5. POST `/projects/{id}/thesis/extract` — Business plan thesis extraction
-6. POST `/ai/chat` — Bottom chat with tool invocation (`create_journal_entry` round-trip)
-
-Skip behavior: if any endpoint surface returns "AI error" / "extraction failed" / 401, mark that case as SKIPPED with a clear note. Other structural assertions (permission guard, routing, schema) still run regardless of key validity.
+No detailed Build 23 section exists in MASTERPLAN.md yet — write one in plan mode before coding. Build 23 is "size: L" so expect more sub-pieces than a typical S/M build.
 
 ## Remaining work
-1. Read the routes above to confirm exact paths and form fields.
-2. Write the test file with skip-on-error semantics.
-3. Run it (it'll likely skip most cases until the user fixes their OpenAI env).
-4. Commit as its own commit: `Add test_ai_e2e.py — comprehensive AI e2e test (skips when OPENAI_API_KEY is invalid)`.
-5. After commit, CURRENT_TASK.md rotates to Build 23 — Chinese i18n (L).
+1. Plan-mode pass: write the Build 23 detail section in MASTERPLAN.md (i18n architecture, key naming convention, switcher UI, persistence model, tests).
+2. Add `users.language` column via the existing migration infrastructure (app/migrations.py from Build 13).
+3. Create `app/i18n.py` (loader + `t(key, **kwargs)` + locale detection middleware reading user pref or cookie).
+4. Create `app/i18n/zh.json` (key → translation map).
+5. Register `t` as a Jinja2 global; sweep templates replacing English strings with `{{ t('...') }}`.
+6. Language switcher in `base.html` navbar.
+7. Tests + docs + version bump.
+8. Commit only after user explicitly asks.
 
 ## Constraints
-- Do not modify any AI logic itself. The test only exercises existing endpoints.
-- Skip-on-error is mandatory — the test must pass in a no-key environment.
+- Translations must be thoughtful (especially product/PM domain terms). No "raw translate" placeholders.
+- Deep docs stay English (USER_GUIDE, CHANGELOG, ARCHITECTURE, MASTERPLAN). i18n is for the UI only.
+- Don't break any existing test by replacing a string the test asserts against — search for asserted strings before replacing.
+- Bottom AI Chat (Build 21) UI labels translate; the prompts themselves (CHAT_ASK_SYSTEM_PROMPT etc.) stay English — they're instructions to the model, not user-visible UI.
 - Do not push to origin without explicit user instruction.
 - If unsure, read the code instead of trusting this file.
 
 ## Next step
-Read `app/routes/journal.py`, `app/routes/projects.py` (thesis extract route), and confirm endpoint paths. Then write `test_ai_e2e.py`.
+Enter plan mode to draft the Build 23 detail section.
+
+## Note on test_ai_e2e.py
+Single command: `python3 test_ai_e2e.py`. Runs structural tests (always) + live AI round-trips (skip-on-error). Expected shape: all PASS or SKIP, never FAIL. After Build 24 ships and the OpenAI env is fixed, re-run for a clean PASS sweep.
