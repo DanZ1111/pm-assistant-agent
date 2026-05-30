@@ -1,9 +1,16 @@
 # PM Product Tracker — Version
 
-**Current Version:** v1.1.0-build21
-**Current Build:** Build 21 — Bottom AI Chat + Side Panel + Conversation History
+**Current Version:** v1.1.0-build22
+**Current Build:** Build 22 — AI-Assisted Create Project
 **Status:** v1.1.0 in progress (build-by-build per roadmap)
-**Last Updated:** 2026-05-29
+**Last Updated:** 2026-05-30
+
+## What's new in v1.1.0-build22
+
+- **Create Project now has two tabs**: **Manual Form** (the existing form) and **AI-Assisted** (paste notes or upload a file → AI extracts fields → review & confirm). Both live at `/projects/new`.
+- **AI Intake link removed from the navbar.** Bottom AI Chat (Build 21) is the daily AI entry point now; AI-Assisted Create lives in the natural place for it — inside the Create Project flow. Old bookmarks still work: `/ai/intake` is now a 303 redirect to `/projects/new?tab=ai`.
+- **No change to the AI extraction logic itself** (parser, prompts, dual-mode classification). UI relocation only — the `/ai/intake/extract`, `/ai/intake/extract-file`, `/ai/intake/confirm`, and `/ai/intake/confirm-idea` POST routes keep their paths and behavior. They now render inside the AI tab.
+- **Edit Project (existing projects)** stays on the same single-form layout — tabs only appear on the create flow.
 
 ## What's new in v1.1.0-build21
 

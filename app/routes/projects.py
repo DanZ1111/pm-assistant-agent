@@ -188,7 +188,7 @@ def my_projects(request: Request, db: Session = Depends(get_db)):
 # ---------------------------------------------------------------------------
 
 @router.get("/projects/new", response_class=HTMLResponse)
-def project_new_form(request: Request, db: Session = Depends(get_db)):
+def project_new_form(request: Request, tab: str = "manual", db: Session = Depends(get_db)):
     current_user = get_current_user(request, db)
     try:
         require_auth(current_user)
@@ -197,11 +197,28 @@ def project_new_form(request: Request, db: Session = Depends(get_db)):
     if current_user.role == "viewer":
         return RedirectResponse(url="/projects", status_code=303)
 
+    # Build 22 — tab=ai opens the AI-Assisted panel; default is Manual Form.
+    initial_tab = "ai" if tab == "ai" else "manual"
+
     return templates.TemplateResponse(request, "project_form.html", {
         "project": None,
         "is_edit": False,
         "error": None,
         "current_user": current_user,
+        "initial_tab": initial_tab,
+        # Defaults so the AI intake panel renders state-1 (input form)
+        "proposed": None,
+        "raw_text": "",
+        "health": None,
+        "uploaded_filename": "",
+        "uploaded_original_filename": "",
+        "uploaded_file_type": "",
+        "uploaded_file_category": "",
+        "uploaded_ai_summary": "",
+        "matched_project": None,
+        "match_score": 0.0,
+        "classification": None,
+        "idea_fields": None,
     })
 
 

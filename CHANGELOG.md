@@ -1,5 +1,34 @@
 # PM Product Tracker — Changelog
 
+## v1.1.0-build22 — AI-Assisted Create Project (Build 22)
+_2026-05-30_
+
+**Goal:** consolidate the two ways to create a project (manual form + AI intake) into a single page with two tabs. Removes the standalone AI Intake nav link now that Bottom AI Chat (Build 21) is the daily AI entry point.
+
+**`/projects/new` is now a two-tab page:**
+- **Manual Form tab** — the existing project_form.html content, unchanged.
+- **AI-Assisted tab** — new partial `app/templates/components/ai_intake_panel.html` containing both intake states (input + review/confirm).
+- Tabs use the same Bootstrap pattern as the Help modal in base.html.
+- `?tab=ai` query param picks the AI tab on initial render; default is Manual.
+
+**Server-side endpoints unchanged in behavior:**
+- `/ai/intake/extract`, `/ai/intake/extract-file`, `/ai/intake/confirm`, `/ai/intake/confirm-idea` — all 4 POST routes keep their paths and create/update logic. They now render `project_form.html` with `initial_tab="ai"` so the AI panel shows after extraction.
+- `GET /ai/intake` becomes a 303 redirect to `/projects/new?tab=ai`. Old bookmarks and any test that GETs `/ai/intake` continue to work.
+
+**Code cleanup:** introduced `_ai_panel_response(request, current_user, **overrides)` helper in `app/routes/intake.py` so every intake response gets the project_form.html scaffolding (project=None, is_edit=False, initial_tab="ai", current_user) plus safe defaults for all intake context keys. Eliminated 8+ near-duplicate context dicts.
+
+**Navbar:** the "AI Intake" link is removed from `base.html`. A short Jinja comment is left in its place pointing to the new home.
+
+**Edit Project (existing projects)** is untouched — tabs only render when `is_edit=False`. The edit flow stays a single form (no AI-Assisted edit in v1.1).
+
+**No schema change. No AI logic change.** UI relocation + helper refactor.
+
+**Files modified:** `app/routes/intake.py` (helper + 8 TemplateResponse call-sites refactored, GET /ai/intake → redirect), `app/routes/projects.py` (GET /projects/new accepts tab=, passes initial_tab + intake defaults), `app/templates/project_form.html` (Bootstrap tab wrapper on create flow), `app/templates/base.html` (AI Intake nav link removed), `app/version.py`, `VERSION.md`, `USER_GUIDE.md`
+
+**Files created:** `app/templates/components/ai_intake_panel.html`, `test_build22.py`
+
+**Files removed:** none (intake.html is no longer rendered but the file stays in the repo as a historical artifact for now; can be deleted in a follow-up if desired).
+
 ## v1.1.0-build21 — Bottom AI Chat + Side Panel + Conversation History (Build 21)
 _2026-05-29_
 

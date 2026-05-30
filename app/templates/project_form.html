@@ -15,7 +15,29 @@
 </div>
 
 <div class="form-page">
-  {% if error %}
+
+{# Build 22 — Tabs on create flow only. Edit flow keeps the single form. #}
+{% if not is_edit %}
+{% set initial_tab = initial_tab or 'manual' %}
+<ul class="nav nav-tabs mb-4" id="createProjectTabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link {% if initial_tab == 'manual' %}active{% endif %}" id="tab-create-manual-btn"
+            data-bs-toggle="tab" data-bs-target="#pane-create-manual" type="button" role="tab">
+      <i class="bi bi-pencil-square me-1"></i>Manual Form
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link {% if initial_tab == 'ai' %}active{% endif %}" id="tab-create-ai-btn"
+            data-bs-toggle="tab" data-bs-target="#pane-create-ai" type="button" role="tab">
+      <i class="bi bi-robot me-1"></i>AI-Assisted
+    </button>
+  </li>
+</ul>
+<div class="tab-content" id="createProjectTabContent">
+<div class="tab-pane fade {% if initial_tab == 'manual' %}show active{% endif %}" id="pane-create-manual" role="tabpanel">
+{% endif %}
+
+  {% if error and is_edit %}
   <div class="alert alert-danger mb-4"><i class="bi bi-exclamation-circle me-2"></i>{{ error }}</div>
   {% endif %}
 
@@ -208,6 +230,17 @@
     </div>
 
   </form>
+
+{% if not is_edit %}
+</div>{# end pane-create-manual #}
+
+<div class="tab-pane fade {% if initial_tab == 'ai' %}show active{% endif %}" id="pane-create-ai" role="tabpanel">
+  {% include "components/ai_intake_panel.html" %}
+</div>
+
+</div>{# end tab-content #}
+{% endif %}
+
 </div>
 {% endblock %}
 

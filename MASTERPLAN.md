@@ -2592,7 +2592,7 @@ Reuses the existing `crud.create_journal_entry` service function (Build 14). Val
 
 ---
 
-### Build 22 — AI-Assisted Create Project (consolidate intake into /projects/new) ← CURRENT BUILD
+### Build 22 — AI-Assisted Create Project (consolidate intake into /projects/new) ✓ SHIPPED v1.1.0-build22
 
 #### Context
 Today the app has two ways to create a project: `/projects/new` (manual form) and `/ai/intake` (paste text / upload file → AI extracts fields → confirm). Conceptually they're the same task, and the navbar carries both as separate destinations. Build 22 consolidates them: `/projects/new` becomes a two-tab page (Manual Form / AI-Assisted), the AI Intake link is removed from the navbar, and the `/ai/intake` route stays as a 303 redirect to `/projects/new?tab=ai` so old bookmarks and test fixtures keep working.

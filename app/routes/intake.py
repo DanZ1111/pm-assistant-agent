@@ -70,17 +70,18 @@ def _health_from_dict(extracted: dict):
     return crud.get_project_health(proj_ns, [], [])
 
 
-@router.get("/ai/intake", response_class=HTMLResponse)
-def intake_form(request: Request, db: Session = Depends(get_db)):
-    current_user = get_current_user(request, db)
-    try:
-        require_auth(current_user)
-    except _RedirectException as e:
-        return e.response
-    if not can_use_ai_intake(current_user):
-        return RedirectResponse(url="/projects", status_code=303)
-
-    return templates.TemplateResponse(request, "intake.html", {
+def _ai_panel_response(request, current_user, **overrides):
+    """Build 22 — render the AI-Assisted panel inside /projects/new with
+    the AI tab active. Fills in safe defaults for any intake context key
+    the caller doesn't supply.
+    """
+    ctx = {
+        # project_form.html scaffolding
+        "project": None,
+        "is_edit": False,
+        "initial_tab": "ai",
+        "current_user": current_user,
+        # AI intake panel defaults
         "proposed": None,
         "raw_text": "",
         "health": None,
@@ -92,8 +93,21 @@ def intake_form(request: Request, db: Session = Depends(get_db)):
         "uploaded_ai_summary": "",
         "matched_project": None,
         "match_score": 0.0,
-        "current_user": current_user,
-    })
+        "classification": None,
+        "idea_fields": None,
+        "idea_types": IDEA_TYPES,
+        "idea_sources": IDEA_SOURCES,
+    }
+    ctx.update(overrides)
+    return templates.TemplateResponse(request, "project_form.html", ctx)
+
+
+@router.get("/ai/intake")
+def intake_form_redirect():
+    """Build 22 — legacy URL preserved as a 303 redirect to the AI tab on
+    the consolidated Create Project page. Bookmarks and old tests still work.
+    """
+    return RedirectResponse(url="/projects/new?tab=ai", status_code=303)
 
 
 @router.post("/ai/intake/extract", response_class=HTMLResponse)
@@ -110,23 +124,16 @@ async def intake_extract(
     if not can_use_ai_intake(current_user):
         return RedirectResponse(url="/projects", status_code=303)
     if not raw_text.strip():
-        return templates.TemplateResponse(request, "intake.html", {
-            "proposed": None, "raw_text": raw_text, "health": None,
-            "error": "Please enter some text to extract from.",
-            "uploaded_filename": "", "uploaded_original_filename": "",
-            "uploaded_file_type": "", "uploaded_file_category": "", "uploaded_ai_summary": "",
-        })
+        return _ai_panel_response(request, current_user,
+            raw_text=raw_text,
+            error="Please enter some text to extract from.")
 
     # Dual-mode classification: project vs idea
     result = extract_intake(raw_text)
     if "_error" in result:
-        return templates.TemplateResponse(request, "intake.html", {
-            "proposed": None, "raw_text": raw_text, "health": None,
-            "error": f"AI extraction failed: {result['_error']}",
-            "uploaded_filename": "", "uploaded_original_filename": "",
-            "uploaded_file_type": "", "uploaded_file_category": "", "uploaded_ai_summary": "",
-            "classification": None, "idea_fields": None,
-        })
+        return _ai_panel_response(request, current_user,
+            raw_text=raw_text,
+            error=f"AI extraction failed: {result['_error']}")
 
     classification = result["classification"]
     project_fields = result["project_fields"] or {}
@@ -148,17 +155,10 @@ async def intake_extract(
 
     # `proposed` is the project_fields dict (for backward compat with template),
     # idea_fields is passed separately
-    return templates.TemplateResponse(request, "intake.html", {
-        "proposed": project_fields, "raw_text": raw_text, "health": health, "error": None,
-        "uploaded_filename": "", "uploaded_original_filename": "",
-        "uploaded_file_type": "", "uploaded_file_category": "", "uploaded_ai_summary": "",
-        "matched_project": matched_project, "match_score": match_score,
-        "classification": classification,
-        "idea_fields": idea_fields,
-        "idea_types": IDEA_TYPES,
-        "idea_sources": IDEA_SOURCES,
-        "current_user": current_user,
-    })
+    return _ai_panel_response(request, current_user,
+        proposed=project_fields, raw_text=raw_text, health=health,
+        matched_project=matched_project, match_score=match_score,
+        classification=classification, idea_fields=idea_fields)
 
 
 @router.post("/ai/intake/extract-file", response_class=HTMLResponse)
@@ -176,22 +176,13 @@ async def intake_extract_file(
     if not can_use_ai_intake(current_user):
         return RedirectResponse(url="/projects", status_code=303)
     if not file or not file.filename:
-        return templates.TemplateResponse(request, "intake.html", {
-            "proposed": None, "raw_text": "", "health": None,
-            "error": "No file selected.",
-            "uploaded_filename": "", "uploaded_original_filename": "",
-            "uploaded_file_type": "", "uploaded_file_category": "", "uploaded_ai_summary": "",
-        })
+        return _ai_panel_response(request, current_user, error="No file selected.")
 
     file_type = detect_file_type(file.filename, file.content_type or "")
 
     if file_type not in SUPPORTED_INTAKE_TYPES:
-        return templates.TemplateResponse(request, "intake.html", {
-            "proposed": None, "raw_text": "", "health": None,
-            "error": f"Unsupported file type '{file_type}'. Upload a PDF or image (PNG, JPG, WEBP).",
-            "uploaded_filename": "", "uploaded_original_filename": "",
-            "uploaded_file_type": "", "uploaded_file_category": "", "uploaded_ai_summary": "",
-        })
+        return _ai_panel_response(request, current_user,
+            error=f"Unsupported file type '{file_type}'. Upload a PDF or image (PNG, JPG, WEBP).")
 
     # Save to UPLOAD_DIR immediately (same pattern as files.py)
     ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
@@ -210,12 +201,8 @@ async def intake_extract_file(
         result = extract_from_pdf(disk_path)
         if "_error" in result:
             os.remove(disk_path)
-            return templates.TemplateResponse(request, "intake.html", {
-                "proposed": None, "raw_text": "", "health": None,
-                "error": f"PDF extraction failed: {result['_error']}",
-                "uploaded_filename": "", "uploaded_original_filename": "",
-                "uploaded_file_type": "", "uploaded_file_category": "", "uploaded_ai_summary": "",
-            })
+            return _ai_panel_response(request, current_user,
+                error=f"PDF extraction failed: {result['_error']}")
         extracted = result["extracted"]
         raw_text_from_file = result.get("raw_text", "")
         ai_summary = raw_text_from_file[:500] if raw_text_from_file else ""
@@ -224,12 +211,8 @@ async def intake_extract_file(
         result = extract_from_image(disk_path)
         if "_error" in result:
             os.remove(disk_path)
-            return templates.TemplateResponse(request, "intake.html", {
-                "proposed": None, "raw_text": "", "health": None,
-                "error": f"Image analysis failed: {result['_error']}",
-                "uploaded_filename": "", "uploaded_original_filename": "",
-                "uploaded_file_type": "", "uploaded_file_category": "", "uploaded_ai_summary": "",
-            })
+            return _ai_panel_response(request, current_user,
+                error=f"Image analysis failed: {result['_error']}")
         extracted = result["extracted"]
         ai_summary = result.get("ai_summary", "")
 
@@ -241,19 +224,19 @@ async def intake_extract_file(
 
     matched_project, match_score = _find_match(extracted, db)
 
-    return templates.TemplateResponse(request, "intake.html", {
-        "proposed": extracted,
-        "raw_text": raw_text_from_file,
-        "health": health,
-        "error": None,
-        "uploaded_filename": unique_name,
-        "uploaded_original_filename": file.filename,
-        "uploaded_file_type": file_type,
-        "uploaded_file_category": file_category,
-        "uploaded_ai_summary": ai_summary,
-        "matched_project": matched_project,
-        "match_score": match_score,
-    })
+    return _ai_panel_response(request, current_user,
+        proposed=extracted,
+        raw_text=raw_text_from_file,
+        health=health,
+        uploaded_filename=unique_name,
+        uploaded_original_filename=file.filename,
+        uploaded_file_type=file_type,
+        uploaded_file_category=file_category,
+        uploaded_ai_summary=ai_summary,
+        matched_project=matched_project,
+        match_score=match_score,
+        classification="project",  # file extractions are always project-classified
+    )
 
 
 @router.post("/ai/intake/confirm")
@@ -291,16 +274,14 @@ def intake_confirm(
 
     name = name.strip()
     if not name:
-        return templates.TemplateResponse(request, "intake.html", {
-            "proposed": None, "raw_text": raw_text, "health": None,
-            "error": "Project name is required to confirm.",
-            "uploaded_filename": uploaded_filename,
-            "uploaded_original_filename": uploaded_original_filename,
-            "uploaded_file_type": uploaded_file_type,
-            "uploaded_file_category": uploaded_file_category,
-            "uploaded_ai_summary": uploaded_ai_summary,
-            "matched_project": None, "match_score": 0.0,
-        })
+        return _ai_panel_response(request, current_user,
+            raw_text=raw_text,
+            error="Project name is required to confirm.",
+            uploaded_filename=uploaded_filename,
+            uploaded_original_filename=uploaded_original_filename,
+            uploaded_file_type=uploaded_file_type,
+            uploaded_file_category=uploaded_file_category,
+            uploaded_ai_summary=uploaded_ai_summary)
 
     data = {
         "name": name,
@@ -323,13 +304,9 @@ def intake_confirm(
         update_data = {k: v for k, v in data.items() if v is not None and k != "status"}
         project = crud.update_project(db, pid, update_data, changed_by="ai")
         if not project:
-            return templates.TemplateResponse(request, "intake.html", {
-                "proposed": None, "raw_text": raw_text, "health": None,
-                "error": f"Project {pid} not found.",
-                "uploaded_filename": "", "uploaded_original_filename": "",
-                "uploaded_file_type": "", "uploaded_file_category": "", "uploaded_ai_summary": "",
-                "matched_project": None, "match_score": 0.0,
-            })
+            return _ai_panel_response(request, current_user,
+                raw_text=raw_text,
+                error=f"Project {pid} not found.")
         crud.write_change(
             db, project.id, "event_note", changed_by="ai",
             summary="Project updated via AI intake.",
@@ -403,14 +380,10 @@ def intake_confirm_idea(
     # Anyone authenticated can create ideas (matches /ideas/new permission)
     name = name.strip()
     if not name:
-        return templates.TemplateResponse(request, "intake.html", {
-            "proposed": None, "raw_text": raw_text, "health": None,
-            "error": "Idea name is required to confirm.",
-            "uploaded_filename": "", "uploaded_original_filename": "",
-            "uploaded_file_type": "", "uploaded_file_category": "", "uploaded_ai_summary": "",
-            "classification": "idea", "idea_fields": None,
-            "current_user": current_user,
-        })
+        return _ai_panel_response(request, current_user,
+            raw_text=raw_text,
+            error="Idea name is required to confirm.",
+            classification="idea")
 
     data = {
         "name": name,

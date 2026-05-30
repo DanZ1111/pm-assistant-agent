@@ -31,9 +31,8 @@
       <a class="nav-link px-3 {% if request.url.path.startswith('/my-projects') %}active{% endif %}" href="/my-projects">
         <i class="bi bi-person-circle me-1"></i>My Projects
       </a>
-      <a class="nav-link px-3 {% if request.url.path.startswith('/ai') %}active{% endif %}" href="/ai/intake">
-        <i class="bi bi-robot me-1"></i>AI Intake
-      </a>
+      {# Build 22 — AI Intake link removed; AI-Assisted Create lives as a tab on /projects/new.
+         Bottom AI Chat (Build 21) is the daily AI entry point. #}
       {% endif %}
       {% if current_user and current_user.role == 'admin' %}
       <a class="nav-link px-3 {% if request.url.path == '/admin/database' %}active{% endif %}" href="/admin/database">

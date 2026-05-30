@@ -196,9 +196,22 @@ Viewers cannot see the chat surface ask about sensitive topics (factory, costs, 
 
 ---
 
-## AI Intake
+## AI-Assisted Create Project (Build 22)
 
-The AI Intake page lets you create a new project from unstructured information.
+The Create Project page (`/projects/new`) has two tabs:
+
+- **Manual Form** — fill in fields by hand (the default).
+- **AI-Assisted** — paste notes or upload a PDF/image. AI extracts the fields, you review and confirm before anything is saved.
+
+The old standalone "AI Intake" navbar link is gone. The link still works as a redirect — `/ai/intake` sends you to `/projects/new?tab=ai`.
+
+For quick chat-driven capture (no full project creation), use the bottom chat bar instead — it can log journal entries directly into existing projects.
+
+---
+
+## AI Intake (legacy)
+
+The AI Intake flow is now embedded in the AI-Assisted tab on Create Project. The instructions below describe the same flow.
 
 ### Option A — Paste text
 
