@@ -1,9 +1,25 @@
 # PM Product Tracker — Version
 
-**Current Version:** v1.1.0-build23
-**Current Build:** Build 23 — Chinese i18n
-**Status:** v1.1.0 in progress (build-by-build per roadmap)
+**Current Version:** v1.1.0
+**Current Build:** Build 24 — v1.1.0 release
+**Status:** v1.1.0 released
 **Last Updated:** 2026-05-30
+
+## What's new in v1.1.0
+
+v1.1.0 turns the tracker from a static project database into a product development workspace.
+
+- **Project Journal** — PM/admin-only notes on project detail, with raw entries preserved and AI summarization available.
+- **Business Plan Upload + Thesis Extraction** — upload PDF/DOCX/DOC/image plans, preview AI-proposed Product Thesis text and detected inspirations, then confirm before any write.
+- **Variants, Packaging, Quotation, and Profit Model placeholder** — track SKU variants, package/accessory inputs, quotation files, and the intended future margin model.
+- **Timeline 2.0** — planned dates and actual dates are split, plan changes require reasons, and Finish Phase advances the workflow.
+- **Rendering History + Prototype Photos** — dedicated visual history sections with per-file comments and latest-rendering thumbnails on project cards.
+- **My Projects** — focused PM/admin view, quieter attention banner, and browser-side last-project memory.
+- **AI Tools + Bottom AI Chat** — security-first tool registry, permission guard updates, persistent chat conversations, and the first wired intake tool: `create_journal_entry`.
+- **AI-Assisted Create Project** — manual and AI-assisted creation now live together at `/projects/new`; the old `/ai/intake` page redirects there.
+- **Chinese UI** — EN / 中文 navbar switcher, persisted by `users.language` or cookie fallback, with broad first-pass coverage of primary user-facing screens.
+
+No Build 24 schema migration. The final release build is documentation, version, and regression-test hardening only.
 
 ## What's new in v1.1.0-build23
 
@@ -133,3 +149,4 @@
 | v0.8.0 | Build 8 + 9 | Multi-Role Auth + Railway Deploy |
 | v0.9.0 | Build 10 | Calendar + Admin Nav Hardening |
 | v1.0.0 | Build 11 | Good Ideas + Project Linkage + AI Dual-Mode |
+| v1.1.0 | Builds 12-24 | Product Development Workspace: Journal, Thesis extraction, variants/packaging/quotation, Timeline 2.0, media history, My Projects, bottom AI chat, AI-assisted create, Chinese i18n |

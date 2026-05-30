@@ -1,5 +1,33 @@
 # PM Product Tracker — Changelog
 
+## v1.1.0 — Product Development Workspace Release (Build 24)
+_2026-05-30_
+
+**Goal:** close the v1.1.0 roadmap with a final release bump, consolidated user documentation, and a release-level regression test.
+
+**Release theme:** the app is now a product development workspace rather than only a static project database. v1.1.0 adds daily PM workflows around project memory, thesis extraction, SKU/packaging detail, timeline reality, visual iteration, and AI-assisted capture.
+
+**Major features included across v1.1.0:**
+- **Governance + migration foundation** — canonical runtime version source, product/AI working rules, idempotent migration infrastructure, and additive schema for v1.1 data.
+- **Project Journal** — internal PM/admin project notes with AI summary support; viewers cannot access journal content.
+- **Business Plan Upload + Thesis Extraction** — AI proposes Product Thesis text and inspiration links from uploaded plans; users preview, edit, and confirm before data is written.
+- **Variants, Packaging, Quotation, and Profit Model placeholder** — multi-SKU tracking, package/accessory components, quotation file surfacing, and the intended profit formula documented for the future full model.
+- **Timeline 2.0** — Plan / Reality columns, required reason capture for planned-date changes, plan-change history, and Finish Phase workflow.
+- **Rendering History + Prototype Photos** — dedicated visual iteration sections, per-file comments, latest rendering thumbnails on project cards.
+- **My Projects + project memory** — focused PM/admin project list, delay-only attention banner, and browser-side last-opened project memory.
+- **AI tools architecture + Bottom AI Chat** — OpenAI tool schemas, security-first dispatcher, viewer permission guard checks before model calls, persistent chat threads, and wired `create_journal_entry`.
+- **AI-Assisted Create Project** — manual and AI-assisted create flows consolidated into `/projects/new`, with `/ai/intake` preserved as a redirect.
+- **Chinese i18n** — EN / 中文 switcher with durable preference, cookie fallback for logged-out visitors, broad first-pass translation coverage of primary user-facing screens, and exact English/Chinese bundle parity.
+
+**Build 24 changes:**
+- `app/version.py` bumped to final `1.1.0`.
+- `VERSION.md` now carries a consolidated "What's new in v1.1.0" release summary.
+- `USER_GUIDE.md` now has a short Chinese summary plus English sections for all v1.1 features and the intended Profit Model formula.
+- `MASTERPLAN.md` marks Build 24 shipped.
+- `test_build24.py` added release-doc/version checks and regression inventory checks.
+
+**No schema migration in Build 24.** This build changes only docs, version metadata, and tests.
+
 ## v1.1.0-build23 — Chinese i18n (Build 23)
 _2026-05-30_
 

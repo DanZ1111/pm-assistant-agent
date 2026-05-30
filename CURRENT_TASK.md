@@ -1,7 +1,7 @@
 # CURRENT_TASK.md
 
 ## Task
-Build 23 — Chinese i18n
+Build 25 — Beauty Department isolated deployment (post-v1.1.0)
 
 ## Handoff rule
 Before editing, inspect:
@@ -12,37 +12,38 @@ Before editing, inspect:
 Git/code is the source of truth. This file is only a short task reminder. If anything here disagrees with git, trust git.
 
 ## Current state
-Build 23 implementation is complete and tested, but not committed. Do not push or commit unless the user explicitly asks.
+v1.1.0 is RELEASED. Build 24 was the final release bump (commit pending — see below).
 
-Implemented:
-- `app/i18n/` package with `en.json` + `zh.json` bundles (520 keys each), `t(...)`, `current_locale(...)`, `get_locale(...)`, and `i18n_context(...)`.
-- `POST /lang/set` route with cookie persistence, logged-in `users.language` persistence, invalid-lang fallback, and local-only redirect target.
-- Navbar language switcher visible to logged-in and logged-out users.
-- Locale context added to user-facing TemplateResponse routes: auth, projects, intake, calendar, ideas, thesis preview.
-- Broad UI translation sweep across primary Build 23 scope: nav, auth pages, projects list, My Projects, Create/Edit Project, AI-assisted create panel, project detail, Project Journal, Variants, Packaging, Quotation, Profit Model placeholder, Rendering History, Prototype Photos, Calendar, Ideas, bottom chat labels/tooltips, status/badge/empty-state copy.
-- Docs/version updated for v1.1.0-build23.
-- Generated `__pycache__` folders removed after testing.
+Last in-flight detail (just resolved by Claude): Codex implemented Build 24 fully (`app/version.py` → `1.1.0`, VERSION/CHANGELOG/USER_GUIDE/MASTERPLAN updated, `test_build24.py` added). Codex ran out of tokens before the final commit + push. Claude verified the work (test_build24 11/11; full v1.1 regression suite still green) and is committing Build 24 now. Push to origin is pending user authorization.
 
-Out of scope remains:
-- Help modal body.
-- Admin-only pages.
-- AI prompts.
-- Changelog/version-history prose.
-- Legacy `app/templates/intake.html` artifact.
+Build 25 is queued up but NOT started. It's the Beauty-dept isolated deployment per `~/.claude/plans/can-you-still-find-nested-cook.md` (architectural decision recorded: Option 4 — separate deployment per dept, same image, different DB + env vars).
 
-## Tests run
-- `python3 -m compileall app` — PASS
-- Jinja template compile smoke — 24 templates compiled
-- `python3 test_build23.py` — 24 PASS / 0 FAIL
-- `python3 test_build18.py` — 17 PASS / 0 FAIL
-- `python3 test_build19.py` — 15 PASS / 0 FAIL
-- `python3 test_build20.py` — 23 PASS / 0 FAIL
-- `python3 test_build21.py` — 20 PASS / 0 FAIL
-- `python3 test_build22.py` — 15 PASS / 0 FAIL
-- `python3 test_ai_e2e.py` — 10 PASS / 7 SKIP / 0 FAIL (SKIPs are expected AI-call failures until server has valid OpenAI config)
-- Extra Chinese-mode smoke: `/projects`, `/my-projects`, `/projects/new`, `/projects/new?tab=ai`, `/calendar`, `/ideas`, `/ideas/new`, and latest `/projects/{id}` all returned 200 with no obvious raw translation keys.
+## Remaining work (Build 25)
+1. **Wait for user to confirm push of Build 24** before any new work.
+2. Answer 4 open questions before starting Build 25:
+   - Hosting platform (Railway? Docker? local?)
+   - URL scheme (subdomain? path? separate domain?)
+   - Beauty starts empty, or copy any shared lookup data?
+   - Shared OpenAI key, or its own?
+3. Provision second Railway service (same git repo).
+4. Different `DATABASE_URL`, `OPENAI_API_KEY`, `INITIAL_ADMIN_USERNAME`/`PASSWORD` per service.
+5. Write `DEPLOYMENT.md` runbook for spinning up a new department instance.
+6. Bump `app/version.py` to `1.1.1` (or `1.1.0-build25` — user's call).
+7. Verify both instances are truly isolated (browser test, regression test against each).
+8. Commit + ask user before push.
 
-## Remaining work
-1. User/native-speaker review of `app/i18n/zh.json` wording.
-2. Optional full historical test sweep if desired.
-3. Commit only after user explicitly asks.
+## Known stale tests (pre-existing, NOT Build 24 regressions)
+- `test_build8.py` — Playwright selectors look for old English nav labels and the now-removed AI Intake link. Broken since Build 22 (nav cleanup) + Build 23 (i18n). Functional coverage still provided by test_build11+.
+- `test_build12.py` — 8/9; "Phase edit buttons not found" Playwright timing issue. Pre-existing.
+
+These are documented out-of-scope. Decision: address only if Build 25 changes anything they would assert.
+
+## Out of scope (deferred to v1.2)
+- Native-speaker review of `app/i18n/zh.json` wording.
+- Full Profit Model implementation (placeholder only in v1.1).
+- Row-level multi-tenancy (Organization table + `org_id` everywhere). Only justified if 4th dept arrives or cross-dept features needed.
+- AI prompt translation, Help modal body translation, `/admin/*` page translation.
+- 15 stubbed AI tools getting real handlers (only `create_journal_entry` wired in v1.1).
+
+## Next step
+Wait for user to authorize push of Build 24. Then revisit the 4 Build 25 open questions and start implementation.

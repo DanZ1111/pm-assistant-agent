@@ -6,6 +6,20 @@ This is a structured product project tracker for knife and product development. 
 
 ---
 
+## v1.1 中文速览
+
+v1.1 把系统从“项目资料表”推进成“产品开发工作台”：PM 可以记录项目日志、上传商业计划并提取 Product Thesis、管理多 SKU / 包装 / 报价资料、追踪计划日期和实际进度、保存渲染图与样品照片历史，并用底部 AI Chat 辅助记录信息。
+
+中文界面已经上线：点击导航栏里的 **中文** 即可切换，登录用户的偏好会保存到账号，未登录用户会保存到浏览器 cookie。项目名称、品牌、工厂、SKU、MSRP、Thesis、AI、PM 等业务数据和常用行业术语不会被翻译。
+
+常用入口：
+- **New Project**：手动创建，或使用 **AI 辅助创建项目** 从笔记/文件提取字段。
+- **Project detail**：查看 Thesis、项目日志、灵感来源、Timeline 2.0、文件、渲染图历史、样品照片、Variants、Packaging、Quotation、Profit Model 占位信息。
+- **Bottom AI Chat**：当前可把聊天内容记录为项目日志；敏感信息权限会先检查，再决定是否调用 AI。
+- **My Projects**：PM / Admin 的日常项目列表。
+
+---
+
 ## Getting Started
 
 ### How to create a project
@@ -19,6 +33,14 @@ This is a structured product project tracker for knife and product development. 
 The project will be created immediately. If critical fields are missing, a **Needs Info** warning will appear on the card.
 
 **Tip:** Use **AI Intake** if you have product notes, a brief, or a spec sheet — the AI can extract the fields for you.
+
+### Chinese UI (Build 23)
+
+Use the **EN / 中文** switcher in the navbar to change the visible UI language.
+
+- Logged-in users: the choice is saved to your account.
+- Logged-out visitors: the choice is saved in the browser cookie.
+- Project data stays exactly as entered. Product terms such as Thesis, SKU, MSRP, AI, and PM intentionally stay in English because they are clearer for mixed-language product work.
 
 ---
 
@@ -102,7 +124,7 @@ The delay badge shows the number of days the worst overdue phase is late.
 
 ## Project Detail Page
 
-Each project detail page has four sections:
+Each project detail page is the working record for one product.
 
 ### 1. Product Thesis
 
@@ -119,9 +141,41 @@ A good Product Thesis answers:
 
 **Minimum length:** 80 characters. Shorter = treated as incomplete.
 
-### 2. Timeline
+### Business Plan Upload + Thesis Extraction (Build 15)
+
+You can upload a business plan or product brief and ask AI to draft the Product Thesis.
+
+- Supported inputs: PDF, DOCX, DOC, and images. DOC requires LibreOffice on the server.
+- AI proposes a thesis and any detected inspirations. It does not write directly.
+- You review, edit, link/create/skip suggested Good Ideas, then confirm.
+- Refreshing the preview does not re-run AI; the saved extraction result is reused.
+- PM/admin can later edit the Product Thesis inline on the project detail page.
+
+### Project Journal (Build 14)
+
+The Project Journal is an internal project memory section for PMs and admins. Use it for factory feedback, design rationale, meeting notes, risk notes, sample test results, and decisions that should not disappear into chat history.
+
+- PM/admin can add entries.
+- Viewers cannot see journal content.
+- Raw entry text is preserved.
+- AI can summarize journal entries on demand.
+- Bottom AI Chat can create journal entries in Intake mode.
+
+### Inspired By
+
+Projects can link to ideas from the **Good Ideas** board. Use this section to record which material, structure, feature, aesthetic, manufacturing idea, or reference inspired the project.
+
+### Timeline 2.0 (Build 17)
 
 Shows all phases in order with planned/actual dates, status, and owner.
+
+Timeline 2.0 separates **Plan** from **Reality**:
+
+- **Planned Start / Planned End** are the schedule targets.
+- **Actual Start / Actual End** record what really happened.
+- Changing a planned date requires a reason. The change history is saved and shown under the phase.
+- A `*` marker appears next to planned dates that have been adjusted.
+- **Finish Phase** marks the active phase done, sets today's actual end date, and advances the next phase to in progress.
 
 **Phase statuses:**
 - `not_started` — work hasn't begun
@@ -140,7 +194,7 @@ Design → Engineering Review → Prototype 1 → Prototype 1 Review → Prototy
 
 To edit a phase, click the **Edit** button. To add a phase, click **Add Phase** at the bottom of the timeline.
 
-### 3. Files & Renderings
+### Files & Renderings
 
 Upload any file associated with the project. Files are organized by category:
 
@@ -160,7 +214,7 @@ Upload any file associated with the project. Files are organized by category:
 
 **Upload:** Drag and drop a file onto the upload zone, or click the zone to browse. Select a category, then click **Upload File**.
 
-### 3a. Rendering History (Build 18)
+### Rendering History (Build 18)
 
 Every file you upload with category **Rendering** also appears here, newest first. Each entry shows the thumbnail, filename, when it was uploaded, and a short comment.
 
@@ -168,11 +222,28 @@ Every file you upload with category **Rendering** also appears here, newest firs
 - Click **Add comment / Edit comment** (PM + admin) to write a short note about the rendering — "what changed in this version", "why we picked this finish", "what the factory pushed back on". Comments are saved instantly and recorded in the Change Log.
 - The most recent rendering also appears as a small thumbnail in the top-right of the project's card on the Projects list page — so you can scan the grid and remember which project looks like what.
 
-### 3b. Prototype Photos (Build 18)
+### Prototype Photos (Build 18)
 
 Same idea as Rendering History but for physical prototype photos. Upload a file with category **Prototype Photo** and it appears here. Use the comment field to capture context — "first sample, plastic too brittle", "v2 with new hinge", "color match approved by client".
 
-### 4. Change Log
+### Variants, Packaging, Quotation, and Profit Model (Build 16)
+
+v1.1 adds lightweight commercial structure to the project detail page.
+
+**Variants** are product SKUs: different sizes, colors, materials, bundles, or price tiers. One variant can be marked **Primary** so the project has a clear main SKU.
+
+**Packaging & Accessories** records what ships with the product: boxes, sheaths, inserts, screws, spare parts, included accessories, or variant-specific extras. Components can apply to the whole project or only one variant.
+
+**Quotation Files** surfaces uploaded files in the **Quotation** category. Viewers can see that quotation files exist but cannot download sensitive quote content.
+
+**Profit Model placeholder** shows the future model inputs and a simple preview where data exists. The full profit model is intentionally deferred, but the intended formulas are:
+
+```text
+Margin per unit = MSRP - factory cost - packaging/accessory unit costs
+Total profit = margin per unit × forecast volume - overhead
+```
+
+### Change Log
 
 A history of every change made to the project, newest first. Includes:
 - Field edits (shows old → new value)

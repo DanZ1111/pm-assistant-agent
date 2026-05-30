@@ -2758,6 +2758,35 @@ New `app/templates/components/lang_switcher.html`: a small `<form method="post" 
 
 ---
 
+### Build 24 — v1.1.0 release tests + USER_GUIDE update + bump ✓ SHIPPED v1.1.0
+
+#### Feature Design Review
+1. Real workflow problem: the v1.1.0 feature set needs one release-level source of truth so users and future agents can understand what shipped.
+2. Repeated or edge-case: release docs and regression inventory are referenced repeatedly by deployers, testers, and future build handoffs.
+3. Structured data: no new structured product data; this is version metadata, docs, and tests.
+4. Could live in notes: no, release/version state must live in canonical repo files and runtime version constants.
+5. Intake burden: no user-facing intake change.
+6. AI reduce burden: no AI behavior change; better docs reduce future handoff ambiguity.
+7. Display/reminder payoff: users get one concise guide for the whole v1.1 workspace and Chinese-speaking users get a short summary.
+8. Migration impact: none.
+9. Minimal schema change: no database schema change.
+10. Minimal UI change: no UI change except the footer/help version string via `app/version.py`.
+11. Deferred: native-speaker review of Chinese bundle wording and future full Profit Model implementation.
+
+#### Scope
+- `app/version.py` bumped from `1.1.0-build23` to final `1.1.0`.
+- `VERSION.md` gets a consolidated v1.1.0 release summary.
+- `CHANGELOG.md` gets a v1.1.0 mega entry above build-level entries.
+- `USER_GUIDE.md` gets a short Chinese summary, English sections for all v1.1 features, and the intended Profit Model formula.
+- `test_build24.py` verifies release docs, runtime version constants, regression-test inventory, and i18n bundle parity.
+
+#### Verification
+- `python3 test_build24.py` checks the release documentation and version state.
+- Final regression includes Build 23 and the v1.1 regression set.
+- No database schema change.
+
+---
+
 #### Context
 Today the app has two ways to create a project: `/projects/new` (manual form) and `/ai/intake` (paste text / upload file → AI extracts fields → confirm). Conceptually they're the same task, and the navbar carries both as separate destinations. Build 22 consolidates them: `/projects/new` becomes a two-tab page (Manual Form / AI-Assisted), the AI Intake link is removed from the navbar, and the `/ai/intake` route stays as a 303 redirect to `/projects/new?tab=ai` so old bookmarks and test fixtures keep working.
 
