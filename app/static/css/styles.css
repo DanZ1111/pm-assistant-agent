@@ -39,11 +39,20 @@ body {
    ========================================================= */
 .navbar-main {
   background: var(--color-nav);
-  height: 52px;
+  /* min-height (not fixed height) so the navbar grows to cover wrapped
+     nav links — otherwise the wrapped row sits on the page background
+     with light-on-dark text and looks transparent. */
+  min-height: 52px;
   border-bottom: 1px solid rgba(255,255,255,0.06);
   position: sticky;
   top: 0;
   z-index: 100;
+}
+.navbar-main .navbar-nav {
+  /* Allow nav links to wrap to a second row inside the dark navbar
+     instead of overflowing or spilling onto the page background. */
+  flex-wrap: wrap;
+  row-gap: 4px;
 }
 .navbar-brand {
   font-size: 15px;
@@ -453,11 +462,14 @@ body {
 .detail-sidebar {
   width: 240px;
   flex-shrink: 0;
-  padding: 24px 20px;
+  padding: 24px 20px 16px;
   border-right: 1px solid var(--color-border);
   position: sticky;
   top: 52px;
-  max-height: calc(100vh - 52px);
+  /* Reserve room for the navbar (52px) + the bottom chat bar (~160px) so
+     the sticky sidebar stops above the fixed chat bar instead of being
+     covered by it. */
+  max-height: calc(100vh - 52px - 160px);
   overflow-y: auto;
 }
 .detail-main {
@@ -1856,7 +1868,9 @@ body {
   line-height: 1.4;
   resize: none;
   min-height: 38px;
-  max-height: 200px;
+  /* Capped at 120px so the bar doesn't grow to fill half the viewport when
+     pasting long text. Above 120px scrolls within the textarea. */
+  max-height: 120px;
   outline: none;
   transition: border-color 0.15s;
 }
@@ -1962,5 +1976,65 @@ body {
 .chat-tool-call-card-name { font-weight: 600; }
 .chat-tool-call-card-result { color: #4b5563; margin-top: 2px; }
 
-/* Push page content above the bottom chat bar so the footer isn't covered */
-body.has-bottom-chat .main-content { padding-bottom: 80px; }
+/* Push page content above the bottom chat bar so it never covers the
+   bottom of the page. 160px = capped 120px textarea + ~20px chrome +
+   ~20px breathing room. */
+body.has-bottom-chat .main-content { padding-bottom: 160px; }
+
+/* =========================================================
+   Build 25 — Responsive tweaks
+   ========================================================= */
+
+/* Project detail page: stack the 240px sidebar above the main content
+   instead of cramming both into a narrow flex row. */
+@media (max-width: 900px) {
+  .detail-layout {
+    flex-direction: column;
+    min-height: auto;
+  }
+  .detail-sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+    position: static;
+    max-height: none;
+    padding: 16px 20px;
+  }
+  .detail-sidebar .sidebar-divider { display: none; }
+  /* Inline the sidebar sections at narrow widths instead of stacking. */
+  .detail-sidebar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 24px;
+  }
+  .detail-sidebar .sidebar-section { margin-bottom: 0; }
+}
+
+/* Navbar: tighten link padding at narrow widths so all items still fit on
+   one row without overflowing horizontally. */
+@media (max-width: 800px) {
+  .navbar-nav .nav-link { padding-left: 8px !important; padding-right: 8px !important; font-size: 12px; }
+  .navbar-brand { font-size: 13px; }
+  .navbar-main { height: auto; min-height: 52px; }
+  .navbar-main .container-fluid { padding-left: 8px; padding-right: 8px; }
+}
+
+/* Bottom chat bar: shorter padding + smaller toggles at narrow widths. */
+@media (max-width: 600px) {
+  .bottom-chat-bar { padding: 6px 10px; }
+  .bottom-chat-form { gap: 6px; }
+  .bottom-chat-toggles .form-select { min-width: 64px; font-size: 0.72rem; padding: 2px 18px 2px 6px; }
+  .bottom-chat-input { font-size: 0.9rem; padding: 6px 10px; }
+  .bottom-chat-submit { padding: 6px 10px; }
+  /* Match the smaller bar at narrow widths so content above isn't over-padded. */
+  body.has-bottom-chat .main-content { padding-bottom: 140px; }
+  /* On phones, the detail-sidebar is stacked above main (per the < 900px
+     rule) so the sticky max-height no longer applies — but if someone
+     resizes between 900px and 600px and back, restore a tighter cap. */
+  .detail-sidebar { max-height: calc(100vh - 52px - 140px); }
+}
+
+/* AI side panel: full-width sheet at narrow widths instead of 95vw cropped. */
+@media (max-width: 480px) {
+  .ai-side-panel { width: 100%; max-width: 100%; }
+}
