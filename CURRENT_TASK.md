@@ -1,7 +1,7 @@
 # CURRENT_TASK.md
 
 ## Task
-Build 25 — Beauty Department isolated deployment (code side complete; awaiting user Railway provisioning)
+Build 26 — AI Side Panel UX polish + Idea tools wiring (plan written, awaiting Codex review)
 
 ## Handoff rule
 Before editing, inspect:
@@ -12,33 +12,28 @@ Before editing, inspect:
 Git/code is the source of truth. This file is only a short task reminder. If anything here disagrees with git, trust git.
 
 ## Current state
-Build 25's code-side deliverable is complete and verified (commit pending). The Railway provisioning side is on the user.
+Build 25's code is fully shipped (commit `af96b46` on `main`, plus follow-up CSS polish `dfb454a`). The Railway provisioning for the Beauty Department instance is on the user — out of code scope.
 
-Code-side (done by Claude):
-- `DEPLOYMENT.md` — canonical Railway runbook at project root.
-- `app/version.py` bumped to `1.1.0-build25`.
-- `VERSION.md` + `CHANGELOG.md` + `MASTERPLAN.md` updated.
-- `test_build25.py` written; all 15 assertions pass.
-- `test_build24.py` loosened to tolerate post-release version bumps (so adding Build 25 doesn't invalidate the v1.1.0-release-proof test). Still 11/11.
+Build 26 is **plan only** right now. The plan lives in `BUILD26_PLAN.md` at project root. It addresses six AI-side-panel UX issues plus wires the `create_idea` + `link_idea_to_project` + minimal `update_idea` tools (schemas already exist; only handlers stubbed). No schema change.
 
-User-action (pending):
-- Provision a second Railway service per `DEPLOYMENT.md` for Beauty dept.
-- Set env vars: `INITIAL_ADMIN_USERNAME`, `INITIAL_ADMIN_PASSWORD`, `OPENAI_API_KEY` (Beauty's own), `SECRET_KEY` (unique), `DISABLE_RELOAD=1`. `DATABASE_URL` is auto-set by the attached PostgreSQL plugin.
-- Configure custom domain (subdomain pattern: `pm.tracker.example.com`, `beauty.tracker.example.com`).
-- Run the 5-step verification checklist in `DEPLOYMENT.md`.
-- Delete bootstrap env vars (`INITIAL_ADMIN_USERNAME`, `INITIAL_ADMIN_PASSWORD`) after first admin login.
+## Who's doing what
 
-## Verification status
-- `python3 test_build25.py` — 15/15 PASS.
-- Regression: `test_build24.py` 11/11, `test_build23.py` 24/24, `test_ai_e2e.py` 10P/7S/0F.
+- **Claude** (this session): wrote the plan, committed it. Will not write code until Codex has reviewed.
+- **Codex** (next): please open `BUILD26_PLAN.md`, read it, then add your review at the bottom under `## Codex Review`. Either +1 the plan, edit sections directly with rationale, or list blocking concerns. Once you're done, the user will decide whether to start implementation as-is or with your amendments.
+- **User**: triggers Codex, then says "go" (or "go with Codex's amendments") to start implementation.
 
-## Out of scope (deferred to v1.2 if Beauty's needs grow)
-- Native-speaker review of `app/i18n/zh.json` wording.
-- Full Profit Model implementation (placeholder only in v1.1).
-- Row-level multi-tenancy (`Organization` table + `org_id` everywhere). Justified if 4th dept arrives or cross-dept features are needed.
-- AI prompt translation, Help modal body translation, `/admin/*` page translation.
-- 15 stubbed AI tools getting real handlers (only `create_journal_entry` wired in v1.1).
-- Auto-provisioning script for Railway (the runbook is manual; could automate with Railway CLI in a future build).
+## Files Codex should read first
+
+In this order, to avoid wasted context:
+1. `BUILD26_PLAN.md` — the proposal
+2. `app/templates/components/bottom_chat.html` — both the bottom bar and the side panel live in this single file
+3. `app/static/js/main.js` lines ~212-352 — open/close/archive/send logic
+4. `app/ai/tools.py` lines 265-408 — `create_idea` + `link_idea_to_project` schemas, permission rules, dispatcher
+5. `app/ai/prompts.py` lines 124-150 — `CHAT_INTAKE_SYSTEM_PROMPT`
+6. `app/routes/ai_chat.py` lines 73-181 — POST `/ai/chat` handler
+
+## Out of scope for this build
+See `BUILD26_PLAN.md` § "Out of scope". Tl;dr: not wiring the other 12 stubbed AI tools, not row-level multi-tenancy, not modal popups, not native-speaker zh review.
 
 ## Next step
-Wait for user to authorize push of Build 25 commit. Then user proceeds with Railway provisioning per `DEPLOYMENT.md`.
+Awaiting Codex review of `BUILD26_PLAN.md`. Implementation paused.
