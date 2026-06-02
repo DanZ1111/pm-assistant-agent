@@ -1,9 +1,22 @@
 # PM Product Tracker — Version
 
-**Current Version:** v1.2.0-build28
-**Current Build:** Build 28 — Assistant PDF, DOCX, and image intake
-**Status:** v1.1.0 released; v1.2.0 in progress with the third assistant-workspace milestone
-**Last Updated:** 2026-06-01
+**Current Version:** v1.2.0
+**Current Build:** Build 29 — v1.2.0 release hardening
+**Status:** v1.1.0 released; v1.2.0 released
+**Last Updated:** 2026-06-02
+
+## What's new in v1.2.0
+
+The v1.2.0 release packages Builds 26-28 plus this release-hardening build (29). It turns the AI assistant from an experimental bottom chat into a professional, project-aware workspace where every write is reviewed before it lands.
+
+- **Professional Assistant Workspace** (Build 26) — the assistant opens beside the tracker as a resizable split panel on desktop and a full-screen pane on mobile. Compact dock when collapsed; composer moves into the pane when expanded; Ask / Capture and This Project / Global are segmented controls, not raw dropdowns. Conversation scope is immutable after the first message.
+- **Project-aware Idea Capture** (Build 26) — project-scoped chat receives a role-filtered project summary, linked Ideas, and recent permitted journal context. Speak naturally ("we were inspired by a Japanese ceramic mug at the Canton tradeshow") and the assistant proposes an Idea with duplicate detection and a one-step Create-and-Link confirmation.
+- **Confirmation Cards for every assistant write** (Build 27) — journal capture, Idea actions, variants, packaging / accessory components, file comments, allowlisted project fields, reasoned phase-plan adjustments, and Finish Phase all wait for explicit Confirm / Cancel. Server-side revalidation on confirm re-checks auth, role, ownership, allowlists, and proposal state. Double-confirmed or cancelled proposals are rejected.
+- **Global Search + Read-Only Context** (Build 27) — `search_projects` and `get_project_context` are immediate read-only tools so Global conversations can find and discuss work without auto-targeting writes. Role-filtered results keep viewer responses clear of factory, engineer, cost, and journal details.
+- **Assistant Attachments** (Build 28) — PDF, DOCX, PNG, JPG/JPEG, WEBP, and GIF inputs can be attached from the dock or panel composer. Pending bytes live in ignored `app/pending_uploads/` (outside the public `/uploads` mount). PDF + DOCX text is extracted locally; pending images are passed to the assistant as image content. Saving to project files requires an explicit `save_pending_attachment` confirmation card; confirmed saves use the normal audited file service with `changed_by="ai"` and `source_type="ai_chat"`.
+- **Sensitive fields gated** — factory, engineer, target cost, MSRP, launch date, and Thesis can be proposed only through the confirmed flow. Derived `current_stage` and operational `status` remain non-writable through chat (CLAUDE.md non-negotiables #4-#5).
+- **Viewer read-only alignment** — viewers can browse Good Ideas and the assistant workspace, but cannot create, edit, link, or upload anything. Permission checks fire before the OpenAI call.
+- **No schema migration in Build 29.** Pending proposals live in assistant-message metadata; confirmed writes use existing tables. Deployment isolation from Build 25 is unchanged.
 
 ## What's new in v1.2.0-build28
 

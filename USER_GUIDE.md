@@ -6,6 +6,55 @@ This is a structured product project tracker for knife and product development. 
 
 ---
 
+## v1.2 中文速览
+
+v1.2 把 AI 从底部聊天框升级成专业的 **AI 工作区**：桌面上以可调宽度的右侧分屏出现，移动端则是全屏面板；折叠时只保留一个紧凑的输入栏。
+
+主要变化：
+- **AI 工作区**：右侧面板和左侧项目数据并排呈现；输入框在面板内部，标题栏始终高于项目内容，关闭后仍可从历史里恢复。模式控件改成 Ask / Capture 分段按钮和 This Project / Global 分段按钮，更专业也更直观。
+- **确认卡（Confirmation Cards）**：每一次需要写入的操作（创建日记、灵感、变体、包装件、文件备注、敏感字段、阶段计划调整、Finish Phase 等）都会先在对话中显示一张可编辑的确认卡。点 Confirm 才真的写入，点 Cancel 直接丢弃，绝不会静默落库。
+- **附件（Attachments）**：可以在输入区粘贴 PDF / DOCX / 图片直接讨论。原始字节保存在公开 `/uploads` 之外的临时位置，只有在你确认 “保存到项目文件” 之后才会进入 `project_files`，并写入 `changed_by="ai"` 的审计日志。
+- **项目上下文自动注入**：在项目页里打开 AI 工作区时，AI 会自动知道你在哪个项目，无需重复说明。Viewer 仍是只读，不会看到 PM 私有字段。
+- **重复灵感识别 + 一键 Create & Link**：说 “这个项目是从一次广交会上看到的陶瓷茶杯启发的”，AI 会查重，建议链接已有 Idea 或新建并立即 link 到 Inspired By。
+
+视频/截图详见上方 “Professional Assistant Workspace” 段落。
+
+---
+
+## What's new in v1.2
+
+v1.2 turns the AI assistant from a bottom chat into a professional, project-aware workspace where every write is reviewed before it lands.
+
+### Professional Assistant Workspace
+
+Opens beside the tracker as a resizable split panel on desktop and a full-screen pane on mobile. The collapsed state is a compact dock; expanded state moves the composer into the panel itself, so the bottom dock no longer overlaps the conversation. Header controls (history, archive, close) always sit above tracker content. Mode and scope are now segmented controls — Ask / Capture and This Project / Global — instead of raw dropdowns. Conversation scope is immutable after the first message: changing project/global context starts a new thread after confirmation.
+
+### Confirmation Cards
+
+Every assistant write (journal entries, Ideas, variants, packaging/accessory components, file comments, allowlisted project fields, phase-plan adjustments, Finish Phase, attachment saves) shows up as an editable card in the conversation with Confirm and Cancel buttons. You can edit the proposed values before confirming. Server-side revalidation on confirm re-checks auth, role, project access, allowlists, and proposal state. Double-confirmed and cancelled proposals are refused.
+
+### Assistant Attachments
+
+Attach PDF, DOCX, PNG, JPG/JPEG, WEBP, or GIF files from the dock or panel composer (10 MB cap). PDF and DOCX text is extracted locally for the conversation; pending images are passed to the assistant as image content. Bytes stay in an ignored, non-public location until you confirm a `Save to project files` proposal — at that point they move into `project_files` through the normal audited service, recording `changed_by="ai"` and `source_type="ai_chat"`. Cancelled or stale (24h+) pending inputs are cleaned up automatically.
+
+### Global Search
+
+In Global scope (no specific project context), the assistant has read-only access to `search_projects` and `get_project_context`. You can ask "find projects with launch date in June" or "what's the status of the Beauty Cup project" and get role-filtered results — viewers still don't see PM-only fields. Global scope never writes; if you want to save something, switch the conversation to a specific project first.
+
+### Idea Auto-Capture
+
+When you say something like "we were inspired by a Japanese ceramic mug at the Canton tradeshow" while a project is active, the assistant proposes creating that Idea and linking it to the project's Inspired By section in one confirmation card. You can edit the proposed name, type, and source before confirming. The "Inspired By" section updates immediately on confirmation.
+
+### Duplicate Idea Detection
+
+Before proposing a new Idea, the assistant searches existing Ideas for likely duplicates. If one is found, the confirmation card offers **Link existing** (use the existing Idea) and **Create new** (make a separate one), so you don't accumulate near-duplicates like "ceramic mug" and "ceramic tea mug."
+
+### Sensitive fields stay gated
+
+Factory, engineer, target cost, MSRP, launch date, and Thesis can only be changed through a confirmation card. Derived fields (`current_stage`, `delayed`, `needs_info`) and operational fields (`status`) remain non-writable through chat — per the project's non-negotiable rules.
+
+---
+
 ## v1.1 中文速览
 
 v1.1 把系统从“项目资料表”推进成“产品开发工作台”：PM 可以记录项目日志、上传商业计划并提取 Product Thesis、管理多 SKU / 包装 / 报价资料、追踪计划日期和实际进度、保存渲染图与样品照片历史，并用底部 AI Chat 辅助记录信息。

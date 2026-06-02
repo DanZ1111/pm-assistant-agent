@@ -1,5 +1,19 @@
 # PM Product Tracker — Changelog
 
+## v1.2.0 — Assistant Workspace Release
+_2026-06-02_
+
+The v1.2.0 release packages Builds 26-28 plus this release-hardening build (29). It turns the AI assistant from an experimental bottom chat into a professional, project-aware workspace where every write is reviewed before it lands.
+
+- **Professional assistant workspace** (Build 26): resizable desktop split panel, mobile full-screen pane, compact collapsed dock, panel composer, Ask / Capture and This Project / Global segmented controls, immutable conversation scope, role-filtered project context injection, project-aware Idea capture with duplicate detection and one-step Create-and-Link.
+- **Confirmed daily PM actions** (Build 27): editable proposal cards in chat for journal entries, Idea actions, variants, packaging / accessory components, file comments, allowlisted project fields, reasoned phase-plan adjustments, and Finish Phase. Confirmation revalidates auth, role, ownership, allowlists, and proposal state; double-confirmed and cancelled proposals are rejected. Sensitive fields (factory, engineer, costs, MSRP, launch date, Thesis) are proposal-only. Derived `current_stage` and operational `status` remain non-writable.
+- **Global read-only search** (Build 27): `search_projects` and `get_project_context` wired as immediate read-only tools. Results are role-filtered so viewers never see PM-only fields.
+- **Assistant attachments** (Build 28): PDF, DOCX, PNG, JPG/JPEG, WEBP, and GIF discussion with bytes held in pending storage outside `/uploads` until the user confirms `save_pending_attachment`. PDF + DOCX text extracted locally; pending images passed to the assistant as image content. Confirmed saves move bytes through the normal audited file service with `changed_by="ai"` and `source_type="ai_chat"`. 10 MB cap and 24-hour request-time cleanup.
+- **Audit + safety**: every confirmed mutation reuses existing CRUD helpers and writes change-log rows. Viewers remain read-only across the new surfaces.
+- **No schema migration in Build 29**. Pending proposals live in assistant-message metadata; confirmed writes use existing tables. Deployment isolation from Build 25 is unchanged.
+
+**Test:** `test_build29.py` is the release-proof regression. Full Build 20-28 suite + `test_ai_e2e.py` (10 passed, 7 external-AI skips, 0 failed) must stay green.
+
 ## v1.2.0-build28 — Assistant PDF, DOCX, and image intake (Build 28)
 _2026-06-01_
 

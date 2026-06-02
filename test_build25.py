@@ -113,7 +113,10 @@ def main():
 
     print("\n── Runtime version constants ──")
     from app.version import CURRENT_BUILD_NAME, CURRENT_VERSION, LAST_UPDATED
-    if CURRENT_VERSION == "1.1.0-build25" or CURRENT_VERSION.startswith("1.2.0-build"):
+    # Tolerant of post-release builds on the 1.1 or 1.2 line so that
+    # adding follow-up builds (or shipping plain v1.2.0) doesn't
+    # invalidate the "Build 25 still in the runtime line" proof.
+    if CURRENT_VERSION.startswith(("1.1.0", "1.2.0")):
         ok(f"app.version CURRENT_VERSION preserves Build 25 or newer ({CURRENT_VERSION})")
     else:
         fail("CURRENT_VERSION", CURRENT_VERSION)

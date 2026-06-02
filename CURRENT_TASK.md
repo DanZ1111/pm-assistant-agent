@@ -1,7 +1,7 @@
 # CURRENT_TASK.md
 
 ## Task
-Build 28 — Assistant file and image intake (`v1.2.0-build28`)
+Idle — v1.2.0 just shipped (`Build 29 — v1.2.0 release hardening`). Awaiting v1.3 planning direction from user.
 
 ## Handoff rule
 Before editing, inspect:
@@ -11,28 +11,34 @@ Before editing, inspect:
 
 Git/code is the source of truth. This file is only a short task reminder.
 
-## Current state
-Build 27 was committed locally as `4e0c0aa` and has not been pushed. Codex is implementing Build 28 from `BUILD26_CODEX_PLAN.md`: add pending PDF, DOCX, and image discussion inputs to the assistant workspace, keep bytes outside public uploads until confirmation, and persist confirmed saves through the normal audited project-file path.
+## What just shipped (Builds 26-29 = v1.2.0)
 
-No schema migration. Build 29 remains separate: v1.2.0 release hardening.
+- **Build 26** — Professional assistant workspace + project-aware Idea capture
+- **Build 27** — Confirmed daily PM actions + Global read-only search
+- **Build 28** — Assistant PDF, DOCX, and image intake
+- **Build 29** — v1.2.0 release hardening (this commit): runtime bumped to plain `1.2.0`, `test_build29.py` written as the release-proof regression, VERSION.md / CHANGELOG.md / MASTERPLAN.md / USER_GUIDE.md updated with the v1.2 series summary + Chinese block, `test_build25.py` strict version check loosened to the `(1.1.0, 1.2.0)` pattern.
 
-## Safety choices
-- Pending attachment bytes live in ignored `app/pending_uploads/`, outside mounted `/uploads`.
-- Confirmed save uses the normal file service with `changed_by="ai"` and `source_type="ai_chat"`.
-- Request-time stale cleanup removes pending inputs after 24 hours; no worker or migration.
-- Viewers remain read-only and cannot upload assistant attachments.
+## Verification at ship time
+- `test_build29.py` 12/12.
+- Regression: `test_build20-28` all green; `test_build24.py` v1.1.0 release proof still passes; `test_build25.py` 15/15 after loosening.
+- `test_ai_e2e.py` 10 passed / 7 external-AI skips / 0 failed.
+- Browser: navbar serves `v1.2.0` (verified at `localhost:8000/auth/login`).
+- i18n parity: 537/537.
 
-## Verification so far
-- Build 27 committed baseline: `test_build27.py` 29/29, Build 20-26 regressions passing, static checks passing, `test_ai_e2e.py` 10 passed / 7 external-AI skips / 0 failed.
-- `python3 test_build28.py` — 23/23 passing after bounded-read hardening.
-- Static checks: `python3 -m compileall -q app`, Python test-file compilation, JSON parse and EN/Chinese parity at 537/537, `node --check app/static/js/main.js`, and `git diff --check` passing.
-- Regressions: `test_build20.py` 24/24, `test_build21.py` 20/20, `test_build22.py` 15/15, `test_build23.py` 24/24, `test_build24.py` 11/11, `test_build25.py` 15/15, `test_build26.py` 19/19, and `test_build27.py` 29/29.
-- `test_ai_e2e.py` — 10 passed, 7 skipped external-AI checks, 0 failed.
-- Browser interaction smoke passed for desktop dock, expanded desktop split panel, and refined mobile full-screen composer. Screenshots: `/tmp/pm-tracker-build28-desktop-dock.png`, `/tmp/pm-tracker-build28-desktop-expanded.png`, and `/tmp/pm-tracker-build28-mobile-refined.png`.
+## What's NOT in v1.2 (deferred candidates for v1.3)
 
-## Remaining
-- Await user review and explicit commit / push instruction.
+- Native-speaker Chinese review of strings added in Builds 26-28.
+- AI prompt translation, Help modal body translation, `/admin/*` page translation.
+- Full Profit Model implementation (placeholder still ships).
+- Row-level multi-tenancy (`Organization` table + `org_id` everywhere). Deployment-level isolation (Build 25) remains the answer for ≤3 departments.
+- Wiring `delete_variant`, `delete_variant_component` through chat (currently manual-UI-only with admin gate).
+- Auto-provisioning script for Railway (the DEPLOYMENT.md runbook is still manual).
+- Pruning the now-historical "Claude Review Request" block at the end of `BUILD26_CODEX_PLAN.md` (light cleanup, can wait).
 
-## Do not do yet
-- Do not implement Build 29.
-- Do not commit or push unless the user explicitly asks.
+## Next step
+
+Wait for user to start v1.3 planning. Suggested directions to weigh:
+1. Native-speaker zh review pass (small but valuable for the Beauty dept rollout).
+2. AI prompt + Help modal translation (medium, completes the i18n story).
+3. Profit Model real implementation (medium-large, the only major v1.1 placeholder still outstanding).
+4. v1.3 architecture: row-level multi-tenancy if a 4th department appears.

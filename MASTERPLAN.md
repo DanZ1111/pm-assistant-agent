@@ -3078,7 +3078,7 @@ The actual Railway provisioning is on the user — Claude can't reach into your 
 
 ---
 
-### Build 28 — Assistant PDF, DOCX, and image intake ← CURRENT BUILD
+### Build 28 — Assistant PDF, DOCX, and image intake ✓ SHIPPED `v1.2.0-build28`
 
 #### Scope
 
@@ -3091,9 +3091,32 @@ The actual Railway provisioning is on the user — Claude can't reach into your 
 
 #### Verification
 
-- `python3 test_build28.py`
+- `python3 test_build28.py` — 23/23
 - Build 20-27 regressions and `python3 test_ai_e2e.py`
 - Desktop/mobile browser smoke for dock, panel composer, pending chips, and attachment save card
+
+### Build 29 — v1.2.0 release hardening ✓ SHIPPED v1.2.0
+
+#### Goal
+
+Close the v1.2 assistant-workspace series (Builds 26-28) with consolidated documentation, a release-proof test, and a broad regression sweep. Release-hardening only — no new features, no schema change.
+
+#### Scope
+
+- Bump `app/version.py` from `1.2.0-build28` → `1.2.0`.
+- Write `test_build29.py` modeled on `test_build24.py` (the v1.1.0 release proof): asserts runtime constants, VERSION.md / CHANGELOG.md / MASTERPLAN.md release-proof strings, USER_GUIDE.md v1.2 coverage including a `## v1.2 中文速览` block, full regression-file inventory, and i18n parity.
+- Update VERSION.md header to `v1.2.0` and add `## What's new in v1.2.0` summarizing the assistant workspace + confirmation cards + attachments + global search + idea auto-capture.
+- Add the `## v1.2.0 — Assistant Workspace Release` mega entry to CHANGELOG.md.
+- Add v1.2 sections to USER_GUIDE.md (English coverage of all new capabilities) plus a short Chinese summary block mirroring the existing v1.1 one.
+- Confirm AI_TOOLS_REGISTRY.md reflects the tools wired in Builds 26-28.
+- No database schema change. Deployment isolation from Build 25 unchanged.
+
+#### Verification
+
+- `python3 test_build29.py`
+- Regression: `python3 test_build20.py`, `test_build21.py`, `test_build22.py`, `test_build23.py`, `test_build24.py`, `test_build25.py`, `test_build26.py`, `test_build27.py`, `test_build28.py`
+- `python3 test_ai_e2e.py` — 10 passed, 7 external-AI skips, 0 failed
+- Browser: navbar shows `v1.2.0` (not `v1.2.0-buildXX`)
 
 ---
 
