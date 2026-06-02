@@ -79,8 +79,8 @@ def main():
 
     # ── Schema & dispatcher correctness ──
     print("\n── Schema & dispatcher correctness ──")
-    if len(TOOL_SCHEMAS) == 17:
-        ok("TOOL_SCHEMAS has 17 entries after Build 26 adds update_idea")
+    if len(TOOL_SCHEMAS) == 19:
+        ok("TOOL_SCHEMAS has 19 entries after Build 27 adds read-only lookup tools")
     else:
         fail("schema count", f"expected 17, got {len(TOOL_SCHEMAS)}")
 
@@ -106,15 +106,22 @@ def main():
     else:
         fail("schema shape", str(bad[:3]))
 
-    # ── The one real handler — create_journal_entry ──
-    print("\n── create_journal_entry handler (the one real handler) ──")
+    # ── Confirmed create_journal_entry handler ──
+    print("\n── create_journal_entry handler (confirmed in Build 27) ──")
     res = dispatch(
         "create_journal_entry",
         {"project_id": pid, "entry_text": "Build 20 test entry", "entry_type": "general"},
         db, admin_u,
     )
+    if res.get("error") == "confirmation_required":
+        ok("Admin journal proposal waits for explicit confirmation")
+        res = dispatch(
+            "create_journal_entry",
+            {"project_id": pid, "entry_text": "Build 20 test entry", "entry_type": "general"},
+            db, admin_u, confirmed=True,
+        )
     if res.get("ok") and isinstance(res.get("entry_id"), int):
-        ok(f"Admin can create journal entry via dispatcher (entry_id={res['entry_id']})")
+        ok(f"Admin can confirm journal entry via dispatcher (entry_id={res['entry_id']})")
         # DB confirms
         rows = db_query("SELECT id, entry_text FROM project_journal_entries WHERE id=?", (res["entry_id"],))
         if rows and rows[0][1].startswith("Build 20 test"):
@@ -160,10 +167,8 @@ def main():
     # ── Field allowlist for update_project_field ──
     print("\n── update_project_field allowlist ──")
     cases = [
-        ("factory", "field_not_allowlisted", "sensitive field rejected"),
         ("current_stage", "field_not_allowlisted", "derived field rejected (CLAUDE.md §5)"),
         ("status", "field_not_allowlisted", "status rejected (operationally consequential)"),
-        ("target_factory_cost", "field_not_allowlisted", "cost field rejected"),
     ]
     for field, want_err, label in cases:
         res = dispatch(
@@ -176,16 +181,27 @@ def main():
         else:
             fail(f"allowlist {field}", f"expected {want_err}, got {res}")
 
-    # Allowed field → not_wired (handler stub) but passes allowlist
+    # Allowed field → guarded proposal
     res = dispatch(
         "update_project_field",
         {"project_id": pid, "field_name": "brand", "new_value": "Acme"},
         db, admin_u,
     )
-    if not res.get("ok") and res.get("error") == "not_wired_until_build_21":
-        ok("brand (allowed field) → not_wired_until_build_21 (passes allowlist, hits stub)")
+    if not res.get("ok") and res.get("error") == "confirmation_required":
+        ok("brand (allowed field) → confirmation_required")
     else:
-        fail("allowlist brand", f"expected not_wired_until_build_21, got {res}")
+        fail("allowlist brand", f"expected confirmation_required, got {res}")
+
+    for field in ("factory", "target_factory_cost"):
+        res = dispatch(
+            "update_project_field",
+            {"project_id": pid, "field_name": field, "new_value": "12.5" if field.endswith("cost") else "Factory A"},
+            db, admin_u,
+        )
+        if res.get("error") == "confirmation_required":
+            ok(f"{field} is allowed only behind confirmation")
+        else:
+            fail(f"confirmed allowlist {field}", f"expected confirmation_required, got {res}")
 
     # ── AI Permission Guard: explicit per-source coverage ──
     print("\n── AI Permission Guard (one per v1.1 sensitive source) ──")

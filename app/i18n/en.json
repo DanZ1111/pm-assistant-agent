@@ -186,8 +186,8 @@
   "chat.mode.capture": "Capture",
   "chat.scope.project": "Project",
   "chat.scope.global": "Global",
-  "chat.placeholder.project": "Ask about this project, or tell me to log a journal entry…",
-  "chat.placeholder.global": "Ask anything about your projects…",
+  "chat.placeholder.project": "Ask about this project, or describe an update to capture…",
+  "chat.placeholder.global": "Search or ask about your projects…",
   "chat.title": "AI Chat",
   "chat.mode_title": "Ask = read-only Q&A. Intake = AI can capture / create.",
   "chat.scope_title": "Project scope = AI knows about this project. Global = no project context.",
@@ -203,6 +203,7 @@
   "chat.confirm_action": "Confirm",
   "chat.create_new_anyway": "Create new anyway",
   "chat.link_existing": "Link existing",
+  "chat.target_project": "Target project:",
 
   "tab.manual": "Manual",
   "tab.ai": "AI",

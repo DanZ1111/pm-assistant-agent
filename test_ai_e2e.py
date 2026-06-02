@@ -315,13 +315,17 @@ def main():
         db = SessionLocal()
         admin_u = db.query(User).filter(User.username == ADMIN).first()
         viewer_u = db.query(User).filter(User.username == VIEWER_USER).first()
-        if len(TOOL_SCHEMAS) == 17:
-            ok("TOOL_SCHEMAS has 17 entries after Build 26 adds update_idea")
+        if len(TOOL_SCHEMAS) == 19:
+            ok("TOOL_SCHEMAS has 19 entries after Build 27 adds read-only lookup")
         else:
-            fail("tool schemas count", f"expected 17, got {len(TOOL_SCHEMAS)}")
+            fail("tool schemas count", f"expected 19, got {len(TOOL_SCHEMAS)}")
         res = dispatch("create_journal_entry",
                        {"project_id": pid, "entry_text": "AI e2e dispatcher test", "entry_type": "general"},
                        db, admin_u)
+        if res.get("error") == "confirmation_required":
+            res = dispatch("create_journal_entry",
+                           {"project_id": pid, "entry_text": "AI e2e dispatcher test", "entry_type": "general"},
+                           db, admin_u, confirmed=True)
         if res.get("ok") and res.get("entry_id"):
             ok(f"Dispatcher invokes create_journal_entry handler (entry_id={res['entry_id']})")
         else:
@@ -354,8 +358,13 @@ def main():
             tool_calls = data.get("tool_calls") or []
             if "AI error" in assistant or "AuthenticationError" in assistant:
                 skip("chat tool round-trip", "AI call failed server-side")
-            elif any(tc.get("name") == "create_journal_entry" and tc.get("result", {}).get("ok") for tc in tool_calls):
-                ok("Chat round-trip invoked create_journal_entry tool successfully")
+            elif any(
+                tc.get("name") == "create_journal_entry"
+                and tc.get("result", {}).get("error") == "confirmation_required"
+                and tc.get("result", {}).get("proposal_id")
+                for tc in tool_calls
+            ):
+                ok("Chat round-trip proposed a confirmable create_journal_entry action")
             elif tool_calls:
                 names = [tc.get("name") for tc in tool_calls]
                 fail("chat tool", f"tool calls happened but no successful create_journal_entry: {names}")

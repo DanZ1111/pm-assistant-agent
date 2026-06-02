@@ -1,9 +1,19 @@
 # PM Product Tracker — Version
 
-**Current Version:** v1.2.0-build26
-**Current Build:** Build 26 — Professional assistant workspace + project-aware Idea capture
-**Status:** v1.1.0 released; v1.2.0 in progress with the first assistant-workspace milestone
+**Current Version:** v1.2.0-build27
+**Current Build:** Build 27 — Confirmed daily PM actions + Global read-only search
+**Status:** v1.1.0 released; v1.2.0 in progress with the second assistant-workspace milestone
 **Last Updated:** 2026-06-01
+
+## What's new in v1.2.0-build27
+
+- **Editable confirmation cards for all assistant writes.** Journal capture, Ideas, variants, packaging/accessory components, file comments, allowlisted project fields, phase-plan adjustments, and Finish Phase now wait for explicit review and confirmation.
+- **Truthful Global scope.** `search_projects` and `get_project_context` are wired as immediate read-only tools. Results remain role-filtered, so viewers do not receive factory, engineer, cost, or journal details.
+- **Server-side revalidation.** Confirmation re-checks authentication, role, project ownership, record relationships, allowlists, and reviewed values. Double-confirmed or cancelled proposals remain rejected.
+- **Sensitive project-field proposals.** Factory, engineer, target cost, MSRP, launch date, and Thesis can be proposed only through the confirmed flow. Derived `current_stage` and operational `status` remain non-writable through chat.
+- **Audited service reuse.** Confirmed AI writes use existing CRUD services and record `changed_by="ai"` with `source_type="ai_chat"`. Manual routes keep their existing defaults.
+- **Schema alignment fixes.** Variant statuses and component cost fields now match the stored model values.
+- **No schema migration.** Pending proposals continue to live in assistant-message metadata.
 
 ## What's new in v1.2.0-build26
 

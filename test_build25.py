@@ -113,7 +113,7 @@ def main():
 
     print("\n── Runtime version constants ──")
     from app.version import CURRENT_BUILD_NAME, CURRENT_VERSION, LAST_UPDATED
-    if CURRENT_VERSION in ("1.1.0-build25", "1.2.0-build26"):
+    if CURRENT_VERSION == "1.1.0-build25" or CURRENT_VERSION.startswith("1.2.0-build"):
         ok(f"app.version CURRENT_VERSION preserves Build 25 or newer ({CURRENT_VERSION})")
     else:
         fail("CURRENT_VERSION", CURRENT_VERSION)

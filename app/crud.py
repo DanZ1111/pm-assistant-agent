@@ -244,7 +244,10 @@ def create_project(db: Session, data: dict, prototype_rounds: str = "single") ->
     db.refresh(project)
     return project
 
-def update_project(db: Session, project_id: int, data: dict, changed_by: str = "user") -> Project | None:
+def update_project(
+    db: Session, project_id: int, data: dict,
+    changed_by: str = "user", source_type: str = "manual_edit",
+) -> Project | None:
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         return None
@@ -269,7 +272,7 @@ def update_project(db: Session, project_id: int, data: dict, changed_by: str = "
                 old_value=str(old_val) if old_val is not None else None,
                 new_value=str(new_val) if new_val is not None else None,
                 summary=f"{display} updated.",
-                source_type="manual_edit",
+                source_type=source_type,
             )
             setattr(project, field, new_val)
 
@@ -365,6 +368,7 @@ def update_phase(
     db: Session, phase_id: int, data: dict,
     changed_by: str = "user", reason: str = "",
     changed_by_user_id: int | None = None,
+    source_type: str = "manual_edit",
 ) -> ProjectPhase | None:
     """Build 17 — Timeline 2.0. Plan-date changes are tracked separately:
     every change to planned_start_date or planned_end_date writes a
@@ -417,7 +421,7 @@ def update_phase(
             field_name=phase.phase_name,
             summary=f"Phase '{phase.phase_name}' updated: {'; '.join(summary_parts)}"
                     + (f" (reason: {reason.strip()})" if reason and plan_date_changes else ""),
-            source_type="manual_edit",
+            source_type=source_type,
         )
 
     db.commit()
@@ -460,6 +464,7 @@ def get_plan_changes_by_project(db: Session, project_id: int) -> dict:
 def finish_phase(
     db: Session, phase_id: int,
     changed_by: str = "user", changed_by_user_id: int | None = None,
+    source_type: str = "manual_edit",
 ) -> dict | None:
     """Build 17 — one-click 'mark phase done and advance next phase'.
     - Current phase: status=done, actual_end_date=today.
@@ -505,7 +510,7 @@ def finish_phase(
     write_change(
         db, phase.project_id, "phase_update", changed_by=changed_by,
         field_name=phase.phase_name, summary=summary,
-        source_type="manual_edit",
+        source_type=source_type,
     )
 
     db.commit()
@@ -1125,6 +1130,8 @@ def create_journal_entry(
     entry_text: str,
     entry_type: str,
     author_user_id: int | None = None,
+    changed_by: str = "user",
+    source_type: str = "manual_edit",
 ) -> ProjectJournalEntry:
     """Create a journal entry. Raw entry_text is preserved forever — never
     overwritten silently. title and ai_summary are filled later via
@@ -1137,6 +1144,13 @@ def create_journal_entry(
         visibility="internal",
     )
     db.add(entry)
+    snippet = entry.entry_text[:80]
+    write_change(
+        db, project_id, "event_note",
+        changed_by=changed_by,
+        summary=f"Journal entry added: '{snippet}…'" if len(entry.entry_text) > 80 else f"Journal entry added: '{snippet}'",
+        source_type=source_type,
+    )
     db.commit()
     db.refresh(entry)
     return entry
@@ -1436,7 +1450,10 @@ def _clear_primary_variants(db: Session, project_id: int) -> None:
     ).update({"is_primary": False})
 
 
-def create_variant(db: Session, project_id: int, data: dict) -> ProjectVariant:
+def create_variant(
+    db: Session, project_id: int, data: dict,
+    changed_by: str = "user", source_type: str = "manual_edit",
+) -> ProjectVariant:
     status = data.get("status") or "evaluating"
     if status not in VARIANT_STATUSES:
         status = "evaluating"
@@ -1458,16 +1475,21 @@ def create_variant(db: Session, project_id: int, data: dict) -> ProjectVariant:
         notes=(data.get("notes") or "").strip() or None,
     )
     db.add(v)
-    db.commit()
-    db.refresh(v)
+    db.flush()
     write_change(
         db, project_id=project_id, change_type="event_note",
         summary=f"Variant created: {v.variant_name}" + (f" (SKU {v.sku})" if v.sku else ""),
+        changed_by=changed_by, source_type=source_type,
     )
+    db.commit()
+    db.refresh(v)
     return v
 
 
-def update_variant(db: Session, variant_id: int, data: dict) -> ProjectVariant | None:
+def update_variant(
+    db: Session, variant_id: int, data: dict,
+    changed_by: str = "user", source_type: str = "manual_edit",
+) -> ProjectVariant | None:
     v = get_variant(db, variant_id)
     if not v:
         return None
@@ -1488,12 +1510,13 @@ def update_variant(db: Session, variant_id: int, data: dict) -> ProjectVariant |
         if field in data:
             setattr(v, field, _parse_float_safe(data.get(field)))
     v.updated_at = datetime.utcnow()
-    db.commit()
-    db.refresh(v)
     write_change(
         db, project_id=v.project_id, change_type="event_note",
         summary=f"Variant updated: {v.variant_name}",
+        changed_by=changed_by, source_type=source_type,
     )
+    db.commit()
+    db.refresh(v)
     return v
 
 
@@ -1504,26 +1527,30 @@ def delete_variant(db: Session, variant_id: int) -> bool:
     label = v.variant_name
     pid = v.project_id
     db.delete(v)
-    db.commit()
     write_change(
         db, project_id=pid, change_type="event_note",
         summary=f"Variant deleted: {label}",
     )
+    db.commit()
     return True
 
 
-def set_primary_variant(db: Session, project_id: int, variant_id: int) -> bool:
+def set_primary_variant(
+    db: Session, project_id: int, variant_id: int,
+    changed_by: str = "user", source_type: str = "manual_edit",
+) -> bool:
     v = get_variant(db, variant_id)
     if not v or v.project_id != project_id:
         return False
     _clear_primary_variants(db, project_id)
     v.is_primary = True
     v.updated_at = datetime.utcnow()
-    db.commit()
     write_change(
         db, project_id=project_id, change_type="event_note",
         summary=f"Set primary variant: {v.variant_name}",
+        changed_by=changed_by, source_type=source_type,
     )
+    db.commit()
     return True
 
 
@@ -1547,7 +1574,10 @@ def get_component(db: Session, component_id: int) -> ProjectVariantComponent | N
         ProjectVariantComponent.id == component_id).first()
 
 
-def create_variant_component(db: Session, project_id: int, data: dict) -> ProjectVariantComponent:
+def create_variant_component(
+    db: Session, project_id: int, data: dict,
+    changed_by: str = "user", source_type: str = "manual_edit",
+) -> ProjectVariantComponent:
     ctype = data.get("component_type") or "accessory"
     if ctype not in COMPONENT_TYPES:
         ctype = "accessory"
@@ -1569,16 +1599,21 @@ def create_variant_component(db: Session, project_id: int, data: dict) -> Projec
         notes=(data.get("notes") or "").strip() or None,
     )
     db.add(c)
-    db.commit()
-    db.refresh(c)
+    db.flush()
     write_change(
         db, project_id=project_id, change_type="event_note",
         summary=f"{ctype.title()} added: {c.name}",
+        changed_by=changed_by, source_type=source_type,
     )
+    db.commit()
+    db.refresh(c)
     return c
 
 
-def update_variant_component(db: Session, component_id: int, data: dict) -> ProjectVariantComponent | None:
+def update_variant_component(
+    db: Session, component_id: int, data: dict,
+    changed_by: str = "user", source_type: str = "manual_edit",
+) -> ProjectVariantComponent | None:
     c = get_component(db, component_id)
     if not c:
         return None
@@ -1601,12 +1636,13 @@ def update_variant_component(db: Session, component_id: int, data: dict) -> Proj
             except (ValueError, TypeError):
                 pass
     c.updated_at = datetime.utcnow()
-    db.commit()
-    db.refresh(c)
     write_change(
         db, project_id=c.project_id, change_type="event_note",
         summary=f"Component updated: {c.name}",
+        changed_by=changed_by, source_type=source_type,
     )
+    db.commit()
+    db.refresh(c)
     return c
 
 
@@ -1617,11 +1653,11 @@ def delete_variant_component(db: Session, component_id: int) -> bool:
     label = c.name
     pid = c.project_id
     db.delete(c)
-    db.commit()
     write_change(
         db, project_id=pid, change_type="event_note",
         summary=f"Component deleted: {label}",
     )
+    db.commit()
     return True
 
 
@@ -1672,7 +1708,10 @@ def get_latest_rendering(db: Session, project_id: int) -> ProjectFile | None:
     )
 
 
-def update_file_comment(db: Session, file_id: int, new_comment: str) -> ProjectFile | None:
+def update_file_comment(
+    db: Session, file_id: int, new_comment: str,
+    changed_by: str = "user", source_type: str = "manual_edit",
+) -> ProjectFile | None:
     """Inline-edit a per-file comment (uses project_files.source_note)."""
     pf = db.query(ProjectFile).filter(ProjectFile.id == file_id).first()
     if not pf:
@@ -1686,7 +1725,7 @@ def update_file_comment(db: Session, file_id: int, new_comment: str) -> ProjectF
         db, project_id=pf.project_id, change_type="event_note",
         summary=f"Comment updated on {pf.file_category or 'file'}: "
                 f"{pf.original_filename or pf.filename}",
-        source_type="manual_edit",
+        changed_by=changed_by, source_type=source_type,
     )
     db.commit()
     db.refresh(pf)

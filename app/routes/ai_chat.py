@@ -39,7 +39,13 @@ def _get_client():
 # How many prior messages to inject for context. Keeps token use bounded.
 _HISTORY_LIMIT = 10
 _MODEL = "gpt-5.4"
-_IDEA_PROPOSAL_TOOLS = {"create_idea", "link_idea_to_project", "update_idea"}
+_PROJECT_DEFAULT_TOOLS = {
+    "get_project_context", "create_journal_entry", "create_variant",
+    "set_primary_variant", "create_variant_component", "finish_phase",
+    "adjust_phase_plan", "update_file_comment", "update_project_field",
+    "create_idea", "link_idea_to_project",
+}
+_READ_ONLY_TOOLS = {"search_projects", "get_project_context"}
 
 
 def _refusal_response():
@@ -126,9 +132,21 @@ def _build_system_prompt(base_prompt: str, db: Session, conv, current_user) -> s
 
 def _with_active_project_defaults(tool_name: str, args: dict, conv) -> dict:
     out = dict(args or {})
-    if conv.project_id and tool_name in ("create_idea", "link_idea_to_project"):
+    if conv.project_id and tool_name in _PROJECT_DEFAULT_TOOLS:
         out.setdefault("project_id", conv.project_id)
     return out
+
+
+def _proposal_project(tool_name: str, args: dict, db: Session):
+    if args.get("project_id"):
+        return crud.get_project(db, int(args["project_id"]))
+    if tool_name == "update_variant":
+        record = crud.get_variant(db, int(args.get("variant_id") or 0))
+        return record.project if record else None
+    if tool_name == "update_variant_component":
+        record = crud.get_component(db, int(args.get("component_id") or 0))
+        return record.project if record else None
+    return None
 
 
 def _decorate_confirmation_result(tool_name: str, args: dict, result: dict, db: Session) -> dict:
@@ -137,9 +155,12 @@ def _decorate_confirmation_result(tool_name: str, args: dict, result: dict, db: 
     proposal_id = uuid.uuid4().hex
     decorated = dict(result)
     decorated["proposal_id"] = proposal_id
+    decorated["editable_args"] = args
+    project = _proposal_project(tool_name, args, db)
+    if project:
+        decorated["target_project"] = {"id": project.id, "name": project.name}
     if tool_name == "create_idea":
         name = str(args.get("name") or "").strip() or "(untitled)"
-        project = crud.get_project(db, int(args["project_id"])) if args.get("project_id") else None
         decorated["summary"] = (
             f"Create Idea “{name}”"
             + (f" and link it to {project.name}?" if project else "?")
@@ -162,8 +183,26 @@ def _decorate_confirmation_result(tool_name: str, args: dict, result: dict, db: 
             "to the active project's Inspired By section?"
         )
     else:
-        decorated["summary"] = "Apply this Idea update?"
+        label = tool_name.replace("_", " ").capitalize()
+        decorated["summary"] = (
+            f"{label}"
+            + (f" in {project.name}" if project else "")
+            + "?"
+        )
     return decorated
+
+
+def _merge_reviewed_args(original: dict, reviewed: dict) -> dict:
+    """Accept edits only for fields already present in the stored proposal."""
+    merged = dict(original)
+    for key, value in reviewed.items():
+        if key not in original:
+            continue
+        if isinstance(original[key], dict) and isinstance(value, dict):
+            merged[key] = _merge_reviewed_args(original[key], value)
+        else:
+            merged[key] = value
+    return merged
 
 
 def _find_pending_proposal(db: Session, conv, proposal_id: str):
@@ -261,6 +300,12 @@ async def ai_chat(request: Request, db: Session = Depends(get_db)):
         if mode == "intake":
             kwargs["tools"] = TOOL_SCHEMAS
             kwargs["tool_choice"] = "auto"
+        elif mode == "ask":
+            kwargs["tools"] = [
+                schema for schema in TOOL_SCHEMAS
+                if schema["function"]["name"] in _READ_ONLY_TOOLS
+            ]
+            kwargs["tool_choice"] = "auto"
         response = _get_client().chat.completions.create(**kwargs)
         choice = response.choices[0]
         assistant_text = (choice.message.content or "").strip()
@@ -275,7 +320,14 @@ async def ai_chat(request: Request, db: Session = Depends(get_db)):
             result = dispatch(name, args, db, current_user)
             result = _decorate_confirmation_result(name, args, result, db)
             tool_results.append({"name": name, "args": args, "result": result})
-        if not assistant_text and tool_results:
+        read_results = [
+            item for item in tool_results
+            if (item.get("result") or {}).get("read_only")
+        ]
+        if read_results:
+            read_summary = _summarize_tool_results(read_results)
+            assistant_text = " ".join(part for part in (assistant_text, read_summary) if part).strip()
+        elif not assistant_text and tool_results:
             # If the model returned only tool_calls with no prose, give the user a brief summary.
             assistant_text = _summarize_tool_results(tool_results)
     except Exception as exc:
@@ -334,6 +386,9 @@ async def confirm_chat_proposal(
     action = body.get("action") or "confirm"
     tool_name = tool_call.get("name")
     args = dict(tool_call.get("args") or {})
+    reviewed_args = body.get("args")
+    if isinstance(reviewed_args, dict):
+        args = _merge_reviewed_args(args, reviewed_args)
 
     if action == "link_existing" and tool_name == "create_idea":
         duplicate = prior_result.get("duplicate") or {}
@@ -407,7 +462,23 @@ def _summarize_tool_results(tool_results: list) -> str:
         r = tr.get("result") or {}
         name = tr.get("name") or "unknown_tool"
         if r.get("ok"):
-            parts.append(f"Done: {name}.")
+            if name == "search_projects":
+                projects = r.get("projects") or []
+                if projects:
+                    parts.append("Projects found: " + "; ".join(
+                        f"#{p.get('id')} {p.get('name')}" for p in projects
+                    ) + ".")
+                else:
+                    parts.append("No matching projects found.")
+            elif name == "get_project_context":
+                project = r.get("project") or {}
+                parts.append(
+                    f"Project #{project.get('id')} {project.get('name')}: "
+                    f"status {project.get('status') or 'unknown'}, "
+                    f"stage {project.get('current_stage') or 'not set'}."
+                )
+            else:
+                parts.append(f"Done: {name}.")
         else:
             err = r.get("error") or "unknown_error"
             if err == "not_wired_until_build_21":

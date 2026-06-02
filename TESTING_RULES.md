@@ -167,6 +167,21 @@ Create `test_build7.py`.
 
 ---
 
+## Build 27 Required Tests
+
+Create `test_build27.py`.
+
+| Flow | Pass condition |
+|---|---|
+| Global project search | Returns matching role-filtered project summaries |
+| Every assistant mutation | Returns `confirmation_required` before writing |
+| Reviewed proposal confirm | Applies editable values through CRUD and writes `ai_chat` audit |
+| Object-ID tools | Re-check owning-project relationships |
+| Sensitive project field | Applies only after confirm; derived fields remain rejected |
+| Double confirm | Returns conflict without a second write |
+
+---
+
 ## Bug Fix Rule
 
 If a test fails:

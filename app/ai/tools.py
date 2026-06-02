@@ -1,28 +1,20 @@
-"""Build 20 — AI Tools Architecture.
+"""AI tool schemas, permission checks, proposal guards, and handlers.
 
-This module defines OpenAI function-calling schemas for every AI-callable
-operation on the system, plus a dispatcher that enforces permission discipline
-even when handlers are not yet wired. Only `create_journal_entry` ships with a
-real handler in v1.1; the rest return `{"ok": False, "error":
-"not_wired_until_build_21"}` AFTER passing the permission check (so Build 21
-inherits a tool surface where auth has never been silently bypassed).
-
-The schemas mirror the manual HTTP routes shipped in Builds 14-18 plus three
-new tools (`update_project_field`, `link_idea_to_project`, `create_idea`)
-introduced here.
-
-Source-of-truth discipline (per CLAUDE.md): the allowlist in
-UPDATE_PROJECT_FIELD_ALLOWED deliberately excludes `current_stage` (derived
-from phases) and `status` (operationally consequential — will get a dedicated
-change tool with confirmation if needed in Build 21).
+Build 27 keeps read-only tools immediate and routes every chat-driven mutation
+through a proposal card. Confirmation re-runs this dispatcher, so record
+relationships, ownership, and allowlists are enforced against reviewed values.
 """
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 import app.crud as crud
-from app.dependencies import can_edit_project, can_view_journal
+from app.dependencies import (
+    can_edit_project, can_view_journal, sanitize_project_for_user,
+)
+from app.models import ProjectFile
 
 
 # ---------------------------------------------------------------------------
@@ -30,6 +22,33 @@ from app.dependencies import can_edit_project, can_view_journal
 # ---------------------------------------------------------------------------
 
 TOOL_SCHEMAS: list[dict] = [
+    {
+        "type": "function",
+        "function": {
+            "name": "search_projects",
+            "description": "Search projects accessible to the current user by name, brand, SKU, or product type. Read-only.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Search text. Leave blank to list recent accessible projects."},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_project_context",
+            "description": "Get a role-filtered summary for one project. Read-only.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "project_id": {"type": "integer"},
+                },
+                "required": ["project_id"],
+            },
+        },
+    },
     {
         "type": "function",
         "function": {
@@ -42,7 +61,7 @@ TOOL_SCHEMAS: list[dict] = [
                     "entry_text": {"type": "string", "description": "The raw text of the journal entry"},
                     "entry_type": {
                         "type": "string",
-                        "enum": ["general", "decision", "question", "discovery", "risk"],
+                        "enum": ["general", "factory_discussion", "cost_discovery", "design_feedback", "decision", "question", "risk", "packaging", "variant", "other"],
                         "description": "What kind of entry this is. Defaults to 'general'.",
                     },
                 },
@@ -90,7 +109,7 @@ TOOL_SCHEMAS: list[dict] = [
                     "project_id": {"type": "integer"},
                     "variant_name": {"type": "string"},
                     "sku": {"type": "string"},
-                    "status": {"type": "string", "enum": ["active", "draft", "discontinued"]},
+                    "status": {"type": "string", "enum": ["idea", "evaluating", "selected", "rejected", "launched"]},
                     "is_primary": {"type": "boolean", "description": "If true, this variant becomes the project's primary SKU."},
                     "target_factory_cost": {"type": "number"},
                     "target_msrp": {"type": "number"},
@@ -157,11 +176,10 @@ TOOL_SCHEMAS: list[dict] = [
                 "properties": {
                     "project_id": {"type": "integer"},
                     "variant_id": {"type": ["integer", "null"], "description": "If null, component applies to the whole project."},
-                    "component_type": {"type": "string", "enum": ["packaging", "accessory", "insert", "other"]},
+                    "component_type": {"type": "string", "enum": ["packaging", "accessory"]},
                     "name": {"type": "string"},
-                    "target_unit_cost": {"type": "number"},
-                    "actual_unit_cost": {"type": "number"},
-                    "supplier": {"type": "string"},
+                    "target_cost": {"type": "number"},
+                    "actual_cost": {"type": "number"},
                     "notes": {"type": "string"},
                 },
                 "required": ["project_id", "component_type", "name"],
@@ -218,12 +236,13 @@ TOOL_SCHEMAS: list[dict] = [
             "parameters": {
                 "type": "object",
                 "properties": {
+                    "project_id": {"type": "integer"},
                     "phase_id": {"type": "integer"},
                     "planned_start_date": {"type": ["string", "null"], "format": "date"},
                     "planned_end_date": {"type": ["string", "null"], "format": "date"},
                     "reason": {"type": "string", "description": "Required — why the plan is changing"},
                 },
-                "required": ["phase_id", "reason"],
+                "required": ["project_id", "phase_id", "reason"],
             },
         },
     },
@@ -247,12 +266,12 @@ TOOL_SCHEMAS: list[dict] = [
         "type": "function",
         "function": {
             "name": "update_project_field",
-            "description": "Propose a change to a non-sensitive project field. The chat surface must show a confirmation card before applying. Sensitive fields (factory, engineer, costs), derived fields (current_stage), and operationally consequential fields (status) are rejected by the allowlist.",
+            "description": "Propose a confirmed change to an allowlisted project field. Derived fields and status are rejected.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "project_id": {"type": "integer"},
-                    "field_name": {"type": "string", "description": "One of: name, brand, sku, product_type, project_owner, product_manager, planned_launch_date, project_thesis, notes"},
+                    "field_name": {"type": "string", "description": "One of: name, brand, sku, product_type, project_owner, product_manager, engineer, factory, target_factory_cost, target_msrp, planned_launch_date, project_thesis"},
                     "new_value": {"description": "New value for the field. Type depends on the field (string, ISO date, etc.)"},
                 },
                 "required": ["project_id", "field_name", "new_value"],
@@ -321,17 +340,29 @@ TOOL_SCHEMAS: list[dict] = [
 # 2. Permission rules per tool — consulted by the dispatcher
 # ---------------------------------------------------------------------------
 
-# Conservative allowlist for update_project_field. See module docstring.
+# Confirmed project-field updates. Derived and operational status fields stay
+# excluded; sensitive values are allowed only because this path always reviews.
 UPDATE_PROJECT_FIELD_ALLOWED: set[str] = {
     "name", "brand", "sku", "product_type",
-    "project_owner", "product_manager",
-    "planned_launch_date", "project_thesis", "notes",
+    "project_owner", "product_manager", "engineer", "factory",
+    "target_factory_cost", "target_msrp",
+    "planned_launch_date", "project_thesis",
+}
+UPDATE_VARIANT_ALLOWED = {
+    "variant_name", "sku", "status", "is_primary", "target_factory_cost",
+    "actual_factory_cost", "target_msrp", "material_summary",
+    "size_color_summary", "packaging_summary", "notes",
+}
+UPDATE_COMPONENT_ALLOWED = {
+    "variant_id", "component_type", "name", "target_cost", "actual_cost", "notes",
 }
 
 # Roles allowed to call each tool. "needs_project" means the dispatcher must
 # also verify can_edit_project() against the project_id in args.
 # "needs_journal" means can_view_journal() must also pass.
 TOOL_PERMISSIONS: dict[str, dict[str, Any]] = {
+    "search_projects":                 {"require_role": ("admin", "pm", "viewer")},
+    "get_project_context":             {"require_role": ("admin", "pm", "viewer")},
     "create_journal_entry":            {"require_role": ("admin", "pm"), "needs_project": True, "needs_journal": True},
     "summarize_journal_entry":         {"require_role": ("admin", "pm"), "needs_journal": True},
     "extract_thesis_from_business_plan": {"require_role": ("admin", "pm"), "needs_project": True},
@@ -343,7 +374,7 @@ TOOL_PERMISSIONS: dict[str, dict[str, Any]] = {
     "update_variant_component":        {"require_role": ("admin", "pm")},
     "delete_variant_component":        {"require_role": ("admin",)},
     "finish_phase":                    {"require_role": ("admin", "pm"), "needs_project": True},
-    "adjust_phase_plan":               {"require_role": ("admin", "pm")},
+    "adjust_phase_plan":               {"require_role": ("admin", "pm"), "needs_project": True},
     "update_file_comment":             {"require_role": ("admin", "pm"), "needs_project": True},
     "update_project_field":            {"require_role": ("admin", "pm"), "needs_project": True,
                                         "field_allowlist": UPDATE_PROJECT_FIELD_ALLOWED},
@@ -352,7 +383,14 @@ TOOL_PERMISSIONS: dict[str, dict[str, Any]] = {
     "update_idea":                     {"require_role": ("admin", "pm")},
 }
 
-IDEA_CONFIRMATION_TOOLS = {"create_idea", "link_idea_to_project", "update_idea"}
+CONFIRMATION_TOOLS = {
+    "create_journal_entry",
+    "create_variant", "update_variant", "set_primary_variant",
+    "create_variant_component", "update_variant_component",
+    "finish_phase", "adjust_phase_plan", "update_file_comment",
+    "update_project_field",
+    "create_idea", "link_idea_to_project", "update_idea",
+}
 UPDATE_IDEA_ALLOWED = {
     "idea_type", "source", "source_detail", "contributor", "notes", "description",
 }
@@ -368,6 +406,53 @@ def _err(error: str, **extra) -> dict:
     return out
 
 
+def _int_arg(args: dict, name: str) -> int | None:
+    try:
+        return int(args.get(name))
+    except (TypeError, ValueError):
+        return None
+
+
+def _relationship_error(tool_name: str, args: dict, db, user) -> dict | None:
+    """Validate object-ID tools against their owning project before proposal
+    display and again on confirmation."""
+    project_id = _int_arg(args, "project_id")
+    if tool_name == "update_variant":
+        variant = crud.get_variant(db, _int_arg(args, "variant_id") or 0)
+        if not variant:
+            return _err("variant_not_found")
+        if not can_edit_project(user, variant.project):
+            return _err("forbidden", reason="cannot_edit_project")
+    elif tool_name == "set_primary_variant":
+        variant = crud.get_variant(db, _int_arg(args, "variant_id") or 0)
+        if not variant or variant.project_id != project_id:
+            return _err("variant_not_found")
+    elif tool_name == "create_variant_component" and args.get("variant_id") not in (None, "", 0, "0"):
+        variant = crud.get_variant(db, _int_arg(args, "variant_id") or 0)
+        if not variant or variant.project_id != project_id:
+            return _err("variant_not_found")
+    elif tool_name == "update_variant_component":
+        component = crud.get_component(db, _int_arg(args, "component_id") or 0)
+        if not component:
+            return _err("component_not_found")
+        if not can_edit_project(user, component.project):
+            return _err("forbidden", reason="cannot_edit_project")
+        fields = args.get("fields") or {}
+        if isinstance(fields, dict) and fields.get("variant_id") not in (None, "", 0, "0"):
+            variant = crud.get_variant(db, _int_arg(fields, "variant_id") or 0)
+            if not variant or variant.project_id != component.project_id:
+                return _err("variant_not_found")
+    elif tool_name in ("finish_phase", "adjust_phase_plan"):
+        phase = crud.get_phase(db, _int_arg(args, "phase_id") or 0)
+        if not phase or phase.project_id != project_id:
+            return _err("phase_not_found")
+    elif tool_name == "update_file_comment":
+        pf = db.query(ProjectFile).filter(ProjectFile.id == (_int_arg(args, "file_id") or 0)).first()
+        if not pf or pf.project_id != project_id:
+            return _err("file_not_found")
+    return None
+
+
 def dispatch(tool_name: str, args: dict, db, user, confirmed: bool = False) -> dict:
     """Look up the tool, enforce permissions, then call the handler.
 
@@ -376,9 +461,10 @@ def dispatch(tool_name: str, args: dict, db, user, confirmed: bool = False) -> d
       2. User passes role check per TOOL_PERMISSIONS → else forbidden
       3. needs_project / needs_journal sub-checks → else forbidden
       4. Field allowlist (for update_project_field) → else field_not_allowlisted
-      5. Confirmation guard for Idea writes        → else confirmation_required
-      6. Handler exists                            → else not_wired_until_build_21
-      7. Call handler                              → return its result
+      5. Relationship checks for object-ID tools   → else record-specific error
+      6. Confirmation guard for every AI write     → else confirmation_required
+      7. Handler exists                            → else not_wired_until_build_21
+      8. Call handler                              → return its result
 
     Permission discipline must apply even when the handler is a stub —
     otherwise Build 21 inherits a tool surface where unwired tools silently
@@ -402,10 +488,10 @@ def dispatch(tool_name: str, args: dict, db, user, confirmed: bool = False) -> d
 
     # 3a. needs_project — must be ownership-eligible
     if perms.get("needs_project"):
-        project_id = args.get("project_id")
+        project_id = _int_arg(args, "project_id")
         if project_id is None:
             return _err("missing_argument", argument="project_id")
-        project = crud.get_project(db, int(project_id))
+        project = crud.get_project(db, project_id)
         if project is None:
             return _err("project_not_found", project_id=project_id)
         if not can_edit_project(user, project):
@@ -414,7 +500,9 @@ def dispatch(tool_name: str, args: dict, db, user, confirmed: bool = False) -> d
     # 3c. Some tools can operate globally but must enforce project ownership
     # whenever the model proposes a project-linked form of the action.
     if perms.get("optional_project") and args.get("project_id") is not None:
-        project_id = int(args["project_id"])
+        project_id = _int_arg(args, "project_id")
+        if project_id is None:
+            return _err("invalid_argument", argument="project_id")
         project = crud.get_project(db, project_id)
         if project is None:
             return _err("project_not_found", project_id=project_id)
@@ -435,23 +523,77 @@ def dispatch(tool_name: str, args: dict, db, user, confirmed: bool = False) -> d
                 allowed=sorted(perms["field_allowlist"]),
             )
 
-    # 5. Build 26 keeps Idea actions useful without violating the repository
-    # preview-confirm rule. The chat route turns this into a small review card.
-    if tool_name in IDEA_CONFIRMATION_TOOLS and not confirmed:
+    # 5. Relationship checks apply before a card is shown and again when the
+    # reviewed proposal is confirmed.
+    relationship_error = _relationship_error(tool_name, args, db, user)
+    if relationship_error:
+        return relationship_error
+
+    # 6. Build 27 proposal guard for every chat-driven write.
+    if tool_name in CONFIRMATION_TOOLS and not confirmed:
         return _err("confirmation_required", tool=tool_name)
 
-    # 6. Handler exists?
+    # 7. Handler exists?
     handler = _HANDLERS.get(tool_name)
     if handler is None:
         return _err("not_wired_until_build_21", tool=tool_name)
 
-    # 7. Call handler
+    # 8. Call handler
     return handler(args, db, user)
 
 
 # ---------------------------------------------------------------------------
-# 4. Real handlers (v1.1: just create_journal_entry)
+# 4. Real handlers
 # ---------------------------------------------------------------------------
+
+def _handle_search_projects(args: dict, db, user) -> dict:
+    query = str(args.get("query") or "").strip().lower()
+    projects = crud.get_projects(db)
+    if query:
+        projects = [
+            p for p in projects
+            if query in " ".join(
+                str(value or "").lower()
+                for value in (p.name, p.brand, p.sku, p.product_type)
+            )
+        ]
+    results = []
+    for project in projects[:10]:
+        item = sanitize_project_for_user(project, user)
+        item["id"] = project.id
+        results.append(item)
+    return {
+        "ok": True, "read_only": True, "projects": results, "count": len(results),
+        "message": f"Found {len(results)} matching project{'s' if len(results) != 1 else ''}.",
+    }
+
+
+def _handle_get_project_context(args: dict, db, user) -> dict:
+    project_id = _int_arg(args, "project_id")
+    project = crud.get_project(db, project_id or 0)
+    if not project:
+        return _err("project_not_found", project_id=project_id)
+    context = sanitize_project_for_user(project, user)
+    context["id"] = project.id
+    context["linked_ideas"] = [
+        {
+            "id": item["idea"].id,
+            "serial_number": item["idea"].serial_number,
+            "name": item["idea"].name,
+            "idea_type": item["idea"].idea_type,
+            "source": item["idea"].source,
+        }
+        for item in crud.get_ideas_for_project(db, project.id)
+    ]
+    if can_view_journal(user):
+        context["recent_journal"] = [
+            {"entry_type": entry.entry_type, "entry_text": entry.entry_text}
+            for entry in crud.get_journal_entries_for_project(db, project.id)[:5]
+        ]
+    return {
+        "ok": True, "read_only": True, "project": context,
+        "message": f"Loaded role-filtered context for {project.name}.",
+    }
 
 def _handle_create_journal_entry(args: dict, db, user) -> dict:
     project_id = int(args["project_id"])
@@ -465,12 +607,174 @@ def _handle_create_journal_entry(args: dict, db, user) -> dict:
         entry_text=entry_text,
         entry_type=entry_type,
         author_user_id=user.id,
+        changed_by="ai",
+        source_type="ai_chat",
     )
     return {
         "ok": True,
         "entry_id": entry.id,
         "entry_type": entry.entry_type,
     }
+
+
+def _handle_create_variant(args: dict, db, user) -> dict:
+    project_id = int(args["project_id"])
+    name = str(args.get("variant_name") or "").strip()
+    if not name:
+        return _err("missing_argument", argument="variant_name")
+    variant = crud.create_variant(
+        db, project_id, args, changed_by="ai", source_type="ai_chat",
+    )
+    return {
+        "ok": True, "variant_id": variant.id,
+        "message": f"Created variant: {variant.variant_name}.",
+    }
+
+
+def _handle_update_variant(args: dict, db, user) -> dict:
+    fields = args.get("fields") or {}
+    if not isinstance(fields, dict) or not fields:
+        return _err("missing_argument", argument="fields")
+    unexpected = sorted(set(fields) - UPDATE_VARIANT_ALLOWED)
+    if unexpected:
+        return _err("field_not_allowlisted", fields=unexpected)
+    variant = crud.update_variant(
+        db, int(args["variant_id"]), fields,
+        changed_by="ai", source_type="ai_chat",
+    )
+    if not variant:
+        return _err("variant_not_found")
+    return {
+        "ok": True, "variant_id": variant.id,
+        "message": f"Updated variant: {variant.variant_name}.",
+    }
+
+
+def _handle_set_primary_variant(args: dict, db, user) -> dict:
+    project_id = int(args["project_id"])
+    variant_id = int(args["variant_id"])
+    if not crud.set_primary_variant(
+        db, project_id, variant_id, changed_by="ai", source_type="ai_chat",
+    ):
+        return _err("variant_not_found")
+    return {"ok": True, "variant_id": variant_id, "message": "Primary variant updated."}
+
+
+def _handle_create_variant_component(args: dict, db, user) -> dict:
+    project_id = int(args["project_id"])
+    name = str(args.get("name") or "").strip()
+    if not name:
+        return _err("missing_argument", argument="name")
+    component = crud.create_variant_component(
+        db, project_id, args, changed_by="ai", source_type="ai_chat",
+    )
+    return {
+        "ok": True, "component_id": component.id,
+        "message": f"Created {component.component_type}: {component.name}.",
+    }
+
+
+def _handle_update_variant_component(args: dict, db, user) -> dict:
+    fields = args.get("fields") or {}
+    if not isinstance(fields, dict) or not fields:
+        return _err("missing_argument", argument="fields")
+    unexpected = sorted(set(fields) - UPDATE_COMPONENT_ALLOWED)
+    if unexpected:
+        return _err("field_not_allowlisted", fields=unexpected)
+    component = crud.update_variant_component(
+        db, int(args["component_id"]), fields,
+        changed_by="ai", source_type="ai_chat",
+    )
+    if not component:
+        return _err("component_not_found")
+    return {
+        "ok": True, "component_id": component.id,
+        "message": f"Updated component: {component.name}.",
+    }
+
+
+def _date_value(args: dict, name: str) -> tuple[date | None, dict | None]:
+    value = args.get(name)
+    if value in (None, ""):
+        return None, None
+    try:
+        return date.fromisoformat(str(value)), None
+    except ValueError:
+        return None, _err("invalid_date", field=name)
+
+
+def _handle_adjust_phase_plan(args: dict, db, user) -> dict:
+    reason = str(args.get("reason") or "").strip()
+    if not reason:
+        return _err("missing_argument", argument="reason")
+    data = {}
+    for field in ("planned_start_date", "planned_end_date"):
+        if field in args:
+            value, error = _date_value(args, field)
+            if error:
+                return error
+            data[field] = value
+    if not data:
+        return _err("missing_argument", argument="planned_start_date_or_planned_end_date")
+    phase = crud.update_phase(
+        db, int(args["phase_id"]), data,
+        changed_by="ai", reason=reason, changed_by_user_id=user.id,
+        source_type="ai_chat",
+    )
+    if not phase:
+        return _err("phase_not_found")
+    return {"ok": True, "phase_id": phase.id, "message": f"Updated phase plan: {phase.phase_name}."}
+
+
+def _handle_finish_phase(args: dict, db, user) -> dict:
+    result = crud.finish_phase(
+        db, int(args["phase_id"]), changed_by="ai",
+        changed_by_user_id=user.id, source_type="ai_chat",
+    )
+    if not result:
+        return _err("phase_not_found")
+    return {
+        "ok": True, "phase_id": result["finished"].id,
+        "message": f"Finished phase: {result['finished'].phase_name}.",
+    }
+
+
+def _handle_update_file_comment(args: dict, db, user) -> dict:
+    pf = crud.update_file_comment(
+        db, int(args["file_id"]), str(args.get("comment") or ""),
+        changed_by="ai", source_type="ai_chat",
+    )
+    if not pf:
+        return _err("file_not_found")
+    return {"ok": True, "file_id": pf.id, "message": "File comment updated."}
+
+
+def _handle_update_project_field(args: dict, db, user) -> dict:
+    field_name = str(args.get("field_name") or "")
+    value = args.get("new_value")
+    if field_name in ("target_factory_cost", "target_msrp"):
+        if value in ("", None):
+            value = None
+        else:
+            try:
+                value = float(str(value).replace(",", "").strip())
+            except (TypeError, ValueError):
+                return _err("invalid_number", field=field_name)
+    elif field_name == "planned_launch_date":
+        if value in ("", None):
+            value = None
+        else:
+            try:
+                value = date.fromisoformat(str(value))
+            except ValueError:
+                return _err("invalid_date", field=field_name)
+    project = crud.update_project(
+        db, int(args["project_id"]), {field_name: value},
+        changed_by="ai", source_type="ai_chat",
+    )
+    if not project:
+        return _err("project_not_found")
+    return {"ok": True, "project_id": project.id, "message": f"Updated {field_name.replace('_', ' ')}."}
 
 
 def _handle_create_idea(args: dict, db, user) -> dict:
@@ -568,10 +872,21 @@ def _handle_update_idea(args: dict, db, user) -> dict:
 
 
 _HANDLERS: dict[str, Any] = {
+    "search_projects": _handle_search_projects,
+    "get_project_context": _handle_get_project_context,
     "create_journal_entry": _handle_create_journal_entry,
+    "create_variant": _handle_create_variant,
+    "update_variant": _handle_update_variant,
+    "set_primary_variant": _handle_set_primary_variant,
+    "create_variant_component": _handle_create_variant_component,
+    "update_variant_component": _handle_update_variant_component,
+    "finish_phase": _handle_finish_phase,
+    "adjust_phase_plan": _handle_adjust_phase_plan,
+    "update_file_comment": _handle_update_file_comment,
+    "update_project_field": _handle_update_project_field,
     "create_idea": _handle_create_idea,
     "link_idea_to_project": _handle_link_idea_to_project,
     "update_idea": _handle_update_idea,
-    # All other tools intentionally absent → dispatcher returns
-    # "not_wired_until_build_21" AFTER permission checks pass.
+    # Delete, thesis-extraction, and journal-summary tools intentionally remain
+    # absent until their dedicated follow-up slices.
 }

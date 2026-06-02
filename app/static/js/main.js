@@ -303,11 +303,74 @@
     actions.appendChild(btn);
   }
 
+  function proposalLabel(key) {
+    return key.replace(/_/g, ' ').replace(/\b\w/g, function (letter) {
+      return letter.toUpperCase();
+    });
+  }
+
+  function isLockedProposalField(key) {
+    return key === 'field_name' || key === 'project_id' || /_id$/.test(key);
+  }
+
+  function isLongProposalField(key, value) {
+    return ['entry_text', 'comment', 'notes', 'description', 'reason', 'project_thesis'].indexOf(key) !== -1 ||
+      String(value).length > 52;
+  }
+
+  function addProposalInputs(container, values, prefix) {
+    Object.keys(values || {}).forEach(function (key) {
+      var value = values[key];
+      var path = prefix ? prefix + '.' + key : key;
+      if (isLockedProposalField(key) || value === null || typeof value === 'undefined') return;
+      if (typeof value === 'object' && !Array.isArray(value)) {
+        addProposalInputs(container, value, path);
+        return;
+      }
+      var row = document.createElement('label');
+      row.className = 'chat-proposal-field';
+      var caption = document.createElement('span');
+      caption.textContent = proposalLabel(key);
+      row.appendChild(caption);
+      var input = document.createElement(isLongProposalField(key, value) ? 'textarea' : 'input');
+      input.className = 'form-control form-control-sm';
+      input.dataset.proposalPath = path;
+      if (typeof value === 'boolean') {
+        input.type = 'checkbox';
+        input.checked = value;
+        input.className = 'form-check-input';
+      } else {
+        if (input.tagName === 'TEXTAREA') input.rows = 2;
+        else input.type = 'text';
+        input.value = String(value);
+      }
+      row.appendChild(input);
+      container.appendChild(row);
+    });
+  }
+
+  function setProposalPath(target, path, value) {
+    var parts = path.split('.');
+    var cursor = target;
+    parts.forEach(function (part, index) {
+      if (index === parts.length - 1) cursor[part] = value;
+      else cursor = cursor[part] = cursor[part] || {};
+    });
+  }
+
+  function collectReviewedArgs(card) {
+    var args = {};
+    card.querySelectorAll('[data-proposal-path]').forEach(function (input) {
+      setProposalPath(args, input.dataset.proposalPath, input.type === 'checkbox' ? input.checked : input.value);
+    });
+    return args;
+  }
+
   async function resolveProposal(card, proposalId, action) {
     var res = await fetch('/ai/chat/' + currentConversationId + '/proposals/' + proposalId + '/confirm', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({action: action || 'confirm'}),
+      body: JSON.stringify({action: action || 'confirm', args: collectReviewedArgs(card)}),
     });
     var data = await res.json();
     var result = card.querySelector('.chat-tool-call-card-result');
@@ -329,7 +392,7 @@
     d.className = 'chat-tool-call-card ' + (pending ? '' : (ok ? 'ok' : 'err'));
     var name = document.createElement('div');
     name.className = 'chat-tool-call-card-name';
-    name.textContent = (pending ? 'Review: ' : (ok ? 'Saved: ' : 'Unable to run: ')) + tc.name;
+    name.textContent = (pending ? 'Review: ' : (outcome.read_only ? 'Result: ' : (ok ? 'Saved: ' : 'Unable to run: '))) + proposalLabel(tc.name);
     d.appendChild(name);
     var result = document.createElement('div');
     result.className = 'chat-tool-call-card-result';
@@ -343,6 +406,16 @@
     d.appendChild(result);
 
     if (pending && outcome.proposal_id) {
+      if (outcome.target_project) {
+        var target = document.createElement('div');
+        target.className = 'chat-tool-call-card-target';
+        target.textContent = (bar.dataset.targetProject || 'Target project:') + ' ' + outcome.target_project.name;
+        d.appendChild(target);
+      }
+      var editor = document.createElement('div');
+      editor.className = 'chat-proposal-fields';
+      addProposalInputs(editor, outcome.editable_args || tc.args || {}, '');
+      if (editor.children.length) d.appendChild(editor);
       var actions = document.createElement('div');
       actions.className = 'chat-tool-call-card-actions';
       if (outcome.duplicate) {

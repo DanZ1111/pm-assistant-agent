@@ -1,5 +1,27 @@
 # PM Product Tracker — Changelog
 
+## v1.2.0-build27 — Confirmed daily PM actions + Global read-only search (Build 27)
+_2026-06-01_
+
+**Goal:** turn the assistant workspace into a trustworthy daily PM copilot while preserving explicit human control over writes.
+
+**Proposal framework:**
+- Generalized Build 26 Idea review cards into editable proposal cards for every chat-driven mutation.
+- Confirmation merges only reviewed fields from the original stored proposal, then re-checks auth, project access, record relationships, allowlists, and handler validation.
+- Keeps pending state in assistant-message metadata; no migration or pending-actions table.
+
+**Daily PM actions + Global lookup:**
+- Wires confirmed journal capture, Idea actions, variants, package/accessory components, file comments, allowlisted project fields, reasoned phase-plan adjustments, and Finish Phase.
+- Adds immediate read-only `search_projects` and `get_project_context` tools for truthful Global conversations.
+- Role-filtered lookup keeps viewer responses clear of factory, engineer, cost, and journal details.
+
+**Audit + safety:**
+- Reused CRUD helpers now accept AI attribution and write change-log rows before commit.
+- Sensitive fields remain proposal-only; derived `current_stage` and operational `status` remain blocked.
+- Corrected older AI-schema drift for variant statuses and component cost fields.
+
+**Test:** `test_build27.py` covers schema parity, Global role filtering, every wired daily handler, audit attribution, relationship and ownership checks, editable HTTP confirmation, and double-confirm rejection.
+
 ## v1.2.0-build26 — Professional assistant workspace + project-aware Idea capture (Build 26)
 _2026-06-01_
 

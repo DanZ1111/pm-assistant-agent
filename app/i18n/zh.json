@@ -186,8 +186,8 @@
   "chat.mode.capture": "录入",
   "chat.scope.project": "本项目",
   "chat.scope.global": "全部",
-  "chat.placeholder.project": "问关于本项目的问题,或让 AI 记一条日志…",
-  "chat.placeholder.global": "向 AI 问关于你项目的任何问题…",
+  "chat.placeholder.project": "询问本项目，或描述需要记录的更新…",
+  "chat.placeholder.global": "搜索或询问你的项目…",
   "chat.title": "AI 对话",
   "chat.mode_title": "问答 = 只读 Q&A；录入 = AI 可以捕捉 / 创建。",
   "chat.scope_title": "本项目 = AI 带项目上下文；全部 = 不带单项目上下文。",
@@ -203,6 +203,7 @@
   "chat.confirm_action": "确认",
   "chat.create_new_anyway": "仍然创建新灵感",
   "chat.link_existing": "关联已有灵感",
+  "chat.target_project": "目标项目：",
 
   "tab.manual": "手动",
   "tab.ai": "AI",

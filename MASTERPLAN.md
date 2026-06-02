@@ -3021,7 +3021,7 @@ The actual Railway provisioning is on the user — Claude can't reach into your 
 | **28** | `v1.2.0-build28` | Assistant PDF, DOCX, and image intake |
 | **29** | `v1.2.0` | Release docs, visual verification, and full regression |
 
-### Build 26 — Professional workspace + project-aware Idea capture ← CURRENT BUILD
+### Build 26 — Professional workspace + project-aware Idea capture ✓ SHIPPED `v1.2.0-build26`
 
 #### Feature Design Review
 1. **Real workflow problem?** PMs need to discuss the current project without losing half the tracker UI or manually creating and then linking inspirations.
@@ -3056,6 +3056,25 @@ The actual Railway provisioning is on the user — Claude can't reach into your 
 #### Deferred to Build 28
 
 - Assistant PDF, DOCX, and image discussion with confirmed save-to-project behavior.
+
+---
+
+### Build 27 — Confirmed daily PM actions + Global read-only search ← CURRENT BUILD
+
+#### Scope
+
+- Generalize Build 26 metadata-backed proposal cards for every chat-driven mutation.
+- Let PMs edit proposed values before confirmation; re-check auth, ownership, record relationships, allowlists, and reviewed values on confirm.
+- Wire journal capture, Ideas, variants, components, file comments, allowlisted project fields, plan-date adjustments, and Finish Phase through existing CRUD services.
+- Add immediate read-only `search_projects` and `get_project_context` tools with role-filtered responses.
+- Keep deletes, journal summarization, thesis extraction, and assistant attachments deferred.
+- No schema migration.
+
+#### Verification
+
+- `python3 test_build27.py`
+- Build 20-26 regressions and `python3 test_ai_e2e.py`
+- Desktop/mobile browser smoke for proposal-card layout
 
 ---
 

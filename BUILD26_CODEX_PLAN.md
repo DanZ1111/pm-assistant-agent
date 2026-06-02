@@ -151,6 +151,33 @@ After the network interruption, Codex resumed from `CURRENT_TASK.md`, reran stat
 
 Generalize the assistant from Idea capture into a trustworthy PM copilot. AI proposes; the user confirms.
 
+### Feature Design Review (2026-06-01)
+
+1. **Real workflow problem:** PMs need to turn normal project conversations into structured tracker updates without leaving the assistant workspace.
+2. **Repeated or edge-case:** Journal capture, product-option edits, file notes, phase-plan changes, and project-field corrections are repeated daily PM work.
+3. **Structured data:** These actions update existing structured records; no new table or column is needed.
+4. **Could live in notes:** General observations can live in the journal, but variants, components, files, project fields, and phases must update their existing records.
+5. **Intake burden:** The PM writes naturally, reviews one compact editable proposal, then confirms or cancels.
+6. **AI reduce burden:** The assistant selects the existing service action and pre-fills fields while the PM retains final control.
+7. **Display/reminder payoff:** Confirmed updates appear in the normal tracker sections and project change history.
+8. **Migration impact:** None; pending proposals remain in assistant-message `metadata_json`.
+9. **Minimal schema change:** No schema change.
+10. **Minimal UI change:** Extend the Build 26 proposal card and composer workspace; do not redesign unrelated tracker surfaces.
+11. **Deferred:** Deletes, chat-driven thesis extraction, journal summarization, file/image attachment intake, and autonomous writes remain outside Build 27.
+
+### Implementation Detail (2026-06-01)
+
+- Expand the existing Build 26 proposal lifecycle routes rather than adding parallel endpoints. Pending proposals stay inside assistant-message `metadata_json`; no migration is needed.
+- Guard every chat-driven mutation behind confirmation, including journal capture. `CLAUDE.md` wins over the older registry text that treated journal capture and file comments as low-stakes direct writes.
+- Keep `search_projects` and `get_project_context` immediate and read-only. Search only projects accessible to the current user; context remains role-filtered through the existing sanitizer.
+- Preserve established tool names from `app/ai/tools.py`: use `update_project_field` and `adjust_phase_plan` rather than introducing plural or renamed aliases.
+- Wire the daily PM handlers through existing `crud.py` services: journal entries, Ideas, variants, components, file comments, project fields, phase-plan adjustments, and Finish Phase.
+- Add target-record authorization checks for object-ID tools (`update_variant`, `update_variant_component`, `adjust_phase_plan`) and validate that file and phase records belong to the supplied target project.
+- Make proposal values editable in the conversation card. Confirmation may submit reviewed args, but the server must re-run role checks, project access checks, record relationship checks, allowlists, and handler validation against the reviewed values.
+- Keep delete tools permission-checked but unwired. Leave chat-driven `summarize_journal_entry` and `extract_thesis_from_business_plan` deferred because their dedicated manual workflows already exist and they are not part of this daily-action slice.
+- Normalize reused CRUD services so confirmed AI writes pass `changed_by="ai"` and `source_type="ai_chat"` into `write_change()` before commit. Manual callers keep their current defaults.
+- Expand project-field proposals to include sensitive PM fields such as factory, engineer, target costs, MSRP, launch date, and thesis only because the common confirmation gate now applies. Keep derived `current_stage`, computed health fields, and operational `status` non-writable through chat.
+
 ### Implementation Changes
 
 #### Proposal Framework
@@ -196,6 +223,20 @@ Wire and document these tools in `AI_TOOLS_REGISTRY.md`:
 - Global search returns only projects accessible to the current user.
 - Derived fields remain non-writable.
 - `test_build27.py` covers proposal lifecycle, validation, stale/double-confirm rejection, role enforcement, Global access filtering, every wired handler, and change-log writes.
+
+### Refinement Log
+
+- **2026-06-01:** Reused the Build 26 proposal endpoints instead of adding new routes.
+- **2026-06-01:** Tightened the confirmation policy to cover every AI mutation, including journal entries and file comments, to match repository non-negotiables.
+- **2026-06-01:** Kept established schema names `update_project_field` and `adjust_phase_plan`; roadmap aliases are documentation-only wording.
+- **2026-06-01:** Deferred delete tools, chat-driven journal summarization, and thesis extraction so Build 27 remains an independently testable daily-workflow slice.
+- **2026-06-01:** Corrected pre-existing schema/service drift while wiring handlers: variant statuses now use `idea | evaluating | selected | rejected | launched`, and components use the stored `target_cost` / `actual_cost` fields with `packaging | accessory` types.
+- **2026-06-01:** Normalized reused CRUD audit sequencing so change rows are added before commit and AI callers can pass `changed_by="ai"` plus `source_type="ai_chat"` without changing manual-route defaults.
+- **2026-06-01:** Refined proposal cards after desktop/mobile visual smoke: humanize tool labels, widen cards slightly, and use compact textareas for longer reviewed values so journal text and notes remain readable.
+- **2026-06-01:** Marked Global lookup results explicitly read-only in handler payloads and UI cards; append a deterministic role-filtered summary so search remains truthful even before a future multi-turn tool-result-to-model enhancement.
+- **2026-06-01:** Verification complete: `test_build27.py` passes 29/29; Build 20-26 regressions pass; `test_ai_e2e.py` passes 10 with 7 expected external-AI skips and 0 failures; static checks and EN/Chinese parity pass at 534/534.
+- **2026-06-01:** Desktop `1600x1000` and mobile `390x844` Playwright geometry smoke passed after the proposal-card refinement. Refined screenshots: `/tmp/pm-tracker-build27-desktop-refined.png` and `/tmp/pm-tracker-build27-mobile-refined.png`.
+- **2026-06-01:** Regression maintenance: widened `test_build25.py`'s staged-v1.2 version assertion after it rejected the valid `1.2.0-build27` bump; rerun passed 15/15.
 
 ---
 

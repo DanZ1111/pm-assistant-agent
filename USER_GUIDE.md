@@ -256,18 +256,18 @@ A history of every change made to the project, newest first. Includes:
 
 ---
 
-## AI Assistant Workspace (Build 26)
+## AI Assistant Workspace (Build 27)
 
 A compact assistant dock sits at the bottom of every authenticated page. Submit a message and the assistant opens beside the tracker on desktop or as a full-screen pane on mobile. The expanded workspace has its own composer, so the dock disappears while you work. Close the pane to return to the full tracker; conversation history remains available.
 
-- **Capture / Ask** — Capture can log journal entries and propose Idea actions. Ask is read-only Q&A.
-- **This Project / Global** — On project detail pages, This Project automatically supplies the active project's role-filtered context. Switching scope during a conversation starts a new thread after confirmation.
+- **Capture / Ask** — Capture can propose structured tracker updates. Ask is read-only Q&A.
+- **This Project / Global** — On project detail pages, This Project automatically supplies the active project's role-filtered context. Global can search and inspect role-filtered project summaries. Switching scope during a conversation starts a new thread after confirmation.
 - **Resizable workspace** — drag the assistant's left edge on desktop. Your preferred width is remembered in your browser.
-- **Idea review cards** — inspiration messages can produce Create, Link, or Update proposals. Review and confirm before anything is written. If a likely duplicate exists, choose **Link existing** or **Create new anyway**.
+- **Editable review cards** — journal entries, inspirations, variants, packaging/accessory components, file comments, allowlisted project fields, phase-plan changes, and Finish Phase actions wait for review and confirmation. If a likely Idea duplicate exists, choose **Link existing** or **Create new anyway**.
 
-Use the history dropdown to reopen past conversations or archive threads you no longer need. Broader PM actions such as variants and phase changes remain follow-up work for Build 27.
+Use the history dropdown to reopen past conversations or archive threads you no longer need. Delete actions remain manual.
 
-Viewers cannot see the chat surface ask about sensitive topics (factory, costs, journal content, business plans, variant costs, packaging costs, quotations) — those questions are blocked before any AI call.
+Viewer questions about sensitive topics (factory, costs, journal content, business plans, variant costs, packaging costs, quotations) are blocked before any AI call.
 
 ---
 
@@ -280,7 +280,7 @@ The Create Project page (`/projects/new`) has two tabs:
 
 The old standalone "AI Intake" navbar link is gone. The link still works as a redirect — `/ai/intake` sends you to `/projects/new?tab=ai`.
 
-For quick chat-driven capture (no full project creation), use the bottom chat bar instead — it can log journal entries directly into existing projects.
+For quick chat-driven capture (no full project creation), use the bottom chat bar instead — it can propose journal entries for review and confirmation inside existing projects.
 
 ---
 
