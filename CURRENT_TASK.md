@@ -1,7 +1,7 @@
 # CURRENT_TASK.md
 
 ## Task
-Unreleased post-v1.2.0 bug fix — make the assistant dock and panel composers safe for Chinese IME candidate-confirmation Enter events.
+Unreleased post-v1.2.0 bug fix — Chinese IME composer controller (v2 mature fix). Implementation complete in working tree; awaiting manual cross-IME verification before commit / push.
 
 ## Handoff rule
 Before editing, inspect:
@@ -11,25 +11,56 @@ Before editing, inspect:
 
 Git/code is the source of truth. This file is only a short task reminder.
 
-## What just shipped (Builds 26-29 = v1.2.0)
+## What changed
 
-- **Build 26** — Professional assistant workspace + project-aware Idea capture
-- **Build 27** — Confirmed daily PM actions + Global read-only search
-- **Build 28** — Assistant PDF, DOCX, and image intake
-- **Build 29** — v1.2.0 release hardening (this commit): runtime bumped to plain `1.2.0`, `test_build29.py` written as the release-proof regression, VERSION.md / CHANGELOG.md / MASTERPLAN.md / USER_GUIDE.md updated with the v1.2 series summary + Chinese block, `test_build25.py` strict version check loosened to the `(1.1.0, 1.2.0)` pattern.
+The v1 IME fix (still uncommitted) layered three guards onto the existing keydown handler. It did NOT solve the bug because on Chrome + Sogou Pinyin and Edge + Microsoft Pinyin the event sequence is `compositionend` → `keydown(Enter, keyCode=13, isComposing=false)`, meaning all three guards are already FALSE by the time the Enter handler runs.
 
-## Verification at ship time
-- `test_build29.py` 12/12.
-- Regression: `test_build20-28` all green; `test_build24.py` v1.1.0 release proof still passes; `test_build25.py` 15/15 after loosening.
-- `test_ai_e2e.py` 10 passed / 7 external-AI skips / 0 failed.
-- Browser: navbar serves `v1.2.0` (verified at `localhost:8000/auth/login`).
-- i18n parity: 537/537.
+v2 (this fix, also uncommitted):
+- New ES module `app/static/js/composer_controller.js` with `createComposerController` + named `IME_CONFIRM_ENTER_SUPPRESS_MS = 80` constant.
+- Four defense layers including the new one-shot `suppressNextEnterUntil` window seeded on every `compositionend`. The window self-clears after blocking one Enter so deliberate rapid follow-up Enters still send.
+- Both composers (dock + panel) refactored onto the shared controller.
+- Single `maybeSubmitComposer()` entry point — keyboard Enter AND send-button click route through it.
+- `app/templates/base.html` now loads `main.js` as `type="module"`.
+- Locked by 10 JSDOM behavioral tests in `tests/composer_ime.test.mjs` (run via `npm run test:composer` or `node --test`).
+- `test_build29.py` extended with 6 named grep assertions + a JSDOM subprocess assertion (skip-on-missing-Node). Now 20/20.
 
-## Unreleased IME fix
+## Setup (one time)
 
-- Root cause: the shared assistant textarea keydown handler submitted on every unshifted Enter, including Enter events used to confirm Chinese input-method candidates.
-- Fix: track `compositionstart` / `compositionend` for both assistant composers and ignore Enter while composing, including the Safari legacy `keyCode 229` path.
-- Regression: `test_build29.py` now locks the composition guards.
+```
+npm install
+```
+
+Installs `jsdom` (single devDep, ~17 MB). On systems with a permission-broken global npm cache, `npm install --cache "$(pwd)/.npm-cache"` works around it without sudo.
+
+## Verification at this point
+- `node --test tests/composer_ime.test.mjs` — 10/10 PASS (one-shot semantics included).
+- `python3 test_build29.py` — 20/20 PASS (was 12/12 pre-fix).
+- Browser smoke (English-only): dev server still serves chat at `localhost:8000`; module loads cleanly.
+
+## Manual verification (gating before commit / push)
+
+| Scenario | Chrome + Sogou (Win) | Edge + MS Pinyin (Win) | Safari + macOS 拼音 |
+|---|---|---|---|
+| Active composition + Enter doesn't send | | | |
+| Plain English Enter sends | | | |
+| Shift+Enter inserts newline | | | |
+| Exact `LC200N` pattern: textarea reads `LC200N`, no message sent until final Enter | | | |
+| Deliberate rapid Enter after IME confirm (within 80ms of last block) — does send (one-shot proof) | | | |
+| Final Enter (>80ms after last composition) sends `LC200N` | | | |
+| Send-button click while composing sends what's there (explicit intent) | | | |
+
+The Chrome + Sogou column is the actual reported failing case and MUST be fully green before commit. Other columns are best-effort based on machine access — mark cells `N/A` with rationale if a setup isn't available.
+
+## Commit plan (once manual matrix is green)
+
+Single commit on top of v1.2.0:
+```
+Chinese IME composer controller (v2 mature fix, unreleased)
+```
+
+Files: `app/static/js/composer_controller.js` (new), `app/static/js/main.js` (refactor), `app/templates/base.html` (type=module), `tests/composer_ime.test.mjs` (new), `package.json` (new), `.gitignore` (add node_modules/, .npm-cache/), `test_build29.py` (expanded), `CHANGELOG.md` (Unreleased entry), `CURRENT_TASK.md` (this file).
+
+No version bump. Stays `v1.2.0`. A `v1.2.1` release-proof regression can come when more small fixes accumulate.
 
 ## What's NOT in v1.2 (deferred candidates for v1.3)
 
@@ -39,12 +70,9 @@ Git/code is the source of truth. This file is only a short task reminder.
 - Row-level multi-tenancy (`Organization` table + `org_id` everywhere). Deployment-level isolation (Build 25) remains the answer for ≤3 departments.
 - Wiring `delete_variant`, `delete_variant_component` through chat (currently manual-UI-only with admin gate).
 - Auto-provisioning script for Railway (the DEPLOYMENT.md runbook is still manual).
-- Pruning the now-historical "Claude Review Request" block at the end of `BUILD26_CODEX_PLAN.md` (light cleanup, can wait).
+- Adding JSDOM composer tests to CI (no CI configured today).
+- Pruning the now-historical "Claude Review Request" block at the end of `BUILD26_CODEX_PLAN.md`.
 
 ## Next step
 
-Verify the IME fix, then await explicit user instruction before commit or push. After that, wait for the user to start v1.3 planning. Suggested directions to weigh:
-1. Native-speaker zh review pass (small but valuable for the Beauty dept rollout).
-2. AI prompt + Help modal translation (medium, completes the i18n story).
-3. Profit Model real implementation (medium-large, the only major v1.1 placeholder still outstanding).
-4. v1.3 architecture: row-level multi-tenancy if a 4th department appears.
+Fill in the Chrome + Sogou (Win) column of the manual matrix above, then ask for explicit commit / push instruction.

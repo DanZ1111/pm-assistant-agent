@@ -16,3 +16,6 @@ build/
 venv/
 server.log
 nohup.out
+node_modules/
+.npm-cache/
+package-lock.json

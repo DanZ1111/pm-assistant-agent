@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:composer": "node --test tests/composer_ime.test.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.0"
+  }
+}

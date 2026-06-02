@@ -9,6 +9,8 @@ Mirrors test_build24.py (which did the same for v1.1.0).
 """
 import json
 import os
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -153,18 +155,104 @@ def main():
         ],
     )
 
-    print("\n── Post-release assistant input regression ──")
+    print("\n── Post-release assistant composer regression (IME-safe Enter) ──")
+
+    controller_path = ROOT / "app/static/js/composer_controller.js"
+    if not controller_path.exists():
+        fail("composer_controller.js exists", "file not found")
+    else:
+        ok("composer_controller.js exists at app/static/js/")
+        controller_js = controller_path.read_text(encoding="utf-8")
+
+        contains_all(
+            "composer_controller.js exports IME_CONFIRM_ENTER_SUPPRESS_MS=80 + helpers",
+            controller_js,
+            [
+                "export const IME_CONFIRM_ENTER_SUPPRESS_MS = 80",
+                "export function createComposerController",
+                "function maybeSubmitComposer",
+                "function shouldSuppressEnterForIME",
+            ],
+        )
+
+        contains_all(
+            "composer_controller.js wires all four IME defense layers",
+            controller_js,
+            [
+                "state.isComposing",
+                "e.isComposing",
+                "e.keyCode === 229",
+                "state.suppressNextEnterUntil",
+            ],
+        )
+
+        contains_all(
+            "composer_controller.js suppression is one-shot (cleared on first block)",
+            controller_js,
+            [
+                "state.suppressNextEnterUntil = 0",
+            ],
+        )
+
+        contains_all(
+            "composer_controller.js gives Shift+Enter unconditional newline",
+            controller_js,
+            [
+                "if (e.shiftKey) return;",
+            ],
+        )
+
+        contains_all(
+            "composer_controller.js routes send-button click through maybeSubmitComposer",
+            controller_js,
+            [
+                "submit.addEventListener('click'",
+                "maybeSubmitComposer()",
+            ],
+        )
+
     main_js = read("app/static/js/main.js")
     contains_all(
-        "assistant composers ignore IME candidate-confirmation Enter events",
+        "main.js imports and wires both composers through createComposerController",
         main_js,
         [
-            "input.addEventListener('compositionstart'",
-            "input.addEventListener('compositionend'",
-            "!e.isComposing",
-            "e.keyCode !== 229",
+            "import { createComposerController }",
+            "createComposerController(dockInput",
+            "createComposerController(panelInput",
         ],
     )
+
+    print("\n── JSDOM behavioral tests (IME event-order proof) ──")
+    node = shutil.which("node")
+    jsdom_installed = (ROOT / "node_modules" / "jsdom" / "package.json").exists()
+    if not node:
+        # Skip (don't fail): matches test_ai_e2e.py's OPENAI_API_KEY pattern.
+        PASS.append("JSDOM composer tests skipped (node not installed)")
+        print("  ⊘  JSDOM composer tests skipped (node not installed)")
+    elif not jsdom_installed:
+        PASS.append("JSDOM composer tests skipped (run `npm install`)")
+        print("  ⊘  JSDOM composer tests skipped (run `npm install` to enable)")
+    else:
+        try:
+            result = subprocess.run(
+                [node, "--test", "tests/composer_ime.test.mjs"],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if result.returncode == 0:
+                # Extract pass count from node --test output for the success line.
+                pass_line = next(
+                    (line for line in result.stdout.splitlines() if line.startswith("# pass") or " pass " in line),
+                    "",
+                )
+                ok(f"JSDOM composer behavioral tests pass (node --test) {pass_line.strip()}")
+            else:
+                tail = (result.stdout + result.stderr)[-600:]
+                fail("JSDOM composer tests", f"node --test failed:\n{tail}")
+        except subprocess.TimeoutExpired:
+            fail("JSDOM composer tests", "node --test timed out after 30s")
 
     print("\n── Regression inventory ──")
     expected_tests = [

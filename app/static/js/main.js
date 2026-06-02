@@ -1,3 +1,5 @@
+import { createComposerController } from './composer_controller.js';
+
 (function () {
 
   // =========================================================
@@ -202,36 +204,36 @@
   var activeScope = defaultProjectId ? 'project' : 'global';
   var pendingAttachments = [];
 
-  function bindTextarea(input, submit, form) {
-    var isComposing = false;
-
+  // Autosize is a layout concern, separate from IME-safe Enter handling.
+  // The IME / submit logic lives in composer_controller.js.
+  function bindAutosize(input) {
     function resize() {
       input.style.height = 'auto';
       input.style.height = Math.min(input.scrollHeight, 120) + 'px';
     }
-    input.addEventListener('compositionstart', function () {
-      isComposing = true;
-    });
-    input.addEventListener('compositionend', function () {
-      isComposing = false;
-    });
     input.addEventListener('input', function () {
       resize();
       refreshSubmitButtons();
     });
-    input.addEventListener('keydown', function (e) {
-      // IMEs use Enter to confirm a candidate. Safari reports the legacy
-      // keyCode 229 path, while other browsers expose isComposing.
-      if (e.key === 'Enter' && !e.shiftKey && !isComposing && !e.isComposing && e.keyCode !== 229) {
-        e.preventDefault();
-        if (!submit.disabled) form.requestSubmit();
-      }
-    });
     return resize;
   }
 
-  var resizeDock = bindTextarea(dockInput, dockSubmit, dockForm);
-  var resizePanel = bindTextarea(panelInput, panelSubmit, panelForm);
+  var resizeDock = bindAutosize(dockInput);
+  var resizePanel = bindAutosize(panelInput);
+
+  // IME-safe Enter + shared submit pipeline for both composers. Send-button
+  // clicks also route through maybeSubmitComposer (the controller intercepts
+  // the click) so trim / disabled / final-submit logic stays consistent.
+  createComposerController(dockInput, dockSubmit, dockForm, {
+    hasContent: function () {
+      return dockInput.value.trim().length > 0 || pendingAttachments.length > 0;
+    },
+  });
+  createComposerController(panelInput, panelSubmit, panelForm, {
+    hasContent: function () {
+      return panelInput.value.trim().length > 0 || pendingAttachments.length > 0;
+    },
+  });
 
   function refreshSubmitButtons() {
     dockSubmit.disabled = !dockInput.value.trim() && pendingAttachments.length === 0;

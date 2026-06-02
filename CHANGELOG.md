@@ -3,7 +3,13 @@
 ## Unreleased
 _2026-06-02_
 
-- **Chinese IME chat fix:** assistant dock and panel composers no longer send a partial message when Enter is used to confirm an input-method candidate, including Safari's legacy `keyCode 229` event path. Unshifted Enter still sends once composition has finished.
+- **Chinese IME chat fix (v2, mature composer controller).** The initial isComposing / keyCode 229 guards did not catch the Chrome + Sogou Pinyin and Edge + Microsoft Pinyin case, where `compositionend` fires BEFORE the Enter keydown that triggered it — all three guards were already cleared by the time the Enter handler ran, so the IME-confirmation Enter sent the message prematurely.
+  - Both composers (bottom dock + assistant side panel) now share a new `createComposerController` helper in `app/static/js/composer_controller.js` (ES module).
+  - Four defense layers: local `isComposing` flag, `e.isComposing`, `e.keyCode === 229`, AND a one-shot `suppressNextEnterUntil` window (`IME_CONFIRM_ENTER_SUPPRESS_MS = 80`) seeded on every `compositionend`. The window self-clears after blocking exactly one Enter so a deliberate rapid follow-up Enter still sends.
+  - Single shared `maybeSubmitComposer()` entry point — keyboard Enter and send-button clicks both route through it for consistent trim / disabled / final-submit logic. The send button click is intentionally NOT IME-gated (explicit user intent); send buttons keep `type="submit"` for accessibility but the click handler intercepts via `preventDefault`.
+  - Plain Enter still sends. Shift+Enter still inserts a newline.
+  - Locked by JSDOM behavioral tests (`npm run test:composer`, 10 cases), folded into `test_build29.py` as a subprocess assertion that skips cleanly on environments without Node/jsdom.
+  - main.js is now loaded as `type="module"` (still IIFE-wrapped; no global behavior change).
 
 ## v1.2.0 — Assistant Workspace Release
 _2026-06-02_
