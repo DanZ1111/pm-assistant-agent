@@ -247,10 +247,17 @@
         <h2 class="section-title"><i class="bi bi-lightbulb me-2"></i>{{ t('section.inspired_by') }}
           {% if linked_ideas %}<span class="text-muted small ms-2">({{ linked_ideas|length }})</span>{% endif %}
         </h2>
-        {% if can_edit and available_ideas %}
-        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#linkIdeaModal">
-          <i class="bi bi-link-45deg me-1"></i>{{ t('btn.link_idea') }}
-        </button>
+        {% if can_edit %}
+        <div class="d-flex gap-2">
+          {% if available_ideas %}
+          <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#linkIdeaModal">
+            <i class="bi bi-link-45deg me-1"></i>{{ t('btn.link_idea') }}
+          </button>
+          {% endif %}
+          <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#createLinkIdeaModal">
+            <i class="bi bi-plus-lg me-1"></i>{{ t('btn.create_link_idea') }}
+          </button>
+        </div>
         {% endif %}
       </div>
 
@@ -278,9 +285,7 @@
       <p class="text-muted small mb-0">
         {{ t('empty.no_linked_ideas') }}
         {% if can_edit %}
-          {% if available_ideas %}{{ t('project.link_idea_hint') }} <a href="/ideas">{{ t('title.ideas') }}</a>.
-          {% else %}{{ t('project.add_ideas_first') }} <a href="/ideas">{{ t('title.ideas') }}</a> {{ t('project.then_link_here') }}.
-          {% endif %}
+          {{ t('project.capture_idea_hint') }}
         {% endif %}
       </p>
       {% endif %}
@@ -316,6 +321,68 @@
             <div class="modal-footer">
               <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ t('btn.cancel') }}</button>
               <button type="submit" class="btn btn-primary"><i class="bi bi-link-45deg me-1"></i>{{ t('btn.link_idea') }}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {# ── Create + Link Idea modal ── #}
+    {% if can_edit %}
+    <div class="modal fade" id="createLinkIdeaModal" tabindex="-1">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <form method="post" action="/projects/{{ project.id }}/ideas/create-and-link">
+            <div class="modal-header">
+              <h5 class="modal-title"><i class="bi bi-lightbulb me-2"></i>{{ t('project.create_link_idea') }}</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <label class="form-label fw-semibold">{{ t('form.idea_name') }} <span class="badge-required">{{ t('badge.required') }}</span></label>
+                <input name="name" class="form-control" required placeholder="{{ t('placeholder.idea_name_example') }}">
+              </div>
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label class="form-label fw-semibold">{{ t('form.idea_type') }}</label>
+                  <select name="idea_type" class="form-select">
+                    {% for idea_type in ['material', 'structure', 'feature', 'aesthetic', 'manufacturing', 'other'] %}
+                    <option value="{{ idea_type }}">{{ t('idea_type.' ~ idea_type) }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-semibold">{{ t('form.source') }}</label>
+                  <select name="source" class="form-select">
+                    {% for idea_source in ['factory', 'tradeshow', 'internet', 'customer', 'team', 'competitor', 'other'] %}
+                    <option value="{{ idea_source }}">{{ t('idea_source.' ~ idea_source) }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-semibold">{{ t('form.description') }} <span class="text-muted small">{{ t('common.optional') }}</span></label>
+                <textarea name="description" class="form-control" rows="3" placeholder="{{ t('placeholder.idea_description') }}"></textarea>
+              </div>
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label class="form-label fw-semibold">{{ t('form.source_detail') }}</label>
+                  <input name="source_detail" class="form-control" placeholder="{{ t('placeholder.source_detail') }}">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-semibold">{{ t('form.contributor') }}</label>
+                  <input name="contributor" class="form-control" value="{{ current_user.display_name or current_user.username }}">
+                </div>
+              </div>
+              <div class="mb-2">
+                <label class="form-label fw-semibold">{{ t('project.link_note') }} <span class="text-muted small">{{ t('common.optional') }}</span></label>
+                <input name="link_note" class="form-control" placeholder="{{ t('placeholder.idea_note') }}">
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ t('btn.cancel') }}</button>
+              <button type="submit" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>{{ t('btn.create_link_idea') }}</button>
             </div>
           </form>
         </div>

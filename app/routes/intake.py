@@ -379,7 +379,8 @@ def intake_confirm_idea(
         require_auth(current_user)
     except _RedirectException as e:
         return e.response
-    # Anyone authenticated can create ideas (matches /ideas/new permission)
+    if not can_use_ai_intake(current_user):
+        return RedirectResponse(url="/ideas", status_code=303)
     name = name.strip()
     if not name:
         return _ai_panel_response(request, current_user,

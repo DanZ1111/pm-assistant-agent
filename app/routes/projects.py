@@ -393,6 +393,7 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
         "prototype_photos": prototype_photos,
         # Build 21 — for bottom chat scope toggle
         "current_project_id": project.id,
+        "current_project_name": project.name,
         **i18n_context(request, current_user),
     })
 
@@ -662,6 +663,50 @@ def project_link_idea(
     project = crud.get_project(db, project_id)
     if project and can_edit_project(current_user, project):
         crud.link_idea_to_project(db, project_id, idea_id, current_user.id, note)
+    return RedirectResponse(url=f"/projects/{project_id}#inspired-by", status_code=303)
+
+
+@router.post("/projects/{project_id}/ideas/create-and-link")
+def project_create_and_link_idea(
+    request: Request,
+    project_id: int,
+    name: str = Form(""),
+    description: str = Form(""),
+    idea_type: str = Form("other"),
+    source: str = Form("other"),
+    source_detail: str = Form(""),
+    contributor: str = Form(""),
+    notes: str = Form(""),
+    link_note: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+
+    project = crud.get_project(db, project_id)
+    if not project or not can_edit_project(current_user, project):
+        return RedirectResponse(url=f"/projects/{project_id}#inspired-by", status_code=303)
+    name = name.strip()
+    if not name:
+        return RedirectResponse(url=f"/projects/{project_id}?idea_error=name_required#inspired-by", status_code=303)
+    crud.create_and_link_idea(
+        db,
+        project_id=project_id,
+        data={
+            "name": name,
+            "description": description,
+            "idea_type": idea_type,
+            "source": source,
+            "source_detail": source_detail,
+            "contributor": contributor or current_user.display_name or current_user.username,
+            "notes": notes,
+        },
+        contributor_user_id=current_user.id,
+        note=link_note,
+    )
     return RedirectResponse(url=f"/projects/{project_id}#inspired-by", status_code=303)
 
 

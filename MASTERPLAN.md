@@ -2943,7 +2943,7 @@ No new sources of sensitive data. The `_VIEWER_FORBIDDEN` list from `app/depende
 
 ---
 
-### Build 25 — Beauty Department isolated deployment ← CURRENT BUILD
+### Build 25 — Beauty Department isolated deployment ✓ SHIPPED v1.1.0-build25
 
 #### Context
 The Beauty department wants to use the PM tracker but with full data isolation from the existing PM dept. Architectural review (recorded in `~/.claude/plans/can-you-still-find-nested-cook.md`) chose **Option 4: separate deployment per department** — same git repo, same image, different database + different env vars. The trade-off: hard isolation with zero code-change risk vs. no cross-dept features (acceptable since none are planned).
@@ -3007,6 +3007,55 @@ The actual Railway provisioning is on the user — Claude can't reach into your 
 - Per-department branding / logos / theming.
 - SSO across departments.
 - Shared user table across instances.
+
+---
+
+## v1.2.0 — Professional AI Assistant Workspace Roadmap
+
+**Approach:** ship the assistant redesign as a staged v1.2.0 release train. Each build is independently usable and keeps the no-silent-write rule intact.
+
+| Build | Version | Theme |
+|---|---|---|
+| **26** | `v1.2.0-build26` | Professional workspace + project-aware Idea capture |
+| **27** | `v1.2.0-build27` | General confirmation cards + daily PM actions + Global read-only search |
+| **28** | `v1.2.0-build28` | Assistant PDF, DOCX, and image intake |
+| **29** | `v1.2.0` | Release docs, visual verification, and full regression |
+
+### Build 26 — Professional workspace + project-aware Idea capture ← CURRENT BUILD
+
+#### Feature Design Review
+1. **Real workflow problem?** PMs need to discuss the current project without losing half the tracker UI or manually creating and then linking inspirations.
+2. **Repeated or edge case?** Repeated daily workflow.
+3. **Structured data?** Reuses existing conversations, messages, Ideas, links, and change logs.
+4. **Could live in notes / metadata?** Pending Idea proposals live in message metadata until confirmed.
+5. **Intake burden?** Reduced: Idea name is the only required field.
+6. **Can AI reduce burden?** Yes: project context, intent classification, duplicate suggestion, and concise follow-up.
+7. **Display payoff?** Tracker and assistant remain visible together; confirmed Ideas appear in Inspired By.
+8. **Migration impact?** None.
+9. **Minimal schema change?** None.
+10. **Minimal UI change?** Assistant shell, segmented controls, panel composer, Idea review cards, and Create & Link modal.
+11. **Deferred?** General PM proposal framework, Global search, assistant attachments, deletes, and unrelated Profit Model work.
+
+#### Scope
+
+- Resizable desktop tracker-plus-assistant split workspace; full-screen assistant pane on mobile.
+- Compact dock while collapsed; internal assistant composer while expanded.
+- Ask / Capture and This Project / Global segmented controls with immutable conversation scope.
+- Role-filtered active-project prompt context, including linked Ideas and permitted recent journal entries.
+- Idea-specific confirmation cards for `create_idea`, `link_idea_to_project`, and allowlisted `update_idea`.
+- Duplicate-aware Idea creation with Link Existing / Create New choices.
+- Manual Create & Link Idea fallback on the project-detail Inspired By section.
+- Viewers remain read-only for Good Ideas mutations.
+- EN / Chinese label parity and `test_build26.py`.
+
+#### Deferred to Build 27
+
+- Generalized confirmation cards for variants, components, file comments, project fields, phase plans, and Finish Phase.
+- Read-only Global project search and role-filtered project lookup tools.
+
+#### Deferred to Build 28
+
+- Assistant PDF, DOCX, and image discussion with confirmed save-to-project behavior.
 
 ---
 

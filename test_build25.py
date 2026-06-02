@@ -113,16 +113,16 @@ def main():
 
     print("\n── Runtime version constants ──")
     from app.version import CURRENT_BUILD_NAME, CURRENT_VERSION, LAST_UPDATED
-    if CURRENT_VERSION == "1.1.0-build25":
-        ok("app.version CURRENT_VERSION is 1.1.0-build25")
+    if CURRENT_VERSION in ("1.1.0-build25", "1.2.0-build26"):
+        ok(f"app.version CURRENT_VERSION preserves Build 25 or newer ({CURRENT_VERSION})")
     else:
         fail("CURRENT_VERSION", CURRENT_VERSION)
-    if "Build 25" in CURRENT_BUILD_NAME and "Beauty" in CURRENT_BUILD_NAME:
-        ok("app.version CURRENT_BUILD_NAME identifies Build 25 (Beauty)")
+    if CURRENT_VERSION != "1.1.0-build25" or ("Build 25" in CURRENT_BUILD_NAME and "Beauty" in CURRENT_BUILD_NAME):
+        ok("app.version CURRENT_BUILD_NAME is compatible with the current runtime build")
     else:
         fail("CURRENT_BUILD_NAME", CURRENT_BUILD_NAME)
-    if LAST_UPDATED == "2026-05-30":
-        ok("app.version LAST_UPDATED is 2026-05-30")
+    if LAST_UPDATED >= "2026-05-30":
+        ok(f"app.version LAST_UPDATED is Build 25 date or newer ({LAST_UPDATED})")
     else:
         fail("LAST_UPDATED", LAST_UPDATED)
 
@@ -135,8 +135,6 @@ def main():
         "VERSION.md reflects Build 25",
         version_md,
         [
-            "**Current Version:** v1.1.0-build25",
-            "**Current Build:** Build 25 — Beauty Department isolated deployment",
             "## What's new in v1.1.0-build25",
         ],
     )
@@ -153,7 +151,7 @@ def main():
         "MASTERPLAN.md has Build 25 detail section",
         masterplan,
         [
-            "### Build 25 — Beauty Department isolated deployment ← CURRENT BUILD",
+            "### Build 25 — Beauty Department isolated deployment ✓ SHIPPED v1.1.0-build25",
             "separate deployment per department",
             "Feature Design Review",
         ],
@@ -171,12 +169,12 @@ def main():
 
     try:
         r = requests.get(f"{BASE}/auth/login", timeout=5)
-        if r.status_code == 200 and "1.1.0-build25" in r.text:
-            ok("Existing PM instance serves the bumped version string (1.1.0-build25)")
+        if r.status_code == 200 and CURRENT_VERSION in r.text:
+            ok(f"Existing PM instance serves the current version string ({CURRENT_VERSION})")
         else:
             fail(
                 "PM version string",
-                f"status={r.status_code} has_version={'1.1.0-build25' in r.text}",
+                f"status={r.status_code} has_version={CURRENT_VERSION in r.text}",
             )
     except requests.RequestException as exc:
         fail("PM version string", f"request failed: {exc}")

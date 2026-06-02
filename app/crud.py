@@ -903,10 +903,23 @@ def create_idea(db: Session, data: dict, contributor_user_id: int | None = None)
     return idea
 
 
-def update_idea(db: Session, idea_id: int, data: dict) -> Idea | None:
+def update_idea(
+    db: Session,
+    idea_id: int,
+    data: dict,
+    changed_by: str = "user",
+    source_type: str = "manual_edit",
+) -> Idea | None:
     idea = db.query(Idea).filter(Idea.id == idea_id).first()
     if not idea:
         return None
+    before = {
+        field: getattr(idea, field)
+        for field in (
+            "name", "description", "source_detail", "contributor", "notes",
+            "idea_type", "source", "status",
+        )
+    }
     for field in ("name", "description", "source_detail", "contributor", "notes"):
         if field in data:
             val = (data.get(field) or "").strip()
@@ -920,6 +933,24 @@ def update_idea(db: Session, idea_id: int, data: dict) -> Idea | None:
     if "status" in data and data["status"] in ("open", "in_use", "archived"):
         idea.status = data["status"]
     idea.updated_at = datetime.utcnow()
+    changed_fields = [
+        field for field, old_value in before.items()
+        if getattr(idea, field) != old_value
+    ]
+    if changed_fields:
+        linked_project_ids = {
+            link.project_id
+            for link in db.query(ProjectIdea).filter(ProjectIdea.idea_id == idea_id).all()
+        }
+        for project_id in linked_project_ids:
+            write_change(
+                db,
+                project_id=project_id,
+                change_type="event_note",
+                changed_by=changed_by,
+                source_type=source_type,
+                summary=f"Updated linked idea {idea.serial_number}: {', '.join(changed_fields)}",
+            )
     db.commit()
     db.refresh(idea)
     return idea
@@ -968,6 +999,8 @@ def link_idea_to_project(
     idea_id: int,
     linked_by_user_id: int | None = None,
     note: str | None = None,
+    changed_by: str = "user",
+    source_type: str = "manual_edit",
 ) -> ProjectIdea | None:
     """Idempotent: returns existing link if already linked, otherwise creates one."""
     existing = (
@@ -988,12 +1021,26 @@ def link_idea_to_project(
     idea = db.query(Idea).filter(Idea.id == idea_id).first()
     if idea and idea.status == "open":
         idea.status = "in_use"
+    write_change(
+        db,
+        project_id=project_id,
+        change_type="event_note",
+        changed_by=changed_by,
+        source_type=source_type,
+        summary=f"Linked {idea.serial_number if idea else f'idea #{idea_id}'} to Inspired By",
+    )
     db.commit()
     db.refresh(link)
     return link
 
 
-def unlink_idea_from_project(db: Session, project_id: int, idea_id: int) -> bool:
+def unlink_idea_from_project(
+    db: Session,
+    project_id: int,
+    idea_id: int,
+    changed_by: str = "user",
+    source_type: str = "manual_edit",
+) -> bool:
     link = (
         db.query(ProjectIdea)
         .filter(ProjectIdea.project_id == project_id, ProjectIdea.idea_id == idea_id)
@@ -1010,8 +1057,40 @@ def unlink_idea_from_project(db: Session, project_id: int, idea_id: int) -> bool
         idea = db.query(Idea).filter(Idea.id == idea_id).first()
         if idea and idea.status == "in_use":
             idea.status = "open"
+    idea = db.query(Idea).filter(Idea.id == idea_id).first()
+    write_change(
+        db,
+        project_id=project_id,
+        change_type="event_note",
+        changed_by=changed_by,
+        source_type=source_type,
+        summary=f"Unlinked {idea.serial_number if idea else f'idea #{idea_id}'} from Inspired By",
+    )
     db.commit()
     return True
+
+
+def create_and_link_idea(
+    db: Session,
+    project_id: int,
+    data: dict,
+    contributor_user_id: int | None = None,
+    note: str | None = None,
+    changed_by: str = "user",
+    source_type: str = "manual_edit",
+) -> tuple[Idea, ProjectIdea]:
+    """Create an Idea and link it to a project through the normal services."""
+    idea = create_idea(db, data, contributor_user_id=contributor_user_id)
+    link = link_idea_to_project(
+        db,
+        project_id=project_id,
+        idea_id=idea.id,
+        linked_by_user_id=contributor_user_id,
+        note=note,
+        changed_by=changed_by,
+        source_type=source_type,
+    )
+    return idea, link
 
 
 def get_ideas_for_project(db: Session, project_id: int) -> list[dict]:
@@ -1259,6 +1338,8 @@ def apply_thesis_extraction(
                 db, project_id, new_idea.id,
                 linked_by_user_id=user.id if user else None,
                 note="From business plan extraction",
+                changed_by="ai",
+                source_type="ai_chat",
             )
             summary["ideas_created"] += 1
             final_inspirations.append({**insp, "action": "create", "resulting_idea_id": new_idea.id})
@@ -1269,6 +1350,8 @@ def apply_thesis_extraction(
                     db, project_id, int(idea_id),
                     linked_by_user_id=user.id if user else None,
                     note="From business plan extraction",
+                    changed_by="ai",
+                    source_type="ai_chat",
                 )
                 summary["ideas_linked"] += 1
                 final_inspirations.append({**insp, "action": "link", "resulting_idea_id": int(idea_id)})

@@ -28,7 +28,7 @@ Status legend:
 
 ## Current Tools
 
-All 16 tools below have an OpenAI function-calling schema in `app/ai/tools.py` as of Build 20. Only `create_journal_entry` has a real handler in v1.1; the rest pass through dispatcher permission checks then return `{"ok": False, "error": "not_wired_until_build_21"}`.
+The original 16 schemas landed in Build 20. Build 26 wires the Idea workflow and adds `update_idea`, bringing the registered total to 17. Remaining stubs still pass through dispatcher permission checks before returning an unavailable response.
 
 | Tool | Params | Permission | Confirmation | Status |
 |---|---|---|---|---|
@@ -46,8 +46,9 @@ All 16 tools below have an OpenAI function-calling schema in `app/ai/tools.py` a
 | `adjust_phase_plan` | phase_id, planned_*_date, reason | auth + `can_edit_project` | YES — reason mandatory | **route + schema implemented (Build 17/20)**; handler wiring lands in Build 21 |
 | `update_file_comment` | project_id, file_id, comment | auth + `can_edit_project` | No (low-stakes annotation) | **route + schema implemented (Build 18/20)**; handler wiring lands in Build 21 |
 | `update_project_field` | project_id, field_name, new_value | auth + `can_edit_project` + field allowlist | YES — show confirmation card with old → new | **schema implemented (Build 20)** — handler stub; full wiring in Build 21 |
-| `link_idea_to_project` | project_id, idea_id, note | auth + `can_edit_project` | YES — show confirmation | **schema implemented (Build 20)** — handler stub; full wiring in Build 21 |
-| `create_idea` | name, description, idea_type, source, source_detail, contributor, notes | auth (all roles incl. viewer) | No — low-stakes capture | **schema implemented (Build 20)** — handler stub; full wiring in Build 21 |
+| `link_idea_to_project` | project_id, idea_id, note | admin/PM + `can_edit_project` | YES — Idea-specific review card | **implemented (Build 26)** |
+| `create_idea` | project_id (optional), name, description, idea_type, source, source_detail, contributor, notes | admin/PM; `can_edit_project` when linking | YES — Idea-specific review card | **implemented (Build 26)** |
+| `update_idea` | idea_id, editable fields | admin/PM | YES — Idea-specific review card | **implemented (Build 26)** |
 
 ## How the dispatcher works
 
@@ -57,9 +58,10 @@ All 16 tools below have an OpenAI function-calling schema in `app/ai/tools.py` a
 2. **User role check** per `TOOL_PERMISSIONS[tool_name]["require_role"]` → else `forbidden / role_not_allowed`.
 3. **Project ownership** if `needs_project: True` — checks `can_edit_project(user, project)` → else `forbidden / cannot_edit_project`.
 4. **Journal access** if `needs_journal: True` — checks `can_view_journal(user)` → else `forbidden / cannot_view_journal`.
-5. **Field allowlist** for tools that carry a `field_allowlist` (today: only `update_project_field`) → else `field_not_allowlisted`.
-6. **Handler lookup** in `_HANDLERS` — if absent, return `not_wired_until_build_21` (the v1.1 stub response).
-7. **Call handler** → return its `{"ok": True, ...}` or `{"ok": False, ...}`.
+5. **Field allowlist** for tools that carry a `field_allowlist` → else `field_not_allowlisted`.
+6. **Confirmation guard** for Idea writes → return `confirmation_required` until the user confirms the review card.
+7. **Handler lookup** in `_HANDLERS` — if absent, return `not_wired_until_build_21` (the legacy stub response).
+8. **Call handler** → return its `{"ok": True, ...}` or `{"ok": False, ...}`.
 
 ## Planned (post v1.1.0)
 

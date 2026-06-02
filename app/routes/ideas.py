@@ -47,6 +47,8 @@ def idea_new_form(request: Request, db: Session = Depends(get_db)):
         require_auth(current_user)
     except _RedirectException as e:
         return e.response
+    if current_user.role == "viewer":
+        return RedirectResponse(url="/ideas", status_code=303)
 
     return templates.TemplateResponse(request, "idea_form.html", {
         "current_user": current_user,
@@ -76,6 +78,8 @@ def idea_new_submit(
         require_auth(current_user)
     except _RedirectException as e:
         return e.response
+    if current_user.role == "viewer":
+        return RedirectResponse(url="/ideas", status_code=303)
 
     name = name.strip()
     if not name:

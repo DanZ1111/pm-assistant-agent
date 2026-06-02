@@ -169,58 +169,115 @@
 
 
 // ========================================================================
-// Build 21 — Bottom AI Chat + Right-Side Panel
+// Build 26 — Compact dock + resizable assistant workspace
 // ========================================================================
 (function () {
   var bar = document.getElementById('bottomChatBar');
-  if (!bar) return;  // anonymous page, no chat
+  if (!bar) return;
 
   document.body.classList.add('has-bottom-chat');
 
-  var form        = document.getElementById('bottomChatForm');
-  var textarea    = document.getElementById('chatInputTextarea');
-  var submitBtn   = document.getElementById('chatSubmitBtn');
-  var modeSelect  = document.getElementById('chatModeSelect');
-  var scopeSelect = document.getElementById('chatScopeSelect');  // may be null
-  var panel       = document.getElementById('aiSidePanel');
-  var msgList     = document.getElementById('aiPanelMessages');
-  var titleEl     = document.getElementById('aiPanelTitle');
-  var historySel  = document.getElementById('conversationHistorySelect');
-  var archiveBtn  = document.getElementById('aiPanelArchiveBtn');
-  var closeBtn    = document.getElementById('aiPanelCloseBtn');
-
-  var projectIdAttr = bar.getAttribute('data-project-id') || '';
-  var defaultProjectId = projectIdAttr ? parseInt(projectIdAttr, 10) : null;
+  var dockForm = document.getElementById('bottomChatForm');
+  var dockInput = document.getElementById('chatInputTextarea');
+  var dockSubmit = document.getElementById('chatSubmitBtn');
+  var panel = document.getElementById('aiSidePanel');
+  var panelForm = document.getElementById('panelChatForm');
+  var panelInput = document.getElementById('panelChatInput');
+  var panelSubmit = document.getElementById('panelChatSubmit');
+  var resizeHandle = document.getElementById('aiPanelResizeHandle');
+  var msgList = document.getElementById('aiPanelMessages');
+  var titleEl = document.getElementById('aiPanelTitle');
+  var contextEl = document.getElementById('aiPanelContext');
+  var historySel = document.getElementById('conversationHistorySelect');
+  var archiveBtn = document.getElementById('aiPanelArchiveBtn');
+  var closeBtn = document.getElementById('aiPanelCloseBtn');
+  var defaultTitle = bar.dataset.defaultTitle || 'AI Chat';
+  var historyLabel = bar.dataset.historyLabel || 'history';
+  var defaultProjectId = parseInt(bar.dataset.projectId || '', 10) || null;
+  var defaultProjectName = bar.dataset.projectName || '';
   var currentConversationId = null;
+  var currentConversationProjectId = defaultProjectId;
+  var currentConversationProjectName = defaultProjectName;
+  var activeMode = 'intake';
+  var activeScope = defaultProjectId ? 'project' : 'global';
 
-  // ── Textarea auto-grow + submit-button gate ──
-  function resizeTextarea() {
-    textarea.style.height = 'auto';
-    textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
-  }
-  textarea.addEventListener('input', function () {
-    resizeTextarea();
-    submitBtn.disabled = !textarea.value.trim();
-  });
-  textarea.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      if (!submitBtn.disabled) form.requestSubmit();
+  function bindTextarea(input, submit, form) {
+    function resize() {
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 120) + 'px';
     }
+    input.addEventListener('input', function () {
+      resize();
+      submit.disabled = !input.value.trim();
+    });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        if (!submit.disabled) form.requestSubmit();
+      }
+    });
+    return resize;
+  }
+
+  var resizeDock = bindTextarea(dockInput, dockSubmit, dockForm);
+  var resizePanel = bindTextarea(panelInput, panelSubmit, panelForm);
+
+  function setSegment(kind, value) {
+    document.querySelectorAll('[data-chat-' + kind + ']').forEach(function (btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-chat-' + kind) === value);
+    });
+  }
+
+  document.querySelectorAll('[data-chat-mode]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      activeMode = btn.dataset.chatMode;
+      setSegment('mode', activeMode);
+    });
   });
 
-  // ── Panel open/close ──
+  document.querySelectorAll('[data-chat-scope]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var nextScope = btn.dataset.chatScope;
+      if (nextScope === activeScope) return;
+      if (currentConversationId && !confirm(bar.dataset.confirmScopeSwitch)) return;
+      if (currentConversationId) {
+        currentConversationId = null;
+        msgList.innerHTML = '';
+        titleEl.textContent = defaultTitle;
+      }
+      activeScope = nextScope;
+      currentConversationProjectId = activeScope === 'project' ? defaultProjectId : null;
+      currentConversationProjectName = activeScope === 'project' ? defaultProjectName : '';
+      setSegment('scope', activeScope);
+      updateContext();
+    });
+  });
+
+  function updateContext() {
+    if (!contextEl) return;
+    if (currentConversationProjectId) {
+      contextEl.innerHTML = '<i class="bi bi-folder2"></i> ' +
+        (contextEl.dataset.inProject || 'In project:') + ' <strong></strong>';
+      contextEl.querySelector('strong').textContent = currentConversationProjectName || ('#' + currentConversationProjectId);
+    } else {
+      contextEl.innerHTML = '<i class="bi bi-globe2"></i> ' + (contextEl.dataset.globalLabel || 'Global');
+    }
+  }
+
   function openPanel() {
     panel.classList.add('open');
     panel.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('assistant-open');
+    window.setTimeout(function () { panelInput.focus(); }, 180);
   }
+
   function closePanel() {
     panel.classList.remove('open');
     panel.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('assistant-open');
   }
   closeBtn.addEventListener('click', closePanel);
 
-  // ── Message rendering ──
   function renderUserMessage(text) {
     var d = document.createElement('div');
     d.className = 'chat-msg chat-msg-user';
@@ -228,6 +285,7 @@
     msgList.appendChild(d);
     msgList.scrollTop = msgList.scrollHeight;
   }
+
   function renderAssistantMessage(text) {
     var d = document.createElement('div');
     d.className = 'chat-msg chat-msg-assistant';
@@ -235,43 +293,99 @@
     msgList.appendChild(d);
     msgList.scrollTop = msgList.scrollHeight;
   }
+
+  function addActionButton(actions, label, className, onClick) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-sm ' + className;
+    btn.textContent = label;
+    btn.addEventListener('click', onClick);
+    actions.appendChild(btn);
+  }
+
+  async function resolveProposal(card, proposalId, action) {
+    var res = await fetch('/ai/chat/' + currentConversationId + '/proposals/' + proposalId + '/confirm', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({action: action || 'confirm'}),
+    });
+    var data = await res.json();
+    var result = card.querySelector('.chat-tool-call-card-result');
+    if (data.ok) {
+      card.className = 'chat-tool-call-card ok';
+      result.textContent = data.message || 'Saved.';
+      var actions = card.querySelector('.chat-tool-call-card-actions');
+      if (actions) actions.remove();
+    } else {
+      result.textContent = data.message || data.error || 'Unable to save.';
+    }
+  }
+
   function renderToolCallCard(tc) {
-    var ok = tc.result && tc.result.ok;
+    var outcome = tc.result || {};
+    var pending = outcome.error === 'confirmation_required';
+    var ok = outcome.ok;
     var d = document.createElement('div');
-    d.className = 'chat-tool-call-card ' + (ok ? 'ok' : 'err');
+    d.className = 'chat-tool-call-card ' + (pending ? '' : (ok ? 'ok' : 'err'));
     var name = document.createElement('div');
     name.className = 'chat-tool-call-card-name';
-    name.textContent = (ok ? '✓ ' : '⚠ ') + tc.name;
+    name.textContent = (pending ? 'Review: ' : (ok ? 'Saved: ' : 'Unable to run: ')) + tc.name;
     d.appendChild(name);
     var result = document.createElement('div');
     result.className = 'chat-tool-call-card-result';
-    if (ok) {
-      result.textContent = 'Success' + (tc.result.entry_id ? ' (id ' + tc.result.entry_id + ')' : '');
+    if (pending) {
+      result.textContent = outcome.summary || bar.dataset.confirmAction || 'Confirm this action?';
+    } else if (ok) {
+      result.textContent = outcome.message || 'Success';
     } else {
-      result.textContent = (tc.result && tc.result.error) || 'unknown error';
+      result.textContent = outcome.message || outcome.error || 'unknown error';
     }
     d.appendChild(result);
+
+    if (pending && outcome.proposal_id) {
+      var actions = document.createElement('div');
+      actions.className = 'chat-tool-call-card-actions';
+      if (outcome.duplicate) {
+        addActionButton(actions, bar.dataset.linkExisting || 'Link existing', 'btn-primary', function () {
+          resolveProposal(d, outcome.proposal_id, 'link_existing');
+        });
+        addActionButton(actions, bar.dataset.createNewAnyway || 'Create new anyway', 'btn-outline-secondary', function () {
+          resolveProposal(d, outcome.proposal_id, 'create_new');
+        });
+      } else {
+        addActionButton(actions, bar.dataset.confirmAction || 'Confirm', 'btn-primary', function () {
+          resolveProposal(d, outcome.proposal_id, 'confirm');
+        });
+      }
+      addActionButton(actions, bar.dataset.cancel || 'Cancel', 'btn-outline-secondary', async function () {
+        await fetch('/ai/chat/' + currentConversationId + '/proposals/' + outcome.proposal_id + '/cancel', {method: 'POST'});
+        d.className = 'chat-tool-call-card err';
+        result.textContent = bar.dataset.cancel || 'Cancelled';
+        actions.remove();
+      });
+      d.appendChild(actions);
+    }
     msgList.appendChild(d);
     msgList.scrollTop = msgList.scrollHeight;
   }
 
-  // ── Submit ──
-  form.addEventListener('submit', async function (e) {
-    e.preventDefault();
-    var text = textarea.value.trim();
+  async function submitMessage(input, submit, resize) {
+    var text = input.value.trim();
     if (!text) return;
-    var mode = modeSelect.value;
-    var sendProjectId = defaultProjectId;
-    if (scopeSelect && scopeSelect.value === 'global') sendProjectId = null;
-
+    var sendProjectId = activeScope === 'project' ? (currentConversationProjectId || defaultProjectId) : null;
     openPanel();
     renderUserMessage(text);
-    textarea.value = '';
-    resizeTextarea();
-    submitBtn.disabled = true;
+    input.value = '';
+    resize();
+    submit.disabled = true;
 
     try {
-      var body = {message: text, mode: mode, conversation_id: currentConversationId};
+      var body = {
+        message: text,
+        mode: activeMode,
+        scope: activeScope,
+        conversation_id: currentConversationId,
+      };
       if (sendProjectId) body.project_id = sendProjectId;
       var res = await fetch('/ai/chat', {
         method: 'POST',
@@ -279,42 +393,50 @@
         body: JSON.stringify(body),
       });
       var data = await res.json();
-      if (!data.ok && data.error === 'question_blocked_by_permission_guard') {
-        renderAssistantMessage(data.message || "I can't answer that based on your access level.");
-        return;
-      }
       if (!data.ok) {
-        renderAssistantMessage('(Error: ' + (data.error || 'unknown') + ')');
+        renderAssistantMessage(data.message || ('Error: ' + (data.error || 'unknown')));
         return;
       }
       currentConversationId = data.conversation_id;
+      currentConversationProjectId = data.project_id || null;
+      currentConversationProjectName = data.project_name || '';
+      updateContext();
       renderAssistantMessage(data.assistant_message || '(no response)');
       (data.tool_calls || []).forEach(renderToolCallCard);
       refreshHistory();
     } catch (err) {
-      renderAssistantMessage('(Request failed: ' + err.message + ')');
+      renderAssistantMessage('Request failed: ' + err.message);
     }
+  }
+
+  dockForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    submitMessage(dockInput, dockSubmit, resizeDock);
+  });
+  panelForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    submitMessage(panelInput, panelSubmit, resizePanel);
   });
 
-  // ── Conversation history dropdown ──
   async function refreshHistory() {
     try {
       var res = await fetch('/ai/conversations');
       var data = await res.json();
       if (!data.ok) return;
-      historySel.innerHTML = '<option value="">— history —</option>';
+      historySel.innerHTML = '<option value="">— ' + historyLabel + ' —</option>';
       data.conversations.forEach(function (c) {
         var opt = document.createElement('option');
         opt.value = c.id;
         opt.textContent = (c.title || '(untitled)') + (c.project_name ? ' · ' + c.project_name : '');
         if (c.id === currentConversationId) {
           opt.selected = true;
-          titleEl.textContent = c.title || 'AI Chat';
+          titleEl.textContent = c.title || defaultTitle;
         }
         historySel.appendChild(opt);
       });
-    } catch (_) { /* ignore */ }
+    } catch (_) { /* history is non-critical */ }
   }
+
   historySel.addEventListener('change', async function () {
     var id = parseInt(historySel.value, 10);
     if (!id) return;
@@ -323,34 +445,63 @@
       var data = await res.json();
       if (!data.ok) return;
       currentConversationId = id;
-      titleEl.textContent = data.conversation.title || 'AI Chat';
+      currentConversationProjectId = data.conversation.project_id || null;
+      currentConversationProjectName = data.conversation.project_name || '';
+      activeScope = currentConversationProjectId ? 'project' : 'global';
+      setSegment('scope', activeScope);
+      updateContext();
+      titleEl.textContent = data.conversation.title || defaultTitle;
       msgList.innerHTML = '';
       data.messages.forEach(function (m) {
         if (m.role === 'user') renderUserMessage(m.message);
         else if (m.role === 'assistant') {
           renderAssistantMessage(m.message);
-          var tcs = (m.metadata && m.metadata.tool_calls) || [];
-          tcs.forEach(renderToolCallCard);
+          ((m.metadata && m.metadata.tool_calls) || []).forEach(renderToolCallCard);
         }
       });
       openPanel();
-    } catch (_) { /* ignore */ }
+    } catch (_) { /* history is non-critical */ }
   });
 
-  // ── Archive button ──
   archiveBtn.addEventListener('click', async function () {
     if (!currentConversationId) return;
-    if (!confirm('Archive this conversation? It will disappear from the history dropdown.')) return;
+    if (!confirm(bar.dataset.confirmArchive)) return;
     try {
       await fetch('/ai/conversations/' + currentConversationId + '/archive', {method: 'POST'});
       currentConversationId = null;
+      currentConversationProjectId = defaultProjectId;
+      currentConversationProjectName = defaultProjectName;
       msgList.innerHTML = '';
-      titleEl.textContent = 'AI Chat';
+      titleEl.textContent = defaultTitle;
       refreshHistory();
       closePanel();
-    } catch (_) { /* ignore */ }
+    } catch (_) { /* archive is non-critical */ }
   });
 
-  // Initial history fetch (so the dropdown is populated on page load).
+  var savedWidth = parseInt(localStorage.getItem('pm_assistant_width') || '', 10);
+  function setPanelWidth(width) {
+    var max = Math.min(680, window.innerWidth * 0.5);
+    var next = Math.max(360, Math.min(width, max));
+    document.documentElement.style.setProperty('--assistant-panel-width', next + 'px');
+    localStorage.setItem('pm_assistant_width', String(next));
+  }
+  if (savedWidth && window.innerWidth > 760) setPanelWidth(savedWidth);
+  resizeHandle.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    resizeHandle.setPointerCapture(e.pointerId);
+    function move(evt) { setPanelWidth(window.innerWidth - evt.clientX); }
+    function stop() {
+      resizeHandle.removeEventListener('pointermove', move);
+      resizeHandle.removeEventListener('pointerup', stop);
+    }
+    resizeHandle.addEventListener('pointermove', move);
+    resizeHandle.addEventListener('pointerup', stop);
+  });
+  resizeHandle.addEventListener('keydown', function (e) {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    var current = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--assistant-panel-width'), 10) || 440;
+    setPanelWidth(current + (e.key === 'ArrowLeft' ? 20 : -20));
+  });
+
   refreshHistory();
 })();

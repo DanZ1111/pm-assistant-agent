@@ -15,7 +15,7 @@ v1.1 把系统从“项目资料表”推进成“产品开发工作台”：PM 
 常用入口：
 - **New Project**：手动创建，或使用 **AI 辅助创建项目** 从笔记/文件提取字段。
 - **Project detail**：查看 Thesis、项目日志、灵感来源、Timeline 2.0、文件、渲染图历史、样品照片、Variants、Packaging、Quotation、Profit Model 占位信息。
-- **Bottom AI Chat**：当前可把聊天内容记录为项目日志；敏感信息权限会先检查，再决定是否调用 AI。
+- **AI 助手工作区**：底部紧凑输入栏可展开为右侧工作区；在项目页内，AI 会自动带入当前项目上下文。PM / Admin 可以让 AI 提议创建并关联灵感，确认后才会写入。
 - **My Projects**：PM / Admin 的日常项目列表。
 
 ---
@@ -165,6 +165,8 @@ The Project Journal is an internal project memory section for PMs and admins. Us
 
 Projects can link to ideas from the **Good Ideas** board. Use this section to record which material, structure, feature, aesthetic, manufacturing idea, or reference inspired the project.
 
+As of Build 26, PMs and admins can click **Create & Link Idea** to capture a new inspiration without leaving the project page. You can also describe the inspiration in the assistant's **Capture** mode: the assistant proposes the Idea, checks for likely duplicates, and waits for confirmation before creating or linking anything.
+
 ### Timeline 2.0 (Build 17)
 
 Shows all phases in order with planned/actual dates, status, and owner.
@@ -254,16 +256,16 @@ A history of every change made to the project, newest first. Includes:
 
 ---
 
-## Bottom AI Chat (Build 21)
+## AI Assistant Workspace (Build 26)
 
-A fixed chat bar at the bottom of every page (when you're logged in). Two toggles:
+A compact assistant dock sits at the bottom of every authenticated page. Submit a message and the assistant opens beside the tracker on desktop or as a full-screen pane on mobile. The expanded workspace has its own composer, so the dock disappears while you work. Close the pane to return to the full tracker; conversation history remains available.
 
-- **Intake / Ask** — Intake lets the AI capture or change things on your behalf (currently only `create_journal_entry` is wired). Ask is read-only Q&A.
-- **Project / Global** (only on project detail pages) — Project scope tells the AI which project you mean; Global asks across everything.
+- **Capture / Ask** — Capture can log journal entries and propose Idea actions. Ask is read-only Q&A.
+- **This Project / Global** — On project detail pages, This Project automatically supplies the active project's role-filtered context. Switching scope during a conversation starts a new thread after confirmation.
+- **Resizable workspace** — drag the assistant's left edge on desktop. Your preferred width is remembered in your browser.
+- **Idea review cards** — inspiration messages can produce Create, Link, or Update proposals. Review and confirm before anything is written. If a likely duplicate exists, choose **Link existing** or **Create new anyway**.
 
-Type and hit Enter. A panel slides in from the right showing the conversation. The history dropdown at the top of the panel lets you jump back to previous conversations; the archive button removes the current one from the history.
-
-What works in v1.1: capture journal entries by saying things like _"log a journal entry: factory pushed back on the gasket spec, want to discuss with engineer Tuesday."_ Other tools (variants, phase shifts, etc.) are stubbed and will land in follow-up builds — for now they'll respond with "not yet wired."
+Use the history dropdown to reopen past conversations or archive threads you no longer need. Broader PM actions such as variants and phase changes remain follow-up work for Build 27.
 
 Viewers cannot see the chat surface ask about sensitive topics (factory, costs, journal content, business plans, variant costs, packaging costs, quotations) — those questions are blocked before any AI call.
 

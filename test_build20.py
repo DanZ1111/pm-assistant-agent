@@ -79,10 +79,10 @@ def main():
 
     # ── Schema & dispatcher correctness ──
     print("\n── Schema & dispatcher correctness ──")
-    if len(TOOL_SCHEMAS) == 16:
-        ok("TOOL_SCHEMAS has exactly 16 entries")
+    if len(TOOL_SCHEMAS) == 17:
+        ok("TOOL_SCHEMAS has 17 entries after Build 26 adds update_idea")
     else:
-        fail("schema count", f"expected 16, got {len(TOOL_SCHEMAS)}")
+        fail("schema count", f"expected 17, got {len(TOOL_SCHEMAS)}")
 
     schema_names = {s["function"]["name"] for s in TOOL_SCHEMAS}
     perm_names = set(TOOL_PERMISSIONS.keys())

@@ -44,8 +44,8 @@ def main():
     # Build 24's purpose was to release v1.1.0. We keep this check tolerant
     # of post-release patch / extension builds (e.g. v1.1.0-build25) so that
     # adding a follow-up build doesn't invalidate the "v1.1.0 shipped" proof.
-    if CURRENT_VERSION.startswith("1.1.0"):
-        ok(f"app.version CURRENT_VERSION is on the v1.1.0 line ({CURRENT_VERSION})")
+    if CURRENT_VERSION.startswith(("1.1.0", "1.2.0")):
+        ok(f"app.version CURRENT_VERSION is on the v1.1+ line ({CURRENT_VERSION})")
     else:
         fail("CURRENT_VERSION", CURRENT_VERSION)
 
@@ -74,7 +74,6 @@ def main():
         "VERSION.md still documents the v1.1.0 release",
         version_md,
         [
-            "**Current Version:** v1.1.0",
             "v1.1.0 released",
             "## What's new in v1.1.0",
         ],

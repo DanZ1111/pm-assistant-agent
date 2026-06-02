@@ -1,9 +1,20 @@
 # PM Product Tracker — Version
 
-**Current Version:** v1.1.0-build25
-**Current Build:** Build 25 — Beauty Department isolated deployment
-**Status:** v1.1.0 released; Build 25 is a post-release infra extension
-**Last Updated:** 2026-05-30
+**Current Version:** v1.2.0-build26
+**Current Build:** Build 26 — Professional assistant workspace + project-aware Idea capture
+**Status:** v1.1.0 released; v1.2.0 in progress with the first assistant-workspace milestone
+**Last Updated:** 2026-06-01
+
+## What's new in v1.2.0-build26
+
+- **Professional assistant workspace.** The AI assistant now opens beside the tracker as a resizable split workspace on desktop and a full-screen pane on mobile. Its header is no longer covered by the navbar.
+- **Compact dock + panel composer.** The collapsed assistant is a compact bottom dock. When expanded, the dock disappears and the composer moves into the assistant pane.
+- **Refined controls.** Ask / Capture and This Project / Global are segmented controls rather than raw dropdowns. Changing scope during an active conversation starts a new thread after confirmation.
+- **Real project context.** Project-scoped chat receives a role-filtered project summary, linked Ideas, and permitted recent journal context. Viewers never receive PM-only fields.
+- **Inspired By capture.** PMs and admins can create-and-link Ideas directly from the Inspired By section. Chat can propose create, link, and follow-up Idea updates using small confirmation cards.
+- **No silent Idea writes.** Chat proposals require explicit confirmation. Confirmed project links write `ai_chat` change-log entries. Duplicate Idea names suggest linking the existing record or creating a new one.
+- **Viewer read-only alignment.** Viewers can browse Good Ideas but cannot create, edit, link, or update Ideas.
+- **No schema migration.** Build 26 reuses existing conversations, message metadata, Ideas, project links, and change logs.
 
 ## What's new in v1.1.0-build25
 

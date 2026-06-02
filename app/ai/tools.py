@@ -279,10 +279,11 @@ TOOL_SCHEMAS: list[dict] = [
         "type": "function",
         "function": {
             "name": "create_idea",
-            "description": "Create a new entry on the Good Ideas board.",
+            "description": "Propose a new Good Idea. When project_id is supplied, confirmation creates the idea and links it to that project's Inspired By section.",
             "parameters": {
                 "type": "object",
                 "properties": {
+                    "project_id": {"type": "integer", "description": "Active project to link this idea to, when applicable"},
                     "name": {"type": "string"},
                     "description": {"type": "string"},
                     "idea_type": {"type": "string", "enum": ["material", "structure", "feature", "aesthetic", "manufacturing", "other"]},
@@ -292,6 +293,24 @@ TOOL_SCHEMAS: list[dict] = [
                     "notes": {"type": "string"},
                 },
                 "required": ["name"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_idea",
+            "description": "Propose a small edit to an existing Good Idea after the user provides follow-up detail.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "idea_id": {"type": "integer"},
+                    "fields": {
+                        "type": "object",
+                        "description": "Editable fields only: idea_type, source, source_detail, contributor, notes, description.",
+                    },
+                },
+                "required": ["idea_id", "fields"],
             },
         },
     },
@@ -329,7 +348,13 @@ TOOL_PERMISSIONS: dict[str, dict[str, Any]] = {
     "update_project_field":            {"require_role": ("admin", "pm"), "needs_project": True,
                                         "field_allowlist": UPDATE_PROJECT_FIELD_ALLOWED},
     "link_idea_to_project":            {"require_role": ("admin", "pm"), "needs_project": True},
-    "create_idea":                     {"require_role": ("admin", "pm", "viewer")},
+    "create_idea":                     {"require_role": ("admin", "pm"), "optional_project": True},
+    "update_idea":                     {"require_role": ("admin", "pm")},
+}
+
+IDEA_CONFIRMATION_TOOLS = {"create_idea", "link_idea_to_project", "update_idea"}
+UPDATE_IDEA_ALLOWED = {
+    "idea_type", "source", "source_detail", "contributor", "notes", "description",
 }
 
 
@@ -343,7 +368,7 @@ def _err(error: str, **extra) -> dict:
     return out
 
 
-def dispatch(tool_name: str, args: dict, db, user) -> dict:
+def dispatch(tool_name: str, args: dict, db, user, confirmed: bool = False) -> dict:
     """Look up the tool, enforce permissions, then call the handler.
 
     Order of checks (security-first; never skipped, even for unwired tools):
@@ -351,8 +376,9 @@ def dispatch(tool_name: str, args: dict, db, user) -> dict:
       2. User passes role check per TOOL_PERMISSIONS → else forbidden
       3. needs_project / needs_journal sub-checks → else forbidden
       4. Field allowlist (for update_project_field) → else field_not_allowlisted
-      5. Handler exists in v1.1                    → else not_wired_until_build_21
-      6. Call handler                              → return its result
+      5. Confirmation guard for Idea writes        → else confirmation_required
+      6. Handler exists                            → else not_wired_until_build_21
+      7. Call handler                              → return its result
 
     Permission discipline must apply even when the handler is a stub —
     otherwise Build 21 inherits a tool surface where unwired tools silently
@@ -385,6 +411,16 @@ def dispatch(tool_name: str, args: dict, db, user) -> dict:
         if not can_edit_project(user, project):
             return _err("forbidden", reason="cannot_edit_project")
 
+    # 3c. Some tools can operate globally but must enforce project ownership
+    # whenever the model proposes a project-linked form of the action.
+    if perms.get("optional_project") and args.get("project_id") is not None:
+        project_id = int(args["project_id"])
+        project = crud.get_project(db, project_id)
+        if project is None:
+            return _err("project_not_found", project_id=project_id)
+        if not can_edit_project(user, project):
+            return _err("forbidden", reason="cannot_edit_project")
+
     # 3b. needs_journal
     if perms.get("needs_journal") and not can_view_journal(user):
         return _err("forbidden", reason="cannot_view_journal")
@@ -399,12 +435,17 @@ def dispatch(tool_name: str, args: dict, db, user) -> dict:
                 allowed=sorted(perms["field_allowlist"]),
             )
 
-    # 5. Handler exists?
+    # 5. Build 26 keeps Idea actions useful without violating the repository
+    # preview-confirm rule. The chat route turns this into a small review card.
+    if tool_name in IDEA_CONFIRMATION_TOOLS and not confirmed:
+        return _err("confirmation_required", tool=tool_name)
+
+    # 6. Handler exists?
     handler = _HANDLERS.get(tool_name)
     if handler is None:
         return _err("not_wired_until_build_21", tool=tool_name)
 
-    # 6. Call handler
+    # 7. Call handler
     return handler(args, db, user)
 
 
@@ -432,8 +473,105 @@ def _handle_create_journal_entry(args: dict, db, user) -> dict:
     }
 
 
+def _handle_create_idea(args: dict, db, user) -> dict:
+    name = str(args.get("name") or "").strip()
+    if not name:
+        return _err("missing_argument", argument="name")
+    data = {
+        field: args.get(field)
+        for field in (
+            "name", "description", "idea_type", "source", "source_detail",
+            "contributor", "notes",
+        )
+    }
+    data["name"] = name
+    data["contributor"] = (
+        data.get("contributor") or user.display_name or user.username
+    )
+    project_id = args.get("project_id")
+    if project_id is not None:
+        idea, _link = crud.create_and_link_idea(
+            db,
+            project_id=int(project_id),
+            data=data,
+            contributor_user_id=user.id,
+            note=args.get("note"),
+            changed_by="ai",
+            source_type="ai_chat",
+        )
+    else:
+        idea = crud.create_idea(db, data, contributor_user_id=user.id)
+    unresolved = [
+        field for field in ("idea_type", "source")
+        if not args.get(field)
+    ]
+    return {
+        "ok": True,
+        "idea_id": idea.id,
+        "serial_number": idea.serial_number,
+        "linked_project_id": int(project_id) if project_id is not None else None,
+        "unresolved_fields": unresolved,
+        "message": f"Saved {idea.serial_number}: {idea.name}.",
+    }
+
+
+def _handle_link_idea_to_project(args: dict, db, user) -> dict:
+    project_id = int(args["project_id"])
+    idea_id = int(args["idea_id"])
+    idea = crud.get_idea(db, idea_id)
+    if idea is None:
+        return _err("idea_not_found", idea_id=idea_id)
+    link = crud.link_idea_to_project(
+        db,
+        project_id=project_id,
+        idea_id=idea_id,
+        linked_by_user_id=user.id,
+        note=args.get("note"),
+        changed_by="ai",
+        source_type="ai_chat",
+    )
+    return {
+        "ok": True,
+        "idea_id": idea.id,
+        "serial_number": idea.serial_number,
+        "project_id": project_id,
+        "message": f"Linked {idea.serial_number}: {idea.name}.",
+        "already_linked": link is not None,
+    }
+
+
+def _handle_update_idea(args: dict, db, user) -> dict:
+    idea_id = int(args.get("idea_id") or 0)
+    fields = args.get("fields") or {}
+    if not idea_id:
+        return _err("missing_argument", argument="idea_id")
+    if not isinstance(fields, dict) or not fields:
+        return _err("missing_argument", argument="fields")
+    unexpected = sorted(set(fields) - UPDATE_IDEA_ALLOWED)
+    if unexpected:
+        return _err("field_not_allowlisted", fields=unexpected)
+    idea = crud.update_idea(
+        db,
+        idea_id=idea_id,
+        data=fields,
+        changed_by="ai",
+        source_type="ai_chat",
+    )
+    if idea is None:
+        return _err("idea_not_found", idea_id=idea_id)
+    return {
+        "ok": True,
+        "idea_id": idea.id,
+        "serial_number": idea.serial_number,
+        "message": f"Updated {idea.serial_number}: {idea.name}.",
+    }
+
+
 _HANDLERS: dict[str, Any] = {
     "create_journal_entry": _handle_create_journal_entry,
+    "create_idea": _handle_create_idea,
+    "link_idea_to_project": _handle_link_idea_to_project,
+    "update_idea": _handle_update_idea,
     # All other tools intentionally absent → dispatcher returns
     # "not_wired_until_build_21" AFTER permission checks pass.
 }

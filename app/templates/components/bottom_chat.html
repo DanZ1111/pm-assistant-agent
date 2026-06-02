@@ -1,39 +1,46 @@
-{# Build 21 — Bottom AI chat bar + right-side panel.
-   Requires: current_user (auth) and optionally current_project_id (set in project_detail route).
-   Hidden for anonymous users by the {% if current_user %} guard in base.html. #}
+{# Build 26 — compact assistant dock + split workspace.
+   Requires: current_user and optionally current_project_id/current_project_name. #}
 <div id="bottomChatBar" class="bottom-chat-bar"
-     data-project-id="{{ current_project_id or '' }}">
+     data-project-id="{{ current_project_id or '' }}"
+     data-project-name="{{ current_project_name or '' }}"
+     data-confirm-scope-switch="{{ t('chat.confirm_scope_switch') }}"
+     data-history-label="{{ t('chat.history') }}"
+     data-default-title="{{ t('chat.title') }}"
+     data-confirm-archive="{{ t('chat.confirm_archive') }}"
+     data-confirm-action="{{ t('chat.confirm_action') }}"
+     data-create-new-anyway="{{ t('chat.create_new_anyway') }}"
+     data-link-existing="{{ t('chat.link_existing') }}"
+     data-cancel="{{ t('btn.cancel') }}">
   <form id="bottomChatForm" class="bottom-chat-form" autocomplete="off">
-    <div class="bottom-chat-toggles">
-      <label class="bottom-chat-mode" title="{{ t('chat.mode_title') }}">
-        <select id="chatModeSelect" class="form-select form-select-sm">
-          <option value="intake" selected>{{ t('chat.mode.intake') }}</option>
-          <option value="ask">{{ t('chat.mode.ask') }}</option>
-        </select>
-      </label>
-      {% if current_project_id %}
-      <label class="bottom-chat-scope" title="{{ t('chat.scope_title') }}">
-        <select id="chatScopeSelect" class="form-select form-select-sm">
-          <option value="project" selected>{{ t('chat.scope.project') }}</option>
-          <option value="global">{{ t('chat.scope.global') }}</option>
-        </select>
-      </label>
-      {% endif %}
+    <div class="chat-segmented" role="group" aria-label="{{ t('chat.mode_title') }}">
+      <button type="button" class="chat-segment-btn active" data-chat-mode="intake">{{ t('chat.mode.capture') }}</button>
+      <button type="button" class="chat-segment-btn" data-chat-mode="ask">{{ t('chat.mode.ask') }}</button>
     </div>
+    {% if current_project_id %}
+    <div class="chat-segmented" role="group" aria-label="{{ t('chat.scope_title') }}">
+      <button type="button" class="chat-segment-btn active" data-chat-scope="project">{{ t('chat.scope.project') }}</button>
+      <button type="button" class="chat-segment-btn" data-chat-scope="global">{{ t('chat.scope.global') }}</button>
+    </div>
+    {% endif %}
     <textarea id="chatInputTextarea"
               class="bottom-chat-input"
               placeholder="{% if current_project_id %}{{ t('chat.placeholder.project') }}{% else %}{{ t('chat.placeholder.global') }}{% endif %}"
               rows="1"></textarea>
-    <button type="submit" id="chatSubmitBtn" class="bottom-chat-submit" disabled>
+    <button type="submit" id="chatSubmitBtn" class="bottom-chat-submit" disabled title="{{ t('btn.send') }}">
       <i class="bi bi-send"></i>
     </button>
   </form>
 </div>
 
-<div id="aiSidePanel" class="ai-side-panel" aria-hidden="true">
+<aside id="aiSidePanel" class="ai-side-panel" aria-hidden="true">
+  <div id="aiPanelResizeHandle" class="ai-panel-resize-handle" role="separator"
+       aria-label="{{ t('chat.resize_panel') }}" aria-orientation="vertical" tabindex="0"></div>
   <div class="ai-side-panel-header">
     <div class="ai-side-panel-title-row">
-      <h2 class="ai-side-panel-title" id="aiPanelTitle">{{ t('chat.title') }}</h2>
+      <div class="ai-side-panel-heading">
+        <span class="ai-side-panel-kicker">{{ t('chat.workspace') }}</span>
+        <h2 class="ai-side-panel-title" id="aiPanelTitle">{{ t('chat.title') }}</h2>
+      </div>
       <div class="ai-side-panel-actions">
         <select id="conversationHistorySelect" class="form-select form-select-sm" title="{{ t('chat.switch_conversation') }}">
           <option value="">— {{ t('chat.history') }} —</option>
@@ -46,6 +53,24 @@
         </button>
       </div>
     </div>
+    <div id="aiPanelContext" class="ai-panel-context"
+         data-in-project="{{ t('chat.in_project') }}"
+         data-global-label="{{ t('chat.scope.global') }}">
+      {% if current_project_id %}
+      <i class="bi bi-folder2"></i> {{ t('chat.in_project') }} <strong>{{ current_project_name }}</strong>
+      {% else %}
+      <i class="bi bi-globe2"></i> {{ t('chat.scope.global') }}
+      {% endif %}
+    </div>
   </div>
   <div id="aiPanelMessages" class="ai-side-panel-messages"></div>
-</div>
+  <form id="panelChatForm" class="ai-panel-composer" autocomplete="off">
+    <textarea id="panelChatInput"
+              class="bottom-chat-input ai-panel-input"
+              placeholder="{% if current_project_id %}{{ t('chat.placeholder.project') }}{% else %}{{ t('chat.placeholder.global') }}{% endif %}"
+              rows="1"></textarea>
+    <button type="submit" id="panelChatSubmit" class="bottom-chat-submit" disabled title="{{ t('btn.send') }}">
+      <i class="bi bi-send"></i>
+    </button>
+  </form>
+</aside>

@@ -1,5 +1,31 @@
 # PM Product Tracker — Changelog
 
+## v1.2.0-build26 — Professional assistant workspace + project-aware Idea capture (Build 26)
+_2026-06-01_
+
+**Goal:** make bottom chat feel like a professional second workspace while fixing the awkward inspiration workflow.
+
+**Assistant workspace:**
+- Replaced the overlay-style expanded state with a resizable desktop split workspace and a mobile full-screen assistant pane.
+- Moved the active composer into the pane and reduced the collapsed state to a compact dock.
+- Replaced raw mode/scope dropdowns with Ask / Capture and This Project / Global segmented controls.
+- Added immutable conversation scope: switching project/global context starts a fresh conversation after confirmation.
+- Kept assistant header controls above tracker navigation so Archive, History, and Close stay reachable.
+
+**Project-aware capture:**
+- Injects role-filtered project context into project-scoped chat. Viewers do not receive factory, engineer, or cost fields.
+- Adds `create_idea`, `link_idea_to_project`, and allowlisted `update_idea` handlers.
+- Adds small Idea-specific review cards with Confirm / Cancel and duplicate-aware Link Existing / Create New actions.
+- Adds manual **Create & Link Idea** in the project-detail Inspired By section.
+- Aligns viewers with read-only Good Ideas behavior.
+
+**Audit + safety:**
+- No schema migration.
+- Idea linkage and linked-Idea edits use service-layer writes and project change-log entries.
+- Chat writes remain preview-confirm; Build 27 will generalize proposal cards to the broader daily PM tool set.
+
+**Test:** `test_build26.py` covers schema parity, i18n parity, role-filtered prompt context, guarded Idea tools, audit writes, duplicate matching, HTTP proposal lifecycle, immutable scope, manual Create & Link, workspace markup, and viewer restrictions.
+
 ## v1.1.0-build25 — Beauty Department isolated deployment (Build 25)
 _2026-05-30_
 

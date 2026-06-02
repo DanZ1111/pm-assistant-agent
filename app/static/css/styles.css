@@ -1828,34 +1828,55 @@ body {
 }
 
 /* ------------------------------------------------------------------ */
-/* Build 21 — Bottom AI Chat + Right-Side Panel                        */
+/* Build 26 — Compact AI dock + resizable assistant workspace          */
 /* ------------------------------------------------------------------ */
+:root { --assistant-panel-width: 440px; }
 .bottom-chat-bar {
   position: fixed;
-  left: 0; right: 0; bottom: 0;
-  background: #1f2937;
-  border-top: 1px solid #374151;
-  padding: 10px 16px;
+  left: 0; right: 0; bottom: 14px;
+  padding: 0 16px;
   z-index: 90;
-  box-shadow: 0 -2px 8px rgba(0,0,0,0.15);
+  pointer-events: none;
 }
 .bottom-chat-form {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 8px;
-  max-width: 1200px;
+  max-width: 980px;
   margin: 0 auto;
+  padding: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  border-radius: 10px;
+  background: #0f172a;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.24);
+  pointer-events: auto;
 }
-.bottom-chat-toggles {
+.chat-segmented {
   display: flex;
-  gap: 6px;
-}
-.bottom-chat-toggles .form-select {
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid #334155;
+  border-radius: 7px;
   background: #111827;
-  color: #e5e7eb;
-  border-color: #374151;
-  font-size: 0.8rem;
-  min-width: 80px;
+}
+.chat-segment-btn {
+  border: 0;
+  border-radius: 5px;
+  padding: 5px 8px;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.chat-segment-btn:hover { color: #f8fafc; }
+.chat-segment-btn.active {
+  color: #fff;
+  background: #334155;
 }
 .bottom-chat-input {
   flex: 1;
@@ -1892,24 +1913,51 @@ body {
 }
 .bottom-chat-submit:not(:disabled):hover { background: #1d4ed8; }
 
-/* Right-side panel (slides in from right when chat is active) */
+body.assistant-open { overflow-x: hidden; }
+body.assistant-open .navbar-main,
+body.assistant-open .main-content {
+  width: calc(100% - var(--assistant-panel-width));
+  transition: width 0.2s ease;
+}
+body.assistant-open .navbar-main .container-fluid { padding-left: 12px !important; padding-right: 12px !important; }
+body.assistant-open .navbar-main .navbar-brand { font-size: 13px; }
+body.assistant-open .navbar-main .nav-link { padding-left: 7px !important; padding-right: 7px !important; font-size: 12px; }
+body.assistant-open .navbar-main .nav-help-btn { font-size: 12px; padding-left: 7px; padding-right: 7px; }
+body.assistant-open .bottom-chat-bar { display: none; }
+body.assistant-open.has-bottom-chat .main-content { padding-bottom: 0; }
+
+/* Right-side assistant app. It owns the right edge, including the top strip,
+   so tracker navigation can never cover its controls. */
 .ai-side-panel {
   position: fixed;
   top: 0; right: 0;
-  width: 420px;
-  max-width: 95vw;
+  width: var(--assistant-panel-width);
+  min-width: 360px;
+  max-width: min(680px, 50vw);
   height: 100vh;
   background: #ffffff;
-  box-shadow: -4px 0 16px rgba(0,0,0,0.18);
+  border-left: 1px solid var(--color-border);
+  box-shadow: -6px 0 20px rgba(15, 23, 42, 0.12);
   transform: translateX(100%);
-  transition: transform 0.25s ease-in-out;
-  z-index: 95;
+  transition: transform 0.2s ease-in-out;
+  z-index: 120;
   display: flex;
   flex-direction: column;
 }
 .ai-side-panel.open { transform: translateX(0); }
+.ai-panel-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 2;
+}
+.ai-panel-resize-handle:hover,
+.ai-panel-resize-handle:focus { background: rgba(59, 130, 246, 0.3); outline: none; }
 .ai-side-panel-header {
-  padding: 14px 16px;
+  padding: 14px 16px 10px;
   border-bottom: 1px solid var(--color-border, #e5e7eb);
   background: #f9fafb;
 }
@@ -1928,17 +1976,35 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.ai-side-panel-heading { min-width: 0; }
+.ai-side-panel-kicker {
+  display: block;
+  margin-bottom: 1px;
+  color: var(--color-text-muted);
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
 .ai-side-panel-actions {
   display: flex;
   gap: 4px;
   align-items: center;
 }
-.ai-side-panel-actions .form-select { min-width: 90px; }
+.ai-side-panel-actions .form-select {
+  width: 130px;
+  min-width: 96px;
+  font-size: 0.76rem;
+}
+.ai-panel-context {
+  margin-top: 8px;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
 .ai-side-panel-messages {
   flex: 1;
   overflow-y: auto;
   padding: 16px;
-  padding-bottom: 96px;  /* leave room above the bottom chat bar */
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1975,11 +2041,31 @@ body {
 .chat-tool-call-card.err { background: #fef2f2; }
 .chat-tool-call-card-name { font-weight: 600; }
 .chat-tool-call-card-result { color: #4b5563; margin-top: 2px; }
+.chat-tool-call-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.chat-tool-call-card-actions .btn { font-size: 0.74rem; }
+.ai-panel-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid var(--color-border);
+  background: #f8fafc;
+}
+.ai-panel-input {
+  background: #fff;
+  color: var(--color-text);
+  border-color: var(--color-border-dark);
+}
+.ai-panel-input::placeholder { color: #94a3b8; }
 
 /* Push page content above the bottom chat bar so it never covers the
-   bottom of the page. 160px = capped 120px textarea + ~20px chrome +
-   ~20px breathing room. */
-body.has-bottom-chat .main-content { padding-bottom: 160px; }
+   bottom of the page. */
+body.has-bottom-chat .main-content { padding-bottom: 104px; }
 
 /* =========================================================
    Build 25 — Responsive tweaks
@@ -2019,22 +2105,24 @@ body.has-bottom-chat .main-content { padding-bottom: 160px; }
   .navbar-main .container-fluid { padding-left: 8px; padding-right: 8px; }
 }
 
-/* Bottom chat bar: shorter padding + smaller toggles at narrow widths. */
+/* Bottom chat dock: keep controls usable at narrow widths. */
 @media (max-width: 600px) {
-  .bottom-chat-bar { padding: 6px 10px; }
+  .bottom-chat-bar { bottom: 8px; padding: 0 8px; }
   .bottom-chat-form { gap: 6px; }
-  .bottom-chat-toggles .form-select { min-width: 64px; font-size: 0.72rem; padding: 2px 18px 2px 6px; }
+  .chat-segment-btn { padding: 4px 6px; font-size: 0.68rem; }
   .bottom-chat-input { font-size: 0.9rem; padding: 6px 10px; }
   .bottom-chat-submit { padding: 6px 10px; }
-  /* Match the smaller bar at narrow widths so content above isn't over-padded. */
-  body.has-bottom-chat .main-content { padding-bottom: 140px; }
+  body.has-bottom-chat .main-content { padding-bottom: 96px; }
   /* On phones, the detail-sidebar is stacked above main (per the < 900px
      rule) so the sticky max-height no longer applies — but if someone
      resizes between 900px and 600px and back, restore a tighter cap. */
-  .detail-sidebar { max-height: calc(100vh - 52px - 140px); }
+  .detail-sidebar { max-height: calc(100vh - 52px - 96px); }
 }
 
-/* AI side panel: full-width sheet at narrow widths instead of 95vw cropped. */
-@media (max-width: 480px) {
-  .ai-side-panel { width: 100%; max-width: 100%; }
+/* Mobile assistant is a full-screen app, with no squeezed tracker behind it. */
+@media (max-width: 760px) {
+  .ai-side-panel { width: 100%; min-width: 0; max-width: 100%; }
+  .ai-panel-resize-handle { display: none; }
+  body.assistant-open .navbar-main,
+  body.assistant-open .main-content { width: 100%; }
 }
