@@ -203,16 +203,26 @@
   var pendingAttachments = [];
 
   function bindTextarea(input, submit, form) {
+    var isComposing = false;
+
     function resize() {
       input.style.height = 'auto';
       input.style.height = Math.min(input.scrollHeight, 120) + 'px';
     }
+    input.addEventListener('compositionstart', function () {
+      isComposing = true;
+    });
+    input.addEventListener('compositionend', function () {
+      isComposing = false;
+    });
     input.addEventListener('input', function () {
       resize();
       refreshSubmitButtons();
     });
     input.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      // IMEs use Enter to confirm a candidate. Safari reports the legacy
+      // keyCode 229 path, while other browsers expose isComposing.
+      if (e.key === 'Enter' && !e.shiftKey && !isComposing && !e.isComposing && e.keyCode !== 229) {
         e.preventDefault();
         if (!submit.disabled) form.requestSubmit();
       }

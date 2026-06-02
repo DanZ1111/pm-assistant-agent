@@ -1,7 +1,7 @@
 # CURRENT_TASK.md
 
 ## Task
-Idle — v1.2.0 just shipped (`Build 29 — v1.2.0 release hardening`). Awaiting v1.3 planning direction from user.
+Unreleased post-v1.2.0 bug fix — make the assistant dock and panel composers safe for Chinese IME candidate-confirmation Enter events.
 
 ## Handoff rule
 Before editing, inspect:
@@ -25,6 +25,12 @@ Git/code is the source of truth. This file is only a short task reminder.
 - Browser: navbar serves `v1.2.0` (verified at `localhost:8000/auth/login`).
 - i18n parity: 537/537.
 
+## Unreleased IME fix
+
+- Root cause: the shared assistant textarea keydown handler submitted on every unshifted Enter, including Enter events used to confirm Chinese input-method candidates.
+- Fix: track `compositionstart` / `compositionend` for both assistant composers and ignore Enter while composing, including the Safari legacy `keyCode 229` path.
+- Regression: `test_build29.py` now locks the composition guards.
+
 ## What's NOT in v1.2 (deferred candidates for v1.3)
 
 - Native-speaker Chinese review of strings added in Builds 26-28.
@@ -37,7 +43,7 @@ Git/code is the source of truth. This file is only a short task reminder.
 
 ## Next step
 
-Wait for user to start v1.3 planning. Suggested directions to weigh:
+Verify the IME fix, then await explicit user instruction before commit or push. After that, wait for the user to start v1.3 planning. Suggested directions to weigh:
 1. Native-speaker zh review pass (small but valuable for the Beauty dept rollout).
 2. AI prompt + Help modal translation (medium, completes the i18n story).
 3. Profit Model real implementation (medium-large, the only major v1.1 placeholder still outstanding).

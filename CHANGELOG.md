@@ -1,5 +1,10 @@
 # PM Product Tracker — Changelog
 
+## Unreleased
+_2026-06-02_
+
+- **Chinese IME chat fix:** assistant dock and panel composers no longer send a partial message when Enter is used to confirm an input-method candidate, including Safari's legacy `keyCode 229` event path. Unshifted Enter still sends once composition has finished.
+
 ## v1.2.0 — Assistant Workspace Release
 _2026-06-02_
 

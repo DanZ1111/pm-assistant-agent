@@ -331,6 +331,10 @@ Close the assistant-workspace release with consolidated documentation and broad 
 - Manually verify desktop and mobile layouts in English and Chinese.
 - Capture browser screenshots showing that the navbar, tracker, dock, resize handle, assistant header, proposal cards, message list, and composer do not overlap.
 
+### Post-release Refinement Log
+
+- **2026-06-02:** Fix the shared assistant composer keyboard binding for Chinese IMEs. Enter used to confirm a composition candidate must not submit a partial chat message. Both dock and expanded-panel inputs track composition lifecycle events and ignore the Safari legacy `keyCode 229` path; ordinary unshifted Enter still submits after composition ends.
+
 ---
 
 ## Explicitly Deferred

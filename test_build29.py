@@ -153,6 +153,19 @@ def main():
         ],
     )
 
+    print("\n── Post-release assistant input regression ──")
+    main_js = read("app/static/js/main.js")
+    contains_all(
+        "assistant composers ignore IME candidate-confirmation Enter events",
+        main_js,
+        [
+            "input.addEventListener('compositionstart'",
+            "input.addEventListener('compositionend'",
+            "!e.isComposing",
+            "e.keyCode !== 229",
+        ],
+    )
+
     print("\n── Regression inventory ──")
     expected_tests = [
         "test_build1.py",
