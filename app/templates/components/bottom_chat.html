@@ -11,6 +11,9 @@
      data-create-new-anyway="{{ t('chat.create_new_anyway') }}"
      data-link-existing="{{ t('chat.link_existing') }}"
      data-target-project="{{ t('chat.target_project') }}"
+     data-attachment-upload="{{ t('chat.attachment_upload') }}"
+     data-attachment-remove="{{ t('chat.attachment_remove') }}"
+     data-attachment-error="{{ t('chat.attachment_error') }}"
      data-cancel="{{ t('btn.cancel') }}">
   <form id="bottomChatForm" class="bottom-chat-form" autocomplete="off">
     <div class="chat-segmented" role="group" aria-label="{{ t('chat.mode_title') }}">
@@ -23,6 +26,13 @@
       <button type="button" class="chat-segment-btn" data-chat-scope="global">{{ t('chat.scope.global') }}</button>
     </div>
     {% endif %}
+    {% if current_user.role in ('admin', 'pm') %}
+    <button type="button" class="chat-attach-btn" data-chat-attachment-button title="{{ t('chat.attachment_upload') }}">
+      <i class="bi bi-paperclip"></i>
+    </button>
+    <input type="file" class="d-none" data-chat-attachment-input accept=".pdf,.docx,.png,.jpg,.jpeg,.webp,.gif">
+    {% endif %}
+    <div class="chat-attachment-list" data-chat-attachment-list></div>
     <textarea id="chatInputTextarea"
               class="bottom-chat-input"
               placeholder="{% if current_project_id %}{{ t('chat.placeholder.project') }}{% else %}{{ t('chat.placeholder.global') }}{% endif %}"
@@ -66,6 +76,13 @@
   </div>
   <div id="aiPanelMessages" class="ai-side-panel-messages"></div>
   <form id="panelChatForm" class="ai-panel-composer" autocomplete="off">
+    {% if current_user.role in ('admin', 'pm') %}
+    <button type="button" class="chat-attach-btn chat-attach-btn-panel" data-chat-attachment-button title="{{ t('chat.attachment_upload') }}">
+      <i class="bi bi-paperclip"></i>
+    </button>
+    <input type="file" class="d-none" data-chat-attachment-input accept=".pdf,.docx,.png,.jpg,.jpeg,.webp,.gif">
+    {% endif %}
+    <div class="chat-attachment-list" data-chat-attachment-list></div>
     <textarea id="panelChatInput"
               class="bottom-chat-input ai-panel-input"
               placeholder="{% if current_project_id %}{{ t('chat.placeholder.project') }}{% else %}{{ t('chat.placeholder.global') }}{% endif %}"

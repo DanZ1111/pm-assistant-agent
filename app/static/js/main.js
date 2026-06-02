@@ -200,6 +200,7 @@
   var currentConversationProjectName = defaultProjectName;
   var activeMode = 'intake';
   var activeScope = defaultProjectId ? 'project' : 'global';
+  var pendingAttachments = [];
 
   function bindTextarea(input, submit, form) {
     function resize() {
@@ -208,7 +209,7 @@
     }
     input.addEventListener('input', function () {
       resize();
-      submit.disabled = !input.value.trim();
+      refreshSubmitButtons();
     });
     input.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -221,6 +222,76 @@
 
   var resizeDock = bindTextarea(dockInput, dockSubmit, dockForm);
   var resizePanel = bindTextarea(panelInput, panelSubmit, panelForm);
+
+  function refreshSubmitButtons() {
+    dockSubmit.disabled = !dockInput.value.trim() && pendingAttachments.length === 0;
+    panelSubmit.disabled = !panelInput.value.trim() && pendingAttachments.length === 0;
+  }
+
+  function removePendingAttachmentById(attachmentId, discard) {
+    pendingAttachments = pendingAttachments.filter(function (item) {
+      return item.attachment_id !== attachmentId;
+    });
+    renderAttachmentLists();
+    refreshSubmitButtons();
+    if (discard !== false) {
+      fetch('/ai/chat/attachments/' + attachmentId, {method: 'DELETE'}).catch(function () {});
+    }
+  }
+
+  function renderAttachmentLists() {
+    document.querySelectorAll('[data-chat-attachment-list]').forEach(function (list) {
+      list.innerHTML = '';
+      pendingAttachments.forEach(function (attachment) {
+        var chip = document.createElement('span');
+        chip.className = 'chat-attachment-chip';
+        var icon = document.createElement('i');
+        icon.className = attachment.file_type === 'image' ? 'bi bi-image' : 'bi bi-file-earmark-text';
+        chip.appendChild(icon);
+        var label = document.createElement('span');
+        label.textContent = attachment.original_filename;
+        chip.appendChild(label);
+        var remove = document.createElement('button');
+        remove.type = 'button';
+        remove.title = bar.dataset.attachmentRemove || 'Remove attachment';
+        remove.innerHTML = '<i class="bi bi-x"></i>';
+        remove.addEventListener('click', function () {
+          removePendingAttachmentById(attachment.attachment_id);
+        });
+        chip.appendChild(remove);
+        list.appendChild(chip);
+      });
+    });
+  }
+
+  async function uploadPendingAttachment(file) {
+    var body = new FormData();
+    body.append('file', file);
+    try {
+      var response = await fetch('/ai/chat/attachments', {method: 'POST', body: body});
+      var data = await response.json();
+      if (!data.ok) throw new Error(data.message || data.error);
+      pendingAttachments.push(data.attachment);
+      renderAttachmentLists();
+      refreshSubmitButtons();
+    } catch (err) {
+      openPanel();
+      renderAssistantMessage((bar.dataset.attachmentError || 'Unable to attach file.') + ' ' + err.message);
+    }
+  }
+
+  document.querySelectorAll('[data-chat-attachment-button]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      var input = button.parentElement.querySelector('[data-chat-attachment-input]');
+      if (input) input.click();
+    });
+  });
+  document.querySelectorAll('[data-chat-attachment-input]').forEach(function (input) {
+    input.addEventListener('change', function () {
+      if (input.files && input.files[0]) uploadPendingAttachment(input.files[0]);
+      input.value = '';
+    });
+  });
 
   function setSegment(kind, value) {
     document.querySelectorAll('[data-chat-' + kind + ']').forEach(function (btn) {
@@ -291,6 +362,21 @@
     d.className = 'chat-msg chat-msg-assistant';
     d.textContent = text;
     msgList.appendChild(d);
+    msgList.scrollTop = msgList.scrollHeight;
+  }
+
+  function renderUserAttachments(attachments) {
+    (attachments || []).forEach(function (attachment) {
+      var d = document.createElement('div');
+      d.className = 'chat-attachment-message';
+      var icon = document.createElement('i');
+      icon.className = attachment.file_type === 'image' ? 'bi bi-image' : 'bi bi-file-earmark-text';
+      d.appendChild(icon);
+      var label = document.createElement('span');
+      label.textContent = attachment.original_filename;
+      d.appendChild(label);
+      msgList.appendChild(d);
+    });
     msgList.scrollTop = msgList.scrollHeight;
   }
 
@@ -379,6 +465,9 @@
       result.textContent = data.message || 'Saved.';
       var actions = card.querySelector('.chat-tool-call-card-actions');
       if (actions) actions.remove();
+      if (data.result && data.result.attachment_id) {
+        removePendingAttachmentById(data.result.attachment_id, false);
+      }
     } else {
       result.textContent = data.message || data.error || 'Unable to save.';
     }
@@ -435,6 +524,9 @@
         d.className = 'chat-tool-call-card err';
         result.textContent = bar.dataset.cancel || 'Cancelled';
         actions.remove();
+        if (tc.name === 'save_pending_attachment' && tc.args && tc.args.attachment_id) {
+          removePendingAttachmentById(tc.args.attachment_id, false);
+        }
       });
       d.appendChild(actions);
     }
@@ -444,13 +536,15 @@
 
   async function submitMessage(input, submit, resize) {
     var text = input.value.trim();
-    if (!text) return;
+    if (!text && pendingAttachments.length === 0) return;
+    var sentAttachments = pendingAttachments.slice();
     var sendProjectId = activeScope === 'project' ? (currentConversationProjectId || defaultProjectId) : null;
     openPanel();
-    renderUserMessage(text);
+    renderUserMessage(text || 'Please review this attachment.');
+    renderUserAttachments(sentAttachments);
     input.value = '';
     resize();
-    submit.disabled = true;
+    refreshSubmitButtons();
 
     try {
       var body = {
@@ -458,6 +552,7 @@
         mode: activeMode,
         scope: activeScope,
         conversation_id: currentConversationId,
+        attachment_ids: sentAttachments.map(function (item) { return item.attachment_id; }),
       };
       if (sendProjectId) body.project_id = sendProjectId;
       var res = await fetch('/ai/chat', {
@@ -526,7 +621,10 @@
       titleEl.textContent = data.conversation.title || defaultTitle;
       msgList.innerHTML = '';
       data.messages.forEach(function (m) {
-        if (m.role === 'user') renderUserMessage(m.message);
+        if (m.role === 'user') {
+          renderUserMessage(m.message);
+          renderUserAttachments((m.metadata && m.metadata.attachments) || []);
+        }
         else if (m.role === 'assistant') {
           renderAssistantMessage(m.message);
           ((m.metadata && m.metadata.tool_calls) || []).forEach(renderToolCallCard);

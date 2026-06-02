@@ -94,8 +94,8 @@ def main():
 
     print("\n── Schema + read-only Global tools ──")
     names = {schema["function"]["name"] for schema in TOOL_SCHEMAS}
-    if len(TOOL_SCHEMAS) == 19 and names == set(TOOL_PERMISSIONS):
-        ok("19 schemas have exact permission-rule parity")
+    if len(TOOL_SCHEMAS) == 20 and names == set(TOOL_PERMISSIONS):
+        ok("20 schemas have exact permission-rule parity")
     else:
         fail("schema parity", f"count={len(TOOL_SCHEMAS)} diff={names ^ set(TOOL_PERMISSIONS)}")
     search = dispatch("search_projects", {"query": suffix}, db, viewer)

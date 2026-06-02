@@ -1,9 +1,19 @@
 # PM Product Tracker — Version
 
-**Current Version:** v1.2.0-build27
-**Current Build:** Build 27 — Confirmed daily PM actions + Global read-only search
-**Status:** v1.1.0 released; v1.2.0 in progress with the second assistant-workspace milestone
+**Current Version:** v1.2.0-build28
+**Current Build:** Build 28 — Assistant PDF, DOCX, and image intake
+**Status:** v1.1.0 released; v1.2.0 in progress with the third assistant-workspace milestone
 **Last Updated:** 2026-06-01
+
+## What's new in v1.2.0-build28
+
+- **Assistant attachments.** PMs and admins can attach PDF, DOCX, PNG, JPG/JPEG, WEBP, and GIF inputs from the compact dock or expanded composer.
+- **Discuss first, file second.** Pending bytes live outside public `/uploads`. Project-scoped conversations show an explicit editable **Save Pending Attachment** proposal; nothing enters project files until confirmation.
+- **Natural document and image context.** PDF and DOCX text is extracted locally for discussion. Pending images are passed to the assistant as image content during the conversation.
+- **Truthful Global behavior.** Global conversations can discuss pending inputs without guessing a target project. Saving requires a named project and the normal confirmation card.
+- **Original bytes preserved.** Confirmed saves move the original input into project files through the normal service and record `changed_by="ai"` with `source_type="ai_chat"`.
+- **Safe temporary lifecycle.** Unsupported files and inputs over 10 MB are rejected. Cancelled proposals remove pending bytes; stale pending inputs expire after 24 hours through request-time cleanup.
+- **No schema migration.** Temporary metadata uses ignored JSON sidecars outside the database.
 
 ## What's new in v1.2.0-build27
 

@@ -3059,7 +3059,7 @@ The actual Railway provisioning is on the user — Claude can't reach into your 
 
 ---
 
-### Build 27 — Confirmed daily PM actions + Global read-only search ← CURRENT BUILD
+### Build 27 — Confirmed daily PM actions + Global read-only search ✓ SHIPPED `v1.2.0-build27`
 
 #### Scope
 
@@ -3075,6 +3075,25 @@ The actual Railway provisioning is on the user — Claude can't reach into your 
 - `python3 test_build27.py`
 - Build 20-26 regressions and `python3 test_ai_e2e.py`
 - Desktop/mobile browser smoke for proposal-card layout
+
+---
+
+### Build 28 — Assistant PDF, DOCX, and image intake ← CURRENT BUILD
+
+#### Scope
+
+- Add paperclip controls and pending chips to the compact dock and expanded assistant composer.
+- Keep pending original bytes in ignored, non-public `app/pending_uploads/` with JSON sidecars and a 24-hour request-time cleanup policy.
+- Extract PDF and DOCX text locally; send pending image bytes into the current assistant turn for visual discussion.
+- Add confirmed `save_pending_attachment(project_id, attachment_id, file_category, source_note)` persistence through the normal audited project-file service.
+- Auto-propose saving in project scope; discuss without auto-targeting in Global scope.
+- No schema migration.
+
+#### Verification
+
+- `python3 test_build28.py`
+- Build 20-27 regressions and `python3 test_ai_e2e.py`
+- Desktop/mobile browser smoke for dock, panel composer, pending chips, and attachment save card
 
 ---
 

@@ -246,6 +246,40 @@ Wire and document these tools in `AI_TOOLS_REGISTRY.md`:
 
 Let PMs discuss reference files and images naturally while preserving original inputs and preventing silent project-file changes.
 
+### Feature Design Review (2026-06-01)
+
+1. **Real workflow problem:** PMs need to drop a spec, reference image, or business document into the assistant conversation without prematurely filing it into a project.
+2. **Repeated or edge-case:** File-backed discussion is a repeated product-development workflow across factory feedback, references, quotations, and packaging decisions.
+3. **Structured data:** Confirmed project files reuse the existing `project_files` table; pending discussion inputs need temporary metadata only.
+4. **Could live in notes:** Discussion context can stay in assistant-message metadata until the PM explicitly saves the original file as project evidence.
+5. **Intake burden:** One attachment button and an optional follow-up message keep intake lightweight.
+6. **AI reduce burden:** PDF and DOCX text extraction plus image-aware chat context let the assistant discuss the input before the PM files it.
+7. **Display/reminder payoff:** Pending attachments remain visible in the composer; confirmed saves appear in the normal project Files section and change log.
+8. **Migration impact:** None; temporary state lives outside the database and confirmed state reuses `project_files`.
+9. **Minimal schema change:** No schema change.
+10. **Minimal UI change:** Add attachment buttons and compact removable chips to the existing dock and expanded composer.
+11. **Deferred:** OCR for scanned PDFs, legacy DOC support in chat, multi-file category editing beyond the proposal card, and long-running background cleanup jobs.
+
+### Architecture Review (2026-06-01)
+
+1. **Problem:** Preserve original discussion inputs without exposing or filing them before user confirmation.
+2. **Affected services:** Add `app/ai/attachments.py`, extend `crud.upload_file()`, add thin assistant attachment routes, and wire `save_pending_attachment`.
+3. **Storage choice:** Use temporary filesystem bytes plus JSON sidecars outside public `/uploads`; confirmed files reuse `project_files`.
+4. **Service-layer discipline:** Routes only parse HTTP; temporary lifecycle and confirmed persistence live in service functions.
+5. **Change log:** Confirmed persistence calls the normal `crud.upload_file()` path with `changed_by="ai"` and `source_type="ai_chat"`.
+6. **Rollback:** Remove the pending attachment service/routes/tool and delete the ignored temporary directory; no migration rollback is required.
+
+### Implementation Detail (2026-06-01)
+
+- Add `app/ai/attachments.py` with an ignored, non-public `app/pending_uploads/` store. Each pending input has original bytes plus a JSON sidecar containing owner, filename, detected type, content type, extracted text preview, and creation time.
+- Accept PDF, DOCX, PNG, JPG/JPEG, WEBP, and GIF up to 10 MB. Reject other extensions and oversized inputs before writing.
+- Extract PDF and DOCX text locally through the existing parser helpers. Send image bytes to chat as image content only while the input is pending.
+- Run stale cleanup opportunistically on attachment requests. A 24-hour TTL is enough for this internal tool and avoids a background worker.
+- Add `POST /ai/chat/attachments` and `DELETE /ai/chat/attachments/{attachment_id}` for upload and discard.
+- Add `save_pending_attachment(project_id, attachment_id, file_category, source_note)` to the AI tool registry. It always waits for confirmation, re-checks pending ownership and target-project access, then moves the original bytes into `/uploads` through the normal audited file service.
+- When a project-scoped conversation sends pending attachments, append save proposals automatically so the PM can discuss first and file explicitly. Global scope allows discussion but does not auto-target a project.
+- Keep sent pending chips visible until save or discard so follow-up messages can continue discussing the same input.
+
 ### Implementation Changes
 
 - Add PDF, DOCX, and image attachments to the compact dock and expanded assistant composer.
@@ -263,6 +297,17 @@ Let PMs discuss reference files and images naturally while preserving original i
 - Cancelled and stale uploads are cleaned safely.
 - Viewer restrictions remain intact.
 - `test_build28.py` covers accepted types, rejected types, extraction, pending state, project-target confirmation, persistence, cleanup, permissions, and change-log writes.
+
+### Refinement Log
+
+- **2026-06-01:** Chose request-time 24-hour cleanup instead of a lifecycle job; the internal workflow does not justify a worker.
+- **2026-06-01:** Store pending bytes outside mounted `/uploads` so unconfirmed files cannot be fetched through the public static route.
+- **2026-06-01:** Reuse the Build 27 proposal lifecycle through one new `save_pending_attachment` tool; confirmed persistence remains a normal audited project-file upload.
+- **2026-06-01:** Bound HTTP reads at 10 MB plus one byte before validation so rejected oversized inputs cannot consume arbitrary memory.
+- **2026-06-01:** Refined the mobile panel composer after visual smoke: pending chips use their own row on phones so the discussion input remains comfortably usable.
+- **2026-06-01:** Verification complete: `test_build28.py` passes 23/23; Build 20-27 regressions pass; `test_ai_e2e.py` passes 10 with 7 expected external-AI skips and 0 failures; static checks and EN/Chinese parity pass at 537/537.
+- **2026-06-01:** Browser interaction smoke passed: attach from desktop dock, open split panel, render pending chip and save proposal, verify desktop geometry, reopen on mobile, and verify full-width panel plus two-row mobile composer. Screenshots: `/tmp/pm-tracker-build28-desktop-dock.png`, `/tmp/pm-tracker-build28-desktop-expanded.png`, and `/tmp/pm-tracker-build28-mobile-refined.png`.
+- **2026-06-01:** Cleaned temporary Build 28 smoke fixtures through the pending-attachment service after visual verification.
 
 ---
 

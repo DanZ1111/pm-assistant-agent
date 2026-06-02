@@ -547,6 +547,8 @@ def upload_file(
     file_size: int,
     source_note: str = None,
     ai_summary: str = None,
+    changed_by: str = "user",
+    source_type: str = "file_upload",
 ) -> ProjectFile:
     f = ProjectFile(
         project_id=project_id,
@@ -562,9 +564,9 @@ def upload_file(
     db.add(f)
     db.flush()
     write_change(
-        db, project_id, "file_upload", changed_by="user",
+        db, project_id, "file_upload", changed_by=changed_by,
         summary=f"File '{original_filename}' uploaded as {file_category}.",
-        source_type="file_upload",
+        source_type=source_type,
     )
     db.commit()
     db.refresh(f)

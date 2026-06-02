@@ -204,6 +204,9 @@
   "chat.create_new_anyway": "仍然创建新灵感",
   "chat.link_existing": "关联已有灵感",
   "chat.target_project": "目标项目：",
+  "chat.attachment_upload": "添加 PDF、DOCX 或图片",
+  "chat.attachment_remove": "移除附件",
+  "chat.attachment_error": "无法添加附件。",
 
   "tab.manual": "手动",
   "tab.ai": "AI",

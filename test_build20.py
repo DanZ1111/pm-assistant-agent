@@ -79,8 +79,8 @@ def main():
 
     # ── Schema & dispatcher correctness ──
     print("\n── Schema & dispatcher correctness ──")
-    if len(TOOL_SCHEMAS) == 19:
-        ok("TOOL_SCHEMAS has 19 entries after Build 27 adds read-only lookup tools")
+    if len(TOOL_SCHEMAS) == 20:
+        ok("TOOL_SCHEMAS has 20 entries after Build 28 adds confirmed attachment save")
     else:
         fail("schema count", f"expected 17, got {len(TOOL_SCHEMAS)}")
 

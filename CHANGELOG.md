@@ -1,5 +1,24 @@
 # PM Product Tracker — Changelog
 
+## v1.2.0-build28 — Assistant PDF, DOCX, and image intake (Build 28)
+_2026-06-01_
+
+**Goal:** let PMs discuss file-backed product evidence naturally without silently adding project files.
+
+**Pending attachment lifecycle:**
+- Adds PDF, DOCX, PNG, JPG/JPEG, WEBP, and GIF attachment controls to the compact dock and expanded assistant composer.
+- Stores pending original bytes and JSON sidecars in ignored, non-public `app/pending_uploads/`.
+- Extracts PDF and DOCX text locally; passes pending image bytes into the current assistant turn for visual discussion.
+- Rejects unsupported extensions and inputs over 10 MB before writing; request-time cleanup removes pending inputs after 24 hours.
+
+**Confirmed persistence:**
+- Adds `save_pending_attachment(project_id, attachment_id, file_category, source_note)`.
+- Project scope offers a save proposal automatically after attachment discussion, even when the external model call is unavailable.
+- Global scope allows discussion without auto-targeting a project.
+- Confirm and cancel reuse the Build 27 proposal lifecycle. Confirm moves original bytes through `crud.upload_file()` with `changed_by="ai"` and `source_type="ai_chat"`; cancel removes pending bytes.
+
+**Test:** `test_build28.py` covers accepted and rejected inputs, DOCX extraction, non-public storage, cleanup, permissions, auto-proposal behavior, cancel cleanup, byte-preserving confirmed persistence, audit attribution, Global behavior, and workspace markup.
+
 ## v1.2.0-build27 — Confirmed daily PM actions + Global read-only search (Build 27)
 _2026-06-01_
 

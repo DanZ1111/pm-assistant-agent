@@ -11,6 +11,9 @@ from datetime import date
 from typing import Any
 
 import app.crud as crud
+from app.ai.attachments import (
+    AttachmentError, get_pending_attachment, persist_pending_attachment,
+)
 from app.dependencies import (
     can_edit_project, can_view_journal, sanitize_project_for_user,
 )
@@ -46,6 +49,26 @@ TOOL_SCHEMAS: list[dict] = [
                     "project_id": {"type": "integer"},
                 },
                 "required": ["project_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "save_pending_attachment",
+            "description": "Propose saving a pending assistant-discussion attachment into a project's normal Files section. Always requires user confirmation.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "project_id": {"type": "integer"},
+                    "attachment_id": {"type": "string"},
+                    "file_category": {
+                        "type": "string",
+                        "enum": ["rendering", "reference", "quotation", "thesis", "factory_feedback", "packaging", "other"],
+                    },
+                    "source_note": {"type": "string"},
+                },
+                "required": ["project_id", "attachment_id"],
             },
         },
     },
@@ -363,6 +386,7 @@ UPDATE_COMPONENT_ALLOWED = {
 TOOL_PERMISSIONS: dict[str, dict[str, Any]] = {
     "search_projects":                 {"require_role": ("admin", "pm", "viewer")},
     "get_project_context":             {"require_role": ("admin", "pm", "viewer")},
+    "save_pending_attachment":         {"require_role": ("admin", "pm"), "needs_project": True},
     "create_journal_entry":            {"require_role": ("admin", "pm"), "needs_project": True, "needs_journal": True},
     "summarize_journal_entry":         {"require_role": ("admin", "pm"), "needs_journal": True},
     "extract_thesis_from_business_plan": {"require_role": ("admin", "pm"), "needs_project": True},
@@ -389,6 +413,7 @@ CONFIRMATION_TOOLS = {
     "create_variant_component", "update_variant_component",
     "finish_phase", "adjust_phase_plan", "update_file_comment",
     "update_project_field",
+    "save_pending_attachment",
     "create_idea", "link_idea_to_project", "update_idea",
 }
 UPDATE_IDEA_ALLOWED = {
@@ -450,6 +475,12 @@ def _relationship_error(tool_name: str, args: dict, db, user) -> dict | None:
         pf = db.query(ProjectFile).filter(ProjectFile.id == (_int_arg(args, "file_id") or 0)).first()
         if not pf or pf.project_id != project_id:
             return _err("file_not_found")
+    elif tool_name == "save_pending_attachment":
+        attachment_id = str(args.get("attachment_id") or "")
+        try:
+            get_pending_attachment(attachment_id, user.id)
+        except AttachmentError as exc:
+            return _err(exc.code, message=exc.message)
     return None
 
 
@@ -593,6 +624,26 @@ def _handle_get_project_context(args: dict, db, user) -> dict:
     return {
         "ok": True, "read_only": True, "project": context,
         "message": f"Loaded role-filtered context for {project.name}.",
+    }
+
+
+def _handle_save_pending_attachment(args: dict, db, user) -> dict:
+    try:
+        project_file = persist_pending_attachment(
+            db,
+            attachment_id=str(args.get("attachment_id") or ""),
+            user_id=user.id,
+            project_id=int(args["project_id"]),
+            file_category=str(args.get("file_category") or "reference"),
+            source_note=args.get("source_note"),
+        )
+    except AttachmentError as exc:
+        return _err(exc.code, message=exc.message)
+    return {
+        "ok": True,
+        "attachment_id": str(args.get("attachment_id") or ""),
+        "file_id": project_file.id,
+        "message": f"Saved {project_file.original_filename} to project files.",
     }
 
 def _handle_create_journal_entry(args: dict, db, user) -> dict:
@@ -874,6 +925,7 @@ def _handle_update_idea(args: dict, db, user) -> dict:
 _HANDLERS: dict[str, Any] = {
     "search_projects": _handle_search_projects,
     "get_project_context": _handle_get_project_context,
+    "save_pending_attachment": _handle_save_pending_attachment,
     "create_journal_entry": _handle_create_journal_entry,
     "create_variant": _handle_create_variant,
     "update_variant": _handle_update_variant,

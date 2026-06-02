@@ -6,22 +6,27 @@ flow per MASTERPLAN.md Build 21 detail section.
 """
 from __future__ import annotations
 
+import base64
 import json
 import os
 import uuid
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, File, Request, UploadFile
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 import app.crud as crud
 from app.ai.tools import TOOL_SCHEMAS, dispatch
+from app.ai.attachments import (
+    MAX_ATTACHMENT_BYTES, AttachmentError, create_pending_attachment, discard_pending_attachment,
+    get_pending_attachment, get_public_pending_attachment, read_pending_bytes,
+)
 from app.ai.matching import find_best_match, MATCH_THRESHOLD
 from app.ai.prompts import CHAT_ASK_SYSTEM_PROMPT, CHAT_INTAKE_SYSTEM_PROMPT
 from app.dependencies import (
     get_current_user, require_auth, is_forbidden_ai_question,
-    sanitize_project_for_user, can_view_journal,
+    sanitize_project_for_user, can_use_ai_intake, can_view_journal,
     _RedirectException,
 )
 
@@ -43,7 +48,7 @@ _PROJECT_DEFAULT_TOOLS = {
     "get_project_context", "create_journal_entry", "create_variant",
     "set_primary_variant", "create_variant_component", "finish_phase",
     "adjust_phase_plan", "update_file_comment", "update_project_field",
-    "create_idea", "link_idea_to_project",
+    "create_idea", "link_idea_to_project", "save_pending_attachment",
 }
 _READ_ONLY_TOOLS = {"search_projects", "get_project_context"}
 
@@ -54,6 +59,89 @@ def _refusal_response():
         "error": "question_blocked_by_permission_guard",
         "message": "I'm not able to answer that based on your current access level.",
     }
+
+
+def _load_pending_attachments(attachment_ids, current_user) -> tuple[list[dict], dict | None]:
+    if not isinstance(attachment_ids, list):
+        return [], {"error": "invalid_attachments", "message": "Attachments must be a list."}
+    unique_ids = list(dict.fromkeys(str(item) for item in attachment_ids if item))
+    if len(unique_ids) > 4:
+        return [], {"error": "too_many_attachments", "message": "Attach up to four files at a time."}
+    attachments = []
+    for attachment_id in unique_ids:
+        try:
+            attachments.append(get_pending_attachment(attachment_id, current_user.id))
+        except AttachmentError as exc:
+            return [], {"error": exc.code, "message": exc.message}
+    return attachments, None
+
+
+def _attachment_user_content(message_text: str, attachments: list[dict]):
+    if not attachments:
+        return message_text
+    lines = [message_text, "", "Pending discussion attachments:"]
+    for item in attachments:
+        lines.append(
+            f"- attachment_id={item['attachment_id']} filename={item['original_filename']} "
+            f"type={item['file_type']}"
+        )
+        if item.get("extracted_text"):
+            lines.append(f"  Extracted text:\n{item['extracted_text'][:12000]}")
+        elif item.get("extraction_error"):
+            lines.append(f"  Local extraction unavailable: {item['extraction_error']}")
+    content = [{"type": "text", "text": "\n".join(lines)}]
+    for item in attachments:
+        if item.get("file_type") != "image":
+            continue
+        encoded = base64.b64encode(read_pending_bytes(item)).decode("ascii")
+        content.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:{item['content_type']};base64,{encoded}"},
+        })
+    return content
+
+
+@router.post("/ai/chat/attachments")
+async def upload_chat_attachment(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException:
+        return JSONResponse({"ok": False, "error": "not_authenticated"}, status_code=401)
+    if not can_use_ai_intake(current_user):
+        return JSONResponse({"ok": False, "error": "forbidden"}, status_code=403)
+    try:
+        metadata = create_pending_attachment(
+            content=await file.read(MAX_ATTACHMENT_BYTES + 1),
+            original_filename=file.filename or "",
+            content_type=file.content_type or "application/octet-stream",
+            user_id=current_user.id,
+        )
+    except AttachmentError as exc:
+        return JSONResponse({"ok": False, "error": exc.code, "message": exc.message}, status_code=400)
+    return {"ok": True, "attachment": metadata}
+
+
+@router.delete("/ai/chat/attachments/{attachment_id}")
+def delete_chat_attachment(
+    attachment_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException:
+        return JSONResponse({"ok": False, "error": "not_authenticated"}, status_code=401)
+    try:
+        discard_pending_attachment(attachment_id, current_user.id)
+    except AttachmentError as exc:
+        return JSONResponse({"ok": False, "error": exc.code, "message": exc.message}, status_code=404)
+    return {"ok": True}
 
 
 def _serialize_message(msg) -> dict:
@@ -216,6 +304,19 @@ def _find_pending_proposal(db: Session, conv, proposal_id: str):
     return None
 
 
+def _has_pending_attachment_proposal(db: Session, conv, attachment_id: str) -> bool:
+    for msg in reversed(crud.get_ai_messages_for_conversation(db, conv.id)):
+        for tool_call in (msg.metadata_json or {}).get("tool_calls") or []:
+            result = tool_call.get("result") or {}
+            if (
+                tool_call.get("name") == "save_pending_attachment"
+                and (tool_call.get("args") or {}).get("attachment_id") == attachment_id
+                and result.get("proposal_status") not in ("confirmed", "cancelled")
+            ):
+                return True
+    return False
+
+
 @router.post("/ai/chat")
 async def ai_chat(request: Request, db: Session = Depends(get_db)):
     current_user = get_current_user(request, db)
@@ -226,8 +327,13 @@ async def ai_chat(request: Request, db: Session = Depends(get_db)):
 
     body = await request.json()
     message_text = (body.get("message") or "").strip()
-    if not message_text:
+    attachments, attachment_error = _load_pending_attachments(body.get("attachment_ids") or [], current_user)
+    if attachment_error:
+        return JSONResponse({"ok": False, **attachment_error}, status_code=400)
+    if not message_text and not attachments:
         return JSONResponse({"ok": False, "error": "empty_message"}, status_code=400)
+    if not message_text:
+        message_text = "Please review this attachment."
 
     mode = body.get("mode") or "intake"
     if mode not in ("ask", "intake"):
@@ -276,7 +382,13 @@ async def ai_chat(request: Request, db: Session = Depends(get_db)):
         project_id=conv.project_id,
         role="user",
         message=message_text,
-        metadata={"conversation_id": conv.id, "mode": mode, "source": "bottom_chat"},
+        metadata={
+            "conversation_id": conv.id, "mode": mode, "source": "bottom_chat",
+            "attachments": [
+                get_public_pending_attachment(item["attachment_id"], current_user.id)
+                for item in attachments
+            ] or None,
+        },
     )
 
     # Build OpenAI messages list.
@@ -286,7 +398,12 @@ async def ai_chat(request: Request, db: Session = Depends(get_db)):
     openai_messages = [{"role": "system", "content": system_prompt}]
     for m in history:
         # The last entry is the new user message we just saved — include it as-is.
-        openai_messages.append({"role": m.role, "content": m.message})
+        content = (
+            _attachment_user_content(m.message, attachments)
+            if attachments and m is history[-1] and m.role == "user"
+            else m.message
+        )
+        openai_messages.append({"role": m.role, "content": content})
 
     # Call OpenAI. If it errors, we still respond gracefully.
     assistant_text = ""
@@ -332,6 +449,34 @@ async def ai_chat(request: Request, db: Session = Depends(get_db)):
             assistant_text = _summarize_tool_results(tool_results)
     except Exception as exc:
         assistant_text = f"(AI error — please try again. Detail: {type(exc).__name__})"
+
+    # Project-scoped discussion inputs always offer an explicit save proposal,
+    # independent of model availability. Global discussion stays untargeted.
+    if conv.project_id and attachments:
+        proposed_ids = {
+            (item.get("args") or {}).get("attachment_id")
+            for item in tool_results
+            if item.get("name") == "save_pending_attachment"
+        }
+        for attachment in attachments:
+            if (
+                attachment["attachment_id"] in proposed_ids
+                or _has_pending_attachment_proposal(db, conv, attachment["attachment_id"])
+            ):
+                continue
+            args = {
+                "project_id": conv.project_id,
+                "attachment_id": attachment["attachment_id"],
+                "file_category": "reference",
+                "source_note": "",
+            }
+            result = _decorate_confirmation_result(
+                "save_pending_attachment",
+                args,
+                dispatch("save_pending_attachment", args, db, current_user),
+                db,
+            )
+            tool_results.append({"name": "save_pending_attachment", "args": args, "result": result})
 
     # Persist assistant message.
     crud.save_ai_message(
@@ -440,6 +585,11 @@ def cancel_chat_proposal(
     prior_result = tool_call.get("result") or {}
     if prior_result.get("proposal_status") in ("confirmed", "cancelled"):
         return JSONResponse({"ok": False, "error": "proposal_already_resolved"}, status_code=409)
+    if tool_call.get("name") == "save_pending_attachment":
+        try:
+            discard_pending_attachment(str((tool_call.get("args") or {}).get("attachment_id") or ""), current_user.id)
+        except AttachmentError:
+            pass
     tool_calls[index] = {
         **tool_call,
         "result": {

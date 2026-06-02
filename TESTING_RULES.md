@@ -182,6 +182,23 @@ Create `test_build27.py`.
 
 ---
 
+## Build 28 Required Tests
+
+Create `test_build28.py`.
+
+| Flow | Pass condition |
+|---|---|
+| PDF, DOCX, and image pending inputs | Accepted; DOCX text extracted locally |
+| Unsupported or oversized input | Rejected before pending persistence |
+| Pending storage | Original bytes are outside public `/uploads` |
+| Project-scoped discussion | Creates confirmation proposal without a `project_files` row |
+| Cancel save proposal | Removes pending bytes and sidecar |
+| Confirm save proposal | Preserves original bytes and writes an `ai_chat` file-upload audit |
+| Global discussion | Does not auto-target a project |
+| Viewer | Cannot upload or confirm assistant attachments |
+
+---
+
 ## Bug Fix Rule
 
 If a test fails:

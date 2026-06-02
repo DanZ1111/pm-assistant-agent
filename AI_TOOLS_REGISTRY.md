@@ -17,6 +17,7 @@ Status legend:
 3. **Sensitive field filter.** Tools must use `sanitize_project_for_user` / `is_forbidden_ai_question` so AI cannot bypass viewer restrictions on factory / engineer / cost / journal entries / business plans / quotations.
 4. **AI proposes; user confirms.** Every chat-driven write surfaces an editable confirmation card. No silent mutations.
 5. **Change log recording.** Every confirmed write calls `write_change()` with `changed_by="ai"` and `source_type="ai_chat"`.
+6. **Pending attachment isolation.** Discussion inputs stay outside public `/uploads`; only confirmed `save_pending_attachment` moves original bytes into project files.
 
 ## How to add a new tool (3-step checklist)
 
@@ -28,12 +29,13 @@ Status legend:
 
 ## Current Tools
 
-The original 16 schemas landed in Build 20. Build 26 added `update_idea`; Build 27 adds two read-only lookup tools and wires the daily PM action set, bringing the registered total to 19. Deferred stubs still pass through dispatcher permission checks before returning an unavailable response.
+The original 16 schemas landed in Build 20. Build 26 added `update_idea`; Build 27 added two read-only lookup tools; Build 28 adds confirmed pending-attachment persistence, bringing the registered total to 20. Deferred stubs still pass through dispatcher permission checks before returning an unavailable response.
 
 | Tool | Params | Permission | Confirmation | Status |
 |---|---|---|---|---|
 | `search_projects` | query | auth; role-filter results | No — read-only | **implemented (Build 27)** |
 | `get_project_context` | project_id | auth; role-filter fields | No — read-only | **implemented (Build 27)** |
+| `save_pending_attachment` | project_id, attachment_id, file_category, source_note | auth + `can_edit_project` + pending ownership | YES | **implemented (Build 28)** |
 | `create_journal_entry` | project_id, entry_text, entry_type | auth + `can_view_journal` + `can_edit_project` | YES | **implemented (Build 27)** |
 | `summarize_journal_entry` | entry_id | auth + `can_view_journal` + `can_edit_project` | No | **dedicated UI implemented; chat handler deferred** |
 | `extract_thesis_from_business_plan` | project_id, file_id | auth + `can_edit_project` | YES — preview/confirm before write | **dedicated UI implemented; chat handler deferred** |

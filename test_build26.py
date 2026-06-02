@@ -75,8 +75,8 @@ def main():
 
     print("\n── Schema + i18n ──")
     schema_names = {schema["function"]["name"] for schema in TOOL_SCHEMAS}
-    if len(TOOL_SCHEMAS) == 19 and schema_names == set(TOOL_PERMISSIONS):
-        ok("19 AI schemas have matching permission rules")
+    if len(TOOL_SCHEMAS) == 20 and schema_names == set(TOOL_PERMISSIONS):
+        ok("20 AI schemas have matching permission rules")
     else:
         fail("schema registry", f"schemas={len(TOOL_SCHEMAS)} diff={schema_names ^ set(TOOL_PERMISSIONS)}")
     if {"create_idea", "link_idea_to_project", "update_idea"} <= schema_names:

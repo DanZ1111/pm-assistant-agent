@@ -2,6 +2,7 @@
 __pycache__/
 app/uploads/*
 !app/uploads/.gitkeep
+app/pending_uploads/*
 *.db
 *.db-journal
 *.pyc

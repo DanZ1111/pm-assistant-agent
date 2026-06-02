@@ -204,6 +204,9 @@
   "chat.create_new_anyway": "Create new anyway",
   "chat.link_existing": "Link existing",
   "chat.target_project": "Target project:",
+  "chat.attachment_upload": "Attach PDF, DOCX, or image",
+  "chat.attachment_remove": "Remove attachment",
+  "chat.attachment_error": "Unable to attach file.",
 
   "tab.manual": "Manual",
   "tab.ai": "AI",

@@ -264,8 +264,10 @@ A compact assistant dock sits at the bottom of every authenticated page. Submit 
 - **This Project / Global** — On project detail pages, This Project automatically supplies the active project's role-filtered context. Global can search and inspect role-filtered project summaries. Switching scope during a conversation starts a new thread after confirmation.
 - **Resizable workspace** — drag the assistant's left edge on desktop. Your preferred width is remembered in your browser.
 - **Editable review cards** — journal entries, inspirations, variants, packaging/accessory components, file comments, allowlisted project fields, phase-plan changes, and Finish Phase actions wait for review and confirmation. If a likely Idea duplicate exists, choose **Link existing** or **Create new anyway**.
+- **PDF, DOCX, and image discussion** — use the paperclip in either composer to attach a document or reference image. The assistant can discuss the pending input before you decide whether it belongs in project files.
+- **Confirmed attachment filing** — in This Project scope, review the proposed file category and note, then confirm **Save Pending Attachment**. In Global scope, discuss first and name a target project before saving.
 
-Use the history dropdown to reopen past conversations or archive threads you no longer need. Delete actions remain manual.
+Pending attachment bytes are not public project files. Remove a chip or cancel its save proposal to discard it; unconfirmed pending inputs also expire after 24 hours. Use the history dropdown to reopen past conversations or archive threads you no longer need. Delete actions remain manual.
 
 Viewer questions about sensitive topics (factory, costs, journal content, business plans, variant costs, packaging costs, quotations) are blocked before any AI call.
 

@@ -315,10 +315,10 @@ def main():
         db = SessionLocal()
         admin_u = db.query(User).filter(User.username == ADMIN).first()
         viewer_u = db.query(User).filter(User.username == VIEWER_USER).first()
-        if len(TOOL_SCHEMAS) == 19:
-            ok("TOOL_SCHEMAS has 19 entries after Build 27 adds read-only lookup")
+        if len(TOOL_SCHEMAS) == 20:
+            ok("TOOL_SCHEMAS has 20 entries after Build 28 adds confirmed attachment save")
         else:
-            fail("tool schemas count", f"expected 19, got {len(TOOL_SCHEMAS)}")
+            fail("tool schemas count", f"expected 20, got {len(TOOL_SCHEMAS)}")
         res = dispatch("create_journal_entry",
                        {"project_id": pid, "entry_text": "AI e2e dispatcher test", "entry_type": "general"},
                        db, admin_u)

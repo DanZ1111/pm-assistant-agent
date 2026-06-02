@@ -1912,6 +1912,55 @@ body {
   cursor: not-allowed;
 }
 .bottom-chat-submit:not(:disabled):hover { background: #1d4ed8; }
+.chat-attach-btn {
+  flex: 0 0 auto;
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid #475569;
+  border-radius: 7px;
+  background: transparent;
+  color: #cbd5e1;
+  cursor: pointer;
+}
+.chat-attach-btn:hover { color: #fff; border-color: #64748b; }
+.chat-attachment-list {
+  display: flex;
+  flex: 0 1 auto;
+  gap: 4px;
+  max-width: 220px;
+  overflow-x: auto;
+}
+.chat-attachment-list:empty { display: none; }
+.chat-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 160px;
+  padding: 4px 5px 4px 7px;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  color: #e2e8f0;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+.chat-attachment-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-attachment-chip button {
+  display: inline-grid;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
 
 body.assistant-open { overflow-x: hidden; }
 body.assistant-open .navbar-main,
@@ -2028,6 +2077,19 @@ body.assistant-open.has-bottom-chat .main-content { padding-bottom: 0; }
   background: #f3f4f6;
   color: #111827;
 }
+.chat-attachment-message {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 88%;
+  padding: 6px 9px;
+  border: 1px solid #bfdbfe;
+  border-radius: 7px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 0.78rem;
+}
 .chat-tool-call-card {
   align-self: flex-start;
   max-width: 94%;
@@ -2085,6 +2147,16 @@ body.assistant-open.has-bottom-chat .main-content { padding-bottom: 0; }
   padding: 12px;
   border-top: 1px solid var(--color-border);
   background: #f8fafc;
+}
+.ai-panel-composer .chat-attach-btn {
+  border-color: var(--color-border-dark);
+  color: #64748b;
+}
+.ai-panel-composer .chat-attach-btn:hover { color: #1d4ed8; border-color: #93c5fd; }
+.ai-panel-composer .chat-attachment-list { max-width: 150px; }
+.ai-panel-composer .chat-attachment-chip {
+  border-color: #cbd5e1;
+  color: #334155;
 }
 .ai-panel-input {
   background: #fff;
@@ -2155,4 +2227,10 @@ body.has-bottom-chat .main-content { padding-bottom: 104px; }
   .ai-panel-resize-handle { display: none; }
   body.assistant-open .navbar-main,
   body.assistant-open .main-content { width: 100%; }
+  .ai-panel-composer { flex-wrap: wrap; }
+  .ai-panel-composer .chat-attachment-list {
+    order: -1;
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
 }
