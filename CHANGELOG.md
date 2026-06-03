@@ -10,6 +10,7 @@ _2026-06-02_
   - Plain Enter still sends. Shift+Enter still inserts a newline.
   - Locked by JSDOM behavioral tests (`npm run test:composer`, 10 cases), folded into `test_build29.py` as a subprocess assertion that skips cleanly on environments without Node/jsdom.
   - main.js is now loaded as `type="module"` (still IIFE-wrapped; no global behavior change).
+- **PM-facing price strings.** Project Target Factory Cost and Target MSRP now preserve real-world planning expressions such as `under 120 RMB` and `$70-100` instead of forcing USD-only floats. Simple USD values still mirror into the legacy numeric columns for old displays and future profit math.
 
 ## v1.2.0 — Assistant Workspace Release
 _2026-06-02_

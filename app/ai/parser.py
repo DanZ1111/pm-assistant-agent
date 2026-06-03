@@ -1,6 +1,7 @@
 import os
 import json
 import base64
+import re
 import shutil
 import subprocess
 import tempfile
@@ -15,6 +16,16 @@ from app.ai.prompts import (
 )
 
 _client: OpenAI | None = None
+
+NON_USD_CURRENCY_RE = re.compile(r"(?:\bRMB\b|\bCNY\b|人民币|元|¥)", re.IGNORECASE)
+USD_CURRENCY_RE = re.compile(r"(?:\$|\bUSD\b|\bUS\$|美元)", re.IGNORECASE)
+RANGE_RE = re.compile(
+    r"(?:\$|USD|US\$|美元)?\s*\d+(?:\.\d+)?\s*(?:-|–|—|~|～|至|到|－|\bto\b)\s*(?:\$|USD|US\$|美元)?\s*\d+(?:\.\d+)?",
+    re.IGNORECASE,
+)
+COST_CONTEXT_RE = re.compile(r"(?:cost|factory|ex[- ]?factory|material|材料|成本|出厂)", re.IGNORECASE)
+MSRP_CONTEXT_RE = re.compile(r"(?:msrp|retail|price|售价|零售|价格)", re.IGNORECASE)
+PRICE_FIELDS = ("target_factory_cost", "target_msrp")
 
 
 def _get_client() -> OpenAI:
@@ -43,9 +54,138 @@ def extract_project_fields(raw_text: str) -> dict:
             temperature=0.1,
         )
         raw = response.choices[0].message.content or "{}"
-        return json.loads(raw)
+        parsed = json.loads(raw)
+        return sanitize_price_fields(parsed, raw_text, source_kind="text")
     except Exception as e:
         return {"_error": str(e)}
+
+
+def sanitize_price_fields(extracted: dict, source_text: str = "", source_kind: str = "text") -> dict:
+    """Normalize PM-facing price fields as text.
+
+    Project-level target cost/MSRP are planning expressions, not pure math
+    inputs. Preserve ranges, currencies, and qualifiers when the source has
+    them; fall back to stringifying the model value.
+    """
+    if not isinstance(extracted, dict):
+        return extracted
+
+    cleaned = dict(extracted)
+    cleaned.pop("_warnings", None)
+
+    for field in PRICE_FIELDS:
+        value = cleaned.get(field)
+        expression = None
+        if source_kind != "image":
+            expression = _source_expression_for_field(source_text, field, value)
+        if expression:
+            cleaned[field] = expression
+        elif value not in (None, ""):
+            cleaned[field] = str(value).strip()
+        else:
+            cleaned.pop(field, None)
+    return cleaned
+
+
+def _number_variants(value) -> set[str]:
+    variants = {str(value).strip()}
+    try:
+        numeric = float(str(value).replace(",", ""))
+    except (TypeError, ValueError):
+        return {v for v in variants if v}
+    variants.add(f"{numeric:g}")
+    variants.add(f"{numeric:.1f}")
+    variants.add(f"{numeric:.2f}")
+    if numeric.is_integer():
+        variants.add(str(int(numeric)))
+    return {v for v in variants if v}
+
+
+def _windows_around_value(source_text: str, value, radius: int = 48) -> list[str]:
+    source = source_text or ""
+    windows = []
+    for variant in _number_variants(value):
+        pattern = re.compile(rf"(?<![\d.]){re.escape(variant)}(?![\d.])")
+        for match in pattern.finditer(source):
+            start = max(0, match.start() - radius)
+            end = min(len(source), match.end() + radius)
+            windows.append(source[start:end])
+    return windows
+
+
+def _source_expression_for_field(source_text: str, field: str, value=None) -> str | None:
+    line_expression = _line_expression_for_field(source_text, field)
+    if line_expression:
+        return line_expression
+
+    if value not in (None, ""):
+        for window in _windows_around_value(source_text, value, radius=32):
+            range_match = RANGE_RE.search(window)
+            if range_match:
+                return _clean_price_expression(range_match.group(0))
+            amount_match = re.search(
+                r"(?:under|around|about|approx\.?|approximately|约|大约|低于|小于)?\s*"
+                r"(?:\$|USD|US\$|RMB|CNY|人民币|美元|元|¥)?\s*"
+                r"\d+(?:,\d{3})*(?:\.\d+)?\s*"
+                r"(?:\$|USD|US\$|RMB|CNY|人民币|美元|元|¥)?"
+                r"(?:\s*出厂)?",
+                window,
+                re.IGNORECASE,
+            )
+            if amount_match:
+                return _clean_price_expression(amount_match.group(0))
+
+    return None
+
+
+def _line_expression_for_field(source_text: str, field: str) -> str | None:
+    source = source_text or ""
+    context_re = COST_CONTEXT_RE if field == "target_factory_cost" else MSRP_CONTEXT_RE
+    for raw_line in source.splitlines():
+        line = raw_line.strip(" \t-*•")
+        if not line or not context_re.search(line):
+            continue
+        if not re.search(r"\d", line):
+            continue
+        segment = line
+        if field == "target_msrp":
+            match = re.search(r"(?:msrp|retail|售价|零售|价格|区间)", segment, re.IGNORECASE)
+            if match:
+                segment = segment[match.end():]
+        else:
+            match = re.search(r"(?:target\s+factory\s+cost|factory\s+cost|ex[- ]?factory|material\s+cost|材料成本|成本|出厂)", segment, re.IGNORECASE)
+            if match:
+                segment = segment[match.end():]
+        if "：" in segment:
+            segment = segment.split("：", 1)[1].strip()
+        elif ":" in segment:
+            segment = segment.split(":", 1)[1].strip()
+        if field == "target_factory_cost":
+            segment = re.split(r"\bMSRP\b|retail|售价|零售|价格", segment, maxsplit=1, flags=re.IGNORECASE)[0]
+        if field == "target_msrp":
+            segment = re.split(r"factory|材料|成本|出厂", segment, maxsplit=1, flags=re.IGNORECASE)[0]
+        range_match = RANGE_RE.search(segment)
+        if range_match:
+            return _clean_price_expression(range_match.group(0))
+        amount_match = re.search(
+            r"(?:under|around|about|approx\.?|approximately|约|大约|低于|小于)?\s*"
+            r"(?:\$|USD|US\$|RMB|CNY|人民币|美元|元|¥)?\s*"
+            r"\d+(?:,\d{3})*(?:\.\d+)?\s*"
+            r"(?:\$|USD|US\$|RMB|CNY|人民币|美元|元|¥)?"
+            r"(?:\s*出厂)?",
+            segment,
+            re.IGNORECASE,
+        )
+        if amount_match:
+            return _clean_price_expression(amount_match.group(0))
+        if context_re.search(segment) and len(segment) > 48:
+            continue
+        return _clean_price_expression(segment)
+    return None
+
+
+def _clean_price_expression(value: str) -> str:
+    return re.sub(r"\s+", " ", (value or "").strip(" \t:：；;,.，。")).strip()
 
 
 def _extract_pdf_text(file_path: str, max_pages: int = 10) -> str:
@@ -137,6 +277,7 @@ def extract_from_image(file_path: str) -> dict:
         )
         raw = response.choices[0].message.content or "{}"
         result = json.loads(raw)
+        result = sanitize_price_fields(result, "", source_kind="image")
         ai_summary = result.pop("ai_summary", "")
         return {"extracted": result, "ai_summary": ai_summary}
     except Exception as e:
@@ -207,9 +348,12 @@ def extract_intake(raw_text: str) -> dict:
         cls = parsed.get("classification")
         if cls not in ("project", "idea"):
             cls = "idea"  # default to idea on missing/invalid classification
+        project_fields = parsed.get("project_fields") or {}
+        if cls == "project":
+            project_fields = sanitize_price_fields(project_fields, raw_text, source_kind="text")
         return {
             "classification": cls,
-            "project_fields": parsed.get("project_fields") or {},
+            "project_fields": project_fields,
             "idea_fields": parsed.get("idea_fields") or {},
         }
     except Exception as e:

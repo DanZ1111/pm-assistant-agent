@@ -254,6 +254,51 @@ def main():
         except subprocess.TimeoutExpired:
             fail("JSDOM composer tests", "node --test timed out after 30s")
 
+    print("\n── Post-release AI intake price strings ──")
+    from app.ai.parser import sanitize_price_fields
+    from app.models import Project
+
+    price_source = (
+        "Price Architecture\n"
+        "材料成本：约 120 RMB 出厂\n"
+        "目标零售价区间：$70-100\n"
+        "定价定位：非低端价格，高端材料的性价比表达"
+    )
+    sanitized = sanitize_price_fields(
+        {"target_factory_cost": 120, "target_msrp": 70},
+        price_source,
+        source_kind="text",
+    )
+    if sanitized.get("target_factory_cost") == "约 120 RMB 出厂" and sanitized.get("target_msrp") == "$70-100":
+        ok("AI intake preserves RMB cost and MSRP range as strings")
+    else:
+        fail("AI intake price strings", f"unexpected sanitized fields: {sanitized}")
+
+    clear_usd = sanitize_price_fields(
+        {"target_factory_cost": 18.50, "target_msrp": 129.99},
+        "Target factory cost $18.50, MSRP $129.99.",
+        source_kind="text",
+    )
+    if clear_usd.get("target_factory_cost") == "$18.50" and clear_usd.get("target_msrp") == "$129.99":
+        ok("AI intake keeps explicit USD price fields as display strings")
+    else:
+        fail("AI intake explicit USD keep", str(clear_usd))
+
+    image_prices = sanitize_price_fields(
+        {"target_factory_cost": "under 120 RMB", "target_msrp": "$70-100"},
+        "",
+        source_kind="image",
+    )
+    if image_prices.get("target_factory_cost") == "under 120 RMB" and image_prices.get("target_msrp") == "$70-100":
+        ok("AI intake preserves image-derived price strings for review")
+    else:
+        fail("AI intake image price strings", str(image_prices))
+
+    if hasattr(Project, "target_factory_cost_text") and hasattr(Project, "target_msrp_text"):
+        ok("Project model has PM-facing text price columns")
+    else:
+        fail("Project text price columns", "missing target_factory_cost_text or target_msrp_text")
+
     print("\n── Regression inventory ──")
     expected_tests = [
         "test_build1.py",

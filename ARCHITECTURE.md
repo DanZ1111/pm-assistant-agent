@@ -6,7 +6,7 @@ An internal product project tracker for a knife/product-development company.
 
 **What it does:**
 - Tracks product projects from concept to mass production
-- Shows who owns each project, which factory, what the target cost/MSRP is
+- Shows who owns each project, which factory, what the target cost/MSRP expression is
 - Warns when projects are delayed or missing critical information
 - Attaches files and renderings to projects
 - Records every important change
@@ -147,6 +147,19 @@ Image files are displayed at **full resolution** in a lightbox — no compressio
 AI may: extract fields, draft thesis, summarize files, suggest project matches, identify gaps.
 
 AI must not silently overwrite: factory, cost, MSRP, PM, engineer, launch date, phase status, thesis.
+
+### Price Fields
+
+Project-level Target Factory Cost and Target MSRP are PM-facing planning
+expressions, not strict profit-model inputs. They may contain ranges and
+original currencies such as `$70-100`, `under 120 RMB`, or `约 120 RMB 出厂`.
+
+- `projects.target_factory_cost_text` / `projects.target_msrp_text` are the
+  display/edit source of truth for project-level planning.
+- Legacy `projects.target_factory_cost` / `projects.target_msrp` floats remain
+  optional derived/simple-USD values for old rows and future calculations.
+- Variant-level cost/MSRP fields remain numeric because they belong to the
+  future Profit Model calculation layer.
 
 All AI writes that matter require explicit user confirmation and must be recorded in the change log with `changed_by="ai"`.
 

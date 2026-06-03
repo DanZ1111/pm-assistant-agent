@@ -805,12 +805,15 @@ def _handle_update_project_field(args: dict, db, user) -> dict:
     value = args.get("new_value")
     if field_name in ("target_factory_cost", "target_msrp"):
         if value in ("", None):
-            value = None
+            value_text = None
+            value_number = None
         else:
-            try:
-                value = float(str(value).replace(",", "").strip())
-            except (TypeError, ValueError):
-                return _err("invalid_number", field=field_name)
+            value_text = str(value).strip()
+            value_number = crud.parse_simple_usd_price(value_text)
+        data = {
+            f"{field_name}_text": value_text,
+            field_name: value_number,
+        }
     elif field_name == "planned_launch_date":
         if value in ("", None):
             value = None
@@ -819,8 +822,11 @@ def _handle_update_project_field(args: dict, db, user) -> dict:
                 value = date.fromisoformat(str(value))
             except ValueError:
                 return _err("invalid_date", field=field_name)
+        data = {field_name: value}
+    else:
+        data = {field_name: value}
     project = crud.update_project(
-        db, int(args["project_id"]), {field_name: value},
+        db, int(args["project_id"]), data,
         changed_by="ai", source_type="ai_chat",
     )
     if not project:

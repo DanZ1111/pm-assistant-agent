@@ -138,8 +138,8 @@ def sanitize_project_for_user(project, user: User | None) -> dict:
         base.update({
             "engineer": project.engineer,
             "factory": project.factory,
-            "target_factory_cost": project.target_factory_cost,
-            "target_msrp": project.target_msrp,
+            "target_factory_cost": project.target_factory_cost_display,
+            "target_msrp": project.target_msrp_display,
             "project_owner": project.project_owner,
         })
 

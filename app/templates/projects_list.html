@@ -128,11 +128,11 @@
         <div class="info-row">
           <span class="info-icon"><i class="bi bi-tag"></i></span>
           <span class="info-val">
-            {% if p.target_factory_cost %}${{ "%.2f"|format(p.target_factory_cost) }} {{ t('common.cost_lower') }}{% else %}{{ t('common.cost') }}: —{% endif %}
+            {% if p.target_factory_cost_display %}{{ p.target_factory_cost_display }} {{ t('common.cost_lower') }}{% else %}{{ t('common.cost') }}: —{% endif %}
           </span>
           <span class="info-sep">·</span>
           <span class="info-val">
-            {% if p.target_msrp %}${{ "%.2f"|format(p.target_msrp) }} MSRP{% else %}MSRP: —{% endif %}
+            {% if p.target_msrp_display %}{{ p.target_msrp_display }} MSRP{% else %}MSRP: —{% endif %}
           </span>
         </div>
         <div class="info-row">
@@ -199,8 +199,8 @@
             <td><span class="stage-pill-sm">{{ p.current_stage or "—" }}</span></td>
             <td>{{ p.product_manager or "—" }}</td>
             <td>{{ p.factory or "—" }}</td>
-            <td>{% if p.target_factory_cost %}${{ "%.2f"|format(p.target_factory_cost) }}{% else %}—{% endif %}</td>
-            <td>{% if p.target_msrp %}${{ "%.2f"|format(p.target_msrp) }}{% else %}—{% endif %}</td>
+            <td>{{ p.target_factory_cost_display or "—" }}</td>
+            <td>{{ p.target_msrp_display or "—" }}</td>
             <td>
               {% if p.planned_launch_date %}{{ p.planned_launch_date.strftime('%b %d, %Y') }}{% else %}—{% endif %}
             </td>

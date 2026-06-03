@@ -20,6 +20,11 @@ class Project(Base):
     factory = Column(String, nullable=True)
     target_factory_cost = Column(Float, nullable=True)
     target_msrp = Column(Float, nullable=True)
+    # PM-facing price fields preserve real-world ranges/currency phrases such
+    # as "$70-100" or "under 120 RMB". Legacy numeric fields remain as optional
+    # derived/simple-USD values for old rows and future profit math.
+    target_factory_cost_text = Column(String, nullable=True)
+    target_msrp_text = Column(String, nullable=True)
     planned_launch_date = Column(Date, nullable=True)
     estimated_launch_date = Column(Date, nullable=True)
     project_thesis = Column(Text, nullable=True)
@@ -41,6 +46,22 @@ class Project(Base):
                             order_by="ProjectVariant.created_at")
     variant_components = relationship("ProjectVariantComponent", back_populates="project",
                                       cascade="all, delete-orphan")
+
+    @property
+    def target_factory_cost_display(self) -> str | None:
+        if self.target_factory_cost_text:
+            return self.target_factory_cost_text
+        if self.target_factory_cost is not None:
+            return f"${self.target_factory_cost:.2f}"
+        return None
+
+    @property
+    def target_msrp_display(self) -> str | None:
+        if self.target_msrp_text:
+            return self.target_msrp_text
+        if self.target_msrp is not None:
+            return f"${self.target_msrp:.2f}"
+        return None
 
 
 class ProjectPhase(Base):

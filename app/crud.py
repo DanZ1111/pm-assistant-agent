@@ -42,6 +42,36 @@ PHASE_TEMPLATES = {
     ],
 }
 
+
+def parse_simple_usd_price(value) -> float | None:
+    """Return a float only for one clean USD-ish amount.
+
+    PM-facing fields preserve ranges/currencies in *_text columns; this legacy
+    numeric value is only for old displays and future calculations.
+    """
+    if value in (None, ""):
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    lowered = text.lower()
+    if any(token in lowered for token in ("rmb", "cny", "人民币", "元", "¥")):
+        return None
+    if any(token in text for token in ("-", "–", "—", "~", "～", "至", "到", "－")) or " to " in lowered:
+        return None
+    cleaned = text.replace(",", "").replace("$", "")
+    cleaned = cleaned.replace("USD", "").replace("usd", "").replace("US$", "").replace("美元", "").strip()
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
+def price_field_present(project: Project, field: str) -> bool:
+    text_val = getattr(project, f"{field}_text", None)
+    numeric_val = getattr(project, field, None)
+    return bool(text_val) or numeric_val is not None
+
 # ---------------------------------------------------------------------------
 # Change log
 # ---------------------------------------------------------------------------
@@ -86,9 +116,9 @@ def get_project_health(project: Project, phases: list, files: list) -> dict:
         if not getattr(project, field):
             critical_missing.append(field)
 
-    if not project.target_factory_cost:
+    if not price_field_present(project, "target_factory_cost"):
         critical_missing.append("target_factory_cost")
-    if not project.target_msrp:
+    if not price_field_present(project, "target_msrp"):
         critical_missing.append("target_msrp")
     if not project.planned_launch_date:
         critical_missing.append("planned_launch_date")
@@ -255,6 +285,8 @@ def update_project(
     DISPLAY_NAMES = {
         "target_factory_cost": "Target Factory Cost",
         "target_msrp": "Target MSRP",
+        "target_factory_cost_text": "Target Factory Cost",
+        "target_msrp_text": "Target MSRP",
         "planned_launch_date": "Planned Launch Date",
         "project_thesis": "Product Thesis",
         "product_manager": "Product Manager",
@@ -263,6 +295,9 @@ def update_project(
     for field, new_val in data.items():
         if new_val == "":
             new_val = None
+        if field in ("target_factory_cost", "target_msrp") and f"{field}_text" in data:
+            setattr(project, field, new_val)
+            continue
         old_val = getattr(project, field, None)
         if str(old_val or "") != str(new_val or ""):
             display = DISPLAY_NAMES.get(field, field.replace("_", " ").title())
@@ -649,8 +684,16 @@ def get_field_usage(db: Session) -> dict:
     for field in nullable_fields:
         col = getattr(Project, field)
         non_empty = db.query(func.count(Project.id)).filter(col.isnot(None)).scalar()
+        if field == "target_factory_cost":
+            non_empty = db.query(func.count(Project.id)).filter(
+                (Project.target_factory_cost.isnot(None)) | (Project.target_factory_cost_text.isnot(None))
+            ).scalar()
+        elif field == "target_msrp":
+            non_empty = db.query(func.count(Project.id)).filter(
+                (Project.target_msrp.isnot(None)) | (Project.target_msrp_text.isnot(None))
+            ).scalar()
         # For thesis, also count short ones as empty
-        if field == "project_thesis":
+        elif field == "project_thesis":
             non_empty = db.query(func.count(Project.id)).filter(
                 Project.project_thesis.isnot(None),
                 func.length(Project.project_thesis) >= 80,
@@ -675,6 +718,9 @@ def get_missing_critical_summary(db: Session) -> dict:
             val = getattr(p, field)
             if field == "project_thesis":
                 if not val or len(val.strip()) < 80:
+                    missing.append(p.name)
+            elif field in ("target_factory_cost", "target_msrp"):
+                if not price_field_present(p, field):
                     missing.append(p.name)
             else:
                 if not val:

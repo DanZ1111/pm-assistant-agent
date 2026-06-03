@@ -122,7 +122,25 @@ MIGRATIONS = [
         "002_v1_1_add_conversation_id_to_ai_messages",
         lambda eng: add_column_if_missing(eng, "ai_messages", "conversation_id", "INTEGER"),
     ),
+    (
+        "003_v1_2_add_price_text_fields",
+        lambda eng: _add_project_price_text_fields(eng),
+    ),
 ]
+
+
+def _add_project_price_text_fields(engine):
+    add_column_if_missing(engine, "projects", "target_factory_cost_text", "VARCHAR")
+    add_column_if_missing(engine, "projects", "target_msrp_text", "VARCHAR")
+    with engine.begin() as conn:
+        conn.execute(text(
+            "UPDATE projects SET target_factory_cost_text = CAST(target_factory_cost AS TEXT) "
+            "WHERE target_factory_cost_text IS NULL AND target_factory_cost IS NOT NULL"
+        ))
+        conn.execute(text(
+            "UPDATE projects SET target_msrp_text = CAST(target_msrp AS TEXT) "
+            "WHERE target_msrp_text IS NULL AND target_msrp IS NOT NULL"
+        ))
 
 
 def run_pending(engine):

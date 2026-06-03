@@ -134,21 +134,19 @@
         </div>
         <div>
           <label class="form-label">
-            {{ t('form.target_factory_cost') }} (USD) <span class="badge-critical">{{ t('badge.critical') }}</span>
+            {{ t('form.target_factory_cost') }} <span class="badge-critical">{{ t('badge.critical') }}</span>
           </label>
-          <input type="number" name="target_factory_cost" class="form-control"
-                 step="0.01" min="0"
-                 value="{{ project.target_factory_cost or '' if project else '' }}"
-                 placeholder="e.g. 18.50">
+          <input type="text" name="target_factory_cost" class="form-control"
+                 value="{{ project.target_factory_cost_display or '' if project else '' }}"
+                 placeholder="e.g. under 120 RMB or $18.50">
         </div>
         <div>
           <label class="form-label">
-            {{ t('form.target_msrp') }} (USD) <span class="badge-critical">{{ t('badge.critical') }}</span>
+            {{ t('form.target_msrp') }} <span class="badge-critical">{{ t('badge.critical') }}</span>
           </label>
-          <input type="number" name="target_msrp" class="form-control"
-                 step="0.01" min="0"
-                 value="{{ project.target_msrp or '' if project else '' }}"
-                 placeholder="e.g. 59.99">
+          <input type="text" name="target_msrp" class="form-control"
+                 value="{{ project.target_msrp_display or '' if project else '' }}"
+                 placeholder="e.g. $70-100">
         </div>
       </div>
     </div>

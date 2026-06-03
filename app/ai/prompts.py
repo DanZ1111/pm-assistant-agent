@@ -12,10 +12,17 @@ Valid fields and formats:
 - product_manager (string): PM's full name
 - engineer (string): engineer's full name
 - factory (string): factory or supplier name
-- target_factory_cost (number): factory unit cost in USD — numbers only, no currency symbols
-- target_msrp (number): target retail price in USD — numbers only, no currency symbols
+- target_factory_cost (string): preserve the source expression for factory/unit cost, including currency, range, or qualifier
+- target_msrp (string): preserve the source expression for retail/MSRP, including currency, range, or qualifier
 - planned_launch_date (string): launch date formatted as YYYY-MM-DD
 - project_thesis (string): 2-3 sentence explanation of why this product exists, who it is for, and what problem it solves
+
+Pricing rules:
+- Preserve what the source says. Examples: "$70-100", "under 120 RMB", "约 120 RMB 出厂".
+- Do not collapse a range to one endpoint.
+- Do not remove currency symbols or qualifiers.
+- Do not convert currencies unless the source itself gives the exchange rate or USD equivalent.
+- Price positioning prose can go in project_thesis, but concrete cost/MSRP expressions belong in the price fields.
 
 Return only a JSON object, nothing else."""
 
@@ -42,7 +49,7 @@ Return a JSON object with this exact shape:
   "project_fields": {
     "name": "...", "brand": "...", "sku": "...", "product_type": "...",
     "product_manager": "...", "engineer": "...", "factory": "...",
-    "target_factory_cost": 0.00, "target_msrp": 0.00,
+    "target_factory_cost": "...", "target_msrp": "...",
     "planned_launch_date": "YYYY-MM-DD",
     "project_thesis": "2-3 sentence why-this-product"
   },
@@ -60,6 +67,7 @@ Rules:
 - Only fill the branch matching your classification. Leave the other branch as {} (empty object).
 - Omit any field within the chosen branch that you cannot confidently extract from the text.
 - Never invent values not present in the text.
+- For target_factory_cost and target_msrp, preserve the source expression as text. Keep RMB/CNY/人民币/元/¥, ranges, and qualifiers. Do not convert currencies or choose a range endpoint.
 - Return JSON only — no prose.
 """
 
@@ -73,11 +81,12 @@ Return ONLY a valid JSON object with these fields (include only fields you can i
 - sku (string): SKU or product code
 - product_type (string): type of product shown (e.g. "chef's knife", "folding knife")
 - factory (string): factory or supplier name if visible
-- target_factory_cost (number): factory cost if visible, numbers only
-- target_msrp (number): retail price if visible, numbers only
+- target_factory_cost (string): factory cost expression if visible, preserving currency/range/qualifiers
+- target_msrp (string): retail price expression if visible, preserving currency/range/qualifiers
 - project_thesis (string): 2-3 sentence description of what the product appears to be and who it is for
 - ai_summary (string): 2-3 sentence plain-language description of what is shown in the image
 
+Never convert currencies unless the source itself gives the exchange rate or USD equivalent. Never choose one number from a price range.
 Always include "ai_summary" describing what you see. Include other fields only if clearly identifiable.
 Return only a JSON object, nothing else."""
 

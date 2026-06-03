@@ -87,14 +87,14 @@
     <div class="sidebar-section">
       <div class="sidebar-label">{{ t('form.target_factory_cost') }}</div>
       <div class="sidebar-value">
-        {% if project.target_factory_cost %}<strong>${{ "%.2f"|format(project.target_factory_cost) }}</strong>{% else %}—{% endif %}
+        {% if project.target_factory_cost_display %}<strong>{{ project.target_factory_cost_display }}</strong>{% else %}—{% endif %}
       </div>
     </div>
     {% endif %}
     <div class="sidebar-section">
       <div class="sidebar-label">{{ t('form.target_msrp') }}</div>
       <div class="sidebar-value">
-        {% if project.target_msrp %}<strong>${{ "%.2f"|format(project.target_msrp) }}</strong>{% else %}—{% endif %}
+        {% if project.target_msrp_display %}<strong>{{ project.target_msrp_display }}</strong>{% else %}—{% endif %}
       </div>
     </div>
     <div class="sidebar-divider"></div>

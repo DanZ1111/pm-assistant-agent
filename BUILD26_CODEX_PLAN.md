@@ -334,6 +334,7 @@ Close the assistant-workspace release with consolidated documentation and broad 
 ### Post-release Refinement Log
 
 - **2026-06-02:** Fix the shared assistant composer keyboard binding for Chinese IMEs. Enter used to confirm a composition candidate must not submit a partial chat message. Both dock and expanded-panel inputs track composition lifecycle events and ignore the Safari legacy `keyCode 229` path; ordinary unshifted Enter still submits after composition ends.
+- **2026-06-02:** Correct project-level price modeling. PM-facing Target Factory Cost and Target MSRP need to store expressions like `under 120 RMB` and `$70-100`, not only USD floats. Add text columns for project price display/editing, keep legacy floats as optional derived/simple-USD values, and update AI intake to preserve source price expressions.
 
 ---
 
