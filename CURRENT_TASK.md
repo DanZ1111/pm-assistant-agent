@@ -1,9 +1,9 @@
 # CURRENT_TASK.md
 
 ## Task
-Build 30B — Excel batch intake. Implementation complete + verified with real AI. **Awaiting user authorization to commit + push.**
+Build 30C — PM draft delete. Complete. **Awaiting user authorization to commit + push.**
 
-Next up: Build 30C (PM draft delete) — still gated on user's policy decision (48h vs "until first phase advance" vs other).
+After this lands, the natural next move is **v1.2.1 release-hardening** to roll up all 7 unreleased patches.
 
 ## Handoff rule
 Before editing, inspect:
@@ -11,57 +11,67 @@ Before editing, inspect:
 - git diff
 - git log --oneline -5
 
-Git/code is the source of truth. This file is only a short task reminder.
+Git/code is the source of truth.
 
-## What changed in Build 30B
+## What changed in Build 30C
 
 ### Backend
-- New `app/ai/excel_parser.py` — workbook (xlsx/xlsm/xls/csv) → sheet-aware plain text. 100k-char cap. Per-cell 500-char guard. CSV dialect sniffing + encoding fallback.
-- New `app/ai/parser.py:extract_batch_from_workbook_text()` — calls `gpt-5.4` with the new `EXCEL_BATCH_INTAKE_PROMPT` and JSON-object response format. Per-row pricing preserved verbatim (the windowed `sanitize_price_fields` was correctly skipped in batch mode because it would match neighboring date columns as prices).
-- New `crud.create_projects_batch_with_idempotency()` + `BatchIdempotencyResult` — claims one Build 30A token atomically + builds N projects in one transaction. Per-row validation failures (missing name) are skipped with a reason.
-- Extended `app/routes/intake.py`:
-  - `SUPPORTED_INTAKE_TYPES` += `"excel"`, `"csv"`.
-  - `intake_extract_file` dispatches to the workbook path for excel/csv file_type, calls AI batch extractor, runs `_find_match` per row, builds `proposed_batch` payload for the template.
-  - New `POST /ai/intake/confirm-batch` handler — parses parallel form arrays (`row_action[]`, `row_name[]`, ...), applies PM defaulting + display_name normalization (Build 30A pattern), routes per-row to create / update_existing / skip, redirects to `/my-projects?imported=N&updated=M&skipped=K`.
-- `app/routes/files.py` — file type detection unchanged (`.xlsx` already mapped to `"excel"`); `.xlsm` and `.csv` work via existing patterns.
-- New deps in `requirements.txt`: `openpyxl`, `xlrd<2.0`.
+- New `can_delete_project(user, project)` helper in `app/dependencies.py`:
+  - Admin: always True (preserves pre-30C behavior).
+  - PM: True if (a) project's `product_manager` matches their username OR display_name (via `can_edit_project`), AND (b) every phase is `status='not_started'` with `actual_start_date is None`. "Until first phase advance" workflow-tied policy.
+  - Viewer: always False.
+  - None user: False (defense in depth).
+- `POST /projects/{id}/delete` in `app/routes/projects.py`: permission expanded from `require_admin` to `can_delete_project`. Returns 403 with a clear "use Archive instead" message when refused, rather than the previous silent redirect.
 
 ### Frontend
-- `app/templates/components/ai_intake_panel.html` — added a batch review table block (renders when `proposed_batch` is set), with editable per-row inputs, action select (Create / Skip / Update Existing / Create Anyway), hidden inputs for non-displayed fields, source-sheet/row provenance column. Restructured the outer `{% if proposed is none %}` so the initial-state forms hide when EITHER `proposed` or `proposed_batch` is set, and the single-project preview section wraps in `{% if proposed %}` so the batch flow (which leaves `proposed=None`) doesn't crash on the preview-only code path.
-- File input `accept` attr extended to include `.xlsx,.xlsm,.xls,.csv`.
+- `app/templates/project_detail.html`: Delete button visibility changed from `current_user.role == 'admin'` to `can_delete` (new context var). PM sees a helpful tooltip explaining the draft-state condition.
+- `app/routes/projects.py:project_detail` exposes `can_delete = can_delete_project(current_user, project)` in template context.
 
-### Tests + fixtures
-- New `tests/fixtures/sample_projects.xlsx` — 3 sheets (Active, Backlog, Notes), 5 valid projects + 1 deliberate empty-name row + 1 noise sheet AI should ignore. Includes pricing edge cases (`$32-38`, `under 28 RMB ex-factory`, `$179-199`).
-- New `test_build30b.py` — 19/19 PASS. Real AI call to `gpt-5.4` (~$0.005/run). Covers parser plumbing, 100k-char cap, AI extraction with provenance + pricing fidelity preservation, HTTP upload → batch review form, batch-confirm POST → N projects in DB, idempotency (duplicate POST yields no new rows), PM-preservation semantics (named PMs from spreadsheet kept; blank PM defaults to uploader), and My Projects coverage.
+### Tests
+- New `test_build30c.py` — **23/23 PASS**. Six role × draft-state combinations:
+  - admin + fresh draft → can delete ✓
+  - admin + advanced project → can delete ✓
+  - PM + own fresh draft → can delete ✓
+  - PM + own advanced project → CANNOT delete (403) ✓
+  - PM + another PM's project → CANNOT delete (403) ✓
+  - Viewer + any → CANNOT delete (403) ✓
+  - Helper unit tests against fresh + advanced fixtures
+- HTTP-level + template-render + DB-persistence assertions.
 
 ### Docs
-- `CHANGELOG.md` — Build 30B entry added to `## Unreleased`.
-- `MASTERPLAN.md` — Build 30B detail section above Build 30A.
-- `BUILD30B_PLAN.md` — implementation plan written before code, includes the locked-decision table and 11-question Feature Design Review.
+- `CHANGELOG.md` — Build 30C entry added to `## Unreleased` (top of patch list).
+- `MASTERPLAN.md` — Build 30C detail section above 30B.
 
-No version bump. Joins the existing `## Unreleased` patch list (IME v2 + nixpacks + price strings + layout refactor + Build 30A + Build 30B). v1.2.1 release-hardening will roll them up.
+No schema change. No new dependencies.
+
+## Pre-existing assumption verified
+- The Design phase does NOT auto-start on project creation. Checked 5 recent projects: all have `advanced_phases=0`, `started_phases=0`. The "Stage: Design" label is `project.current_stage` (a cached string showing the first not-started phase's NAME) — not an indication the phase has started.
 
 ## Verification at this point
 
-- `python3 test_build30b.py` — **19/19** with real AI extraction.
+- `python3 test_build30c.py` — **23/23**.
+- `python3 test_build30b.py` — 19/19 (unchanged).
 - `python3 test_build30.py` — 23/23 (unchanged).
 - `python3 test_build29.py` — 26/26 (unchanged).
-- `python3 test_ai_e2e.py` — 15P/2S/0F (unchanged; 2 skips are the 1×1 PNG + empty PDF fixture limits).
-- Manual browser smoke:
-  - GET `/projects/new?tab=ai` → upload `sample_projects.xlsx` → batch review table renders with 5 editable rows.
-  - Click Save Batch → redirected to `/my-projects?imported=5&updated=0&skipped=0`.
-  - Browser back + re-submit → no duplicate (idempotency token claimed).
+- `python3 test_ai_e2e.py` — 15P/2S/0F (unchanged).
+- Manual smoke: log in as PM, create a fresh project (no phases advanced) → Delete button visible → click → project gone. Repeat with a phase manually set to in_progress → no Delete button.
 
-## What's NOT in this build
+## v1.2 patch series (queued for v1.2.1 release-hardening)
 
-- **Build 30C** — PM draft delete capability (gated on user policy decision: 48h vs "until first phase advance" vs other).
-- v1.2.1 release-proof regression — happens when unreleased patches accumulate enough.
-- One-time cleanup of the original 6 admin-linked duplicates from the user's incident — admin manual task, still in the todo list separately from code.
+Now 7 patches on `## Unreleased` against `v1.2.0`:
+1. IME composer fix v2 (`7d56198`)
+2. Nixpacks Python-only (`2bd82bf`)
+3. Price strings (`1465265`)
+4. Layout refactor (`36a787e`)
+5. Build 30A — project creation safety (`cab8884`)
+6. Build 30B — Excel batch intake (`1d811b9`)
+7. Build 30C — PM draft delete (this commit, pending)
 
 ## Next step
 
-Awaiting user authorization to commit + push Build 30B. After that, the natural next moves:
-
-1. **Admin one-time cleanup** of the 6 existing duplicates (manual SQL or admin UI).
-2. **Build 30C** — policy decision needed: PM delete window. 48h vs "until first phase advance" vs other.
-3. **v1.2.1 release-hardening** — once the queue of unreleased patches feels full.
+Awaiting commit/push authorization. After that: **v1.2.1 release-hardening** (per user direction: "After [30C] we can do release hardening all together"). That build will:
+- Bump `app/version.py` from `1.2.0` → `1.2.1`.
+- Write `test_build_v121.py` mirroring `test_build29.py`'s release-proof pattern.
+- Update VERSION.md / CHANGELOG.md / MASTERPLAN.md / USER_GUIDE.md with the rollup release notes.
+- Full regression sweep across all v1.0+ builds.
+- Loosen any strict version assertions in the post-30 test files for the bump.

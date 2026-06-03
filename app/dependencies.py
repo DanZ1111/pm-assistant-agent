@@ -55,6 +55,35 @@ def can_edit_project(user: User, project) -> bool:
     return False
 
 
+def can_delete_project(user: User | None, project) -> bool:
+    """Build 30C — who can hard-delete a project.
+
+    Admin: always (matches existing admin-only delete behavior, preserved).
+    PM: only if they own the project AND no phase has started yet.
+        "No phase has started" = every phase still has status='not_started'
+        AND actual_start_date IS NULL. This is "until first phase advance":
+        once anyone marks real work as started, the project is no longer
+        a deletable draft — switch to archive instead.
+    Viewer: never.
+    """
+    if user is None:
+        return False
+    if user.role == "admin":
+        return True
+    if user.role != "pm":
+        return False
+    if not can_edit_project(user, project):
+        return False
+    # Conservative draft check: every phase must be untouched.
+    phases = getattr(project, "phases", None) or []
+    for phase in phases:
+        if phase.status != "not_started":
+            return False
+        if phase.actual_start_date is not None:
+            return False
+    return True
+
+
 def can_view_sensitive_fields(user: User) -> bool:
     """Factory and engineer are visible only to admin and pm."""
     return user.role in ("admin", "pm")

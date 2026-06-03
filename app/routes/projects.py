@@ -13,7 +13,8 @@ from app.ai.parser import extract_thesis_and_inspirations
 from app.ai.matching import find_best_match, MATCH_THRESHOLD
 from app.dependencies import (
     get_current_user, require_auth, require_admin,
-    can_edit_project, can_view_sensitive_fields, can_view_journal, can_view_costs,
+    can_edit_project, can_delete_project,
+    can_view_sensitive_fields, can_view_journal, can_view_costs,
     _RedirectException
 )
 from app.i18n import i18n_context
@@ -355,6 +356,7 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
     delay = crud.calculate_delay(project, phases)
     changes = sorted(project.changes, key=lambda c: c.changed_at, reverse=True)[:30]
     can_edit = can_edit_project(current_user, project)
+    can_delete = can_delete_project(current_user, project)
     can_sensitive = can_view_sensitive_fields(current_user)
     linked_ideas = crud.get_ideas_for_project(db, project_id)
     linked_idea_ids = {li["idea"].id for li in linked_ideas}
@@ -407,6 +409,7 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
         "today": date.today(),
         "current_user": current_user,
         "can_edit": can_edit,
+        "can_delete": can_delete,
         "can_sensitive": can_sensitive,
         "linked_ideas": linked_ideas,
         "available_ideas": available_ideas,
@@ -540,11 +543,31 @@ def project_archive(request: Request, project_id: int, db: Session = Depends(get
 
 @router.post("/projects/{project_id}/delete")
 def project_delete(request: Request, project_id: int, db: Session = Depends(get_db)):
+    """Build 30C — permission expanded from admin-only to admin + PM-of-untouched-draft.
+
+    PM scope: PM is the project's product_manager AND every phase is still
+    `not_started` with no actual_start_date. Once any phase advances, the
+    project leaves draft state and PM must use Archive instead.
+    """
     current_user = get_current_user(request, db)
     try:
-        require_admin(current_user)
+        require_auth(current_user)
     except _RedirectException as e:
         return e.response
+
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if not can_delete_project(current_user, project):
+        # Mirrors the pre-30C admin-only behavior for unauthorized callers:
+        # 403 rather than a silent redirect, so PMs see why their POST failed
+        # if they hit the route directly after a phase advance.
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot delete this project. Admin can delete any project; "
+                   "PM can delete only their own projects that have no advanced phases. "
+                   "If work has started, use Archive instead.",
+        )
 
     crud.delete_project(db, project_id)
     return RedirectResponse(url="/projects", status_code=303)

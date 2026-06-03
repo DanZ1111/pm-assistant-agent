@@ -61,9 +61,11 @@
           </button>
         </form>
         {% endif %}
-        {% if current_user and current_user.role == 'admin' %}
+        {# Build 30C — Delete shown when the viewer is allowed to delete
+           (admin always; PM only for their own untouched-draft projects). #}
+        {% if can_delete %}
         <form method="post" action="/projects/{{ project.id }}/delete" class="d-inline" onsubmit="return confirm('{{ t('project.delete_confirm') }}')">
-          <button class="btn btn-sm btn-outline-danger">
+          <button class="btn btn-sm btn-outline-danger" title="{% if current_user and current_user.role == 'pm' %}You can delete this project because no phase has started yet. Once any phase advances, use Archive instead.{% endif %}">
             <i class="bi bi-trash me-1"></i>{{ t('btn.delete') }}
           </button>
         </form>

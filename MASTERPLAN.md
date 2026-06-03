@@ -3118,6 +3118,36 @@ Close the v1.2 assistant-workspace series (Builds 26-28) with consolidated docum
 - `python3 test_ai_e2e.py` — 10 passed, 7 external-AI skips, 0 failed
 - Browser: navbar shows `v1.2.0` (not `v1.2.0-buildXX`)
 
+### Build 30C — PM draft delete ✓ SHIPPED (unreleased on v1.2.0)
+
+#### Context
+
+User-reported incident (Build 30A backstory): a PM ended up with 6 duplicate projects she couldn't clean up. Build 30A prevented the duplicate-creation; this build closes the loop by letting PMs delete their own drafts directly, so they no longer need admin intervention for typo / accidental rows.
+
+#### Policy (locked)
+
+- **Admin**: can delete any project. (Pre-30C behavior preserved.)
+- **PM**: can delete only if (a) project's `product_manager` matches their username OR display_name, AND (b) every phase is still `status='not_started'` with no `actual_start_date` set. "Until first phase advance" — tied to a real workflow event, not a clock. Once anyone marks work as started, the project leaves draft state and PM must use Archive instead.
+- **Viewer**: cannot delete anything.
+
+#### Scope
+
+- New `can_delete_project(user, project)` helper in `app/dependencies.py`. Composes `can_edit_project` (PM ownership) + phase-state check.
+- `POST /projects/{id}/delete` route: permission expanded from `require_admin` to `can_delete_project`. Unauthorized POST returns 403 with a clear "use Archive instead" message rather than a silent redirect.
+- Project detail view now exposes `can_delete` to the template; the Delete button shows when `can_delete=True` (was gated on `current_user.role == 'admin'`).
+- No schema change. Reuses existing `actual_start_date` + `status` phase fields.
+
+#### Out of scope (deferred)
+
+- Soft delete / undo window (current behavior is hard delete; admin still gets `archive_project` for the reversible path).
+- Cascading-delete preview UI (the cascade is automatic via SQLAlchemy relationships).
+- Bulk delete from the projects list.
+
+#### Verification
+
+- `python3 test_build30c.py` — 23/23, covering all six role × draft-state combinations (admin/PM/viewer × fresh/advanced) at both the HTTP and helper level.
+- Regression: `python3 test_build30.py`, `test_build30b.py`, plus the post-v1.2.0 suite.
+
 ### Build 30B — Excel batch intake ✓ SHIPPED (unreleased on v1.2.0)
 
 #### Context
