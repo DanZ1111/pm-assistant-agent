@@ -1,0 +1,13 @@
+# Force Nixpacks to use ONLY the Python provider during Railway builds.
+#
+# The `package.json` at the project root exists for local development only
+# (it lets `node --test tests/composer_ime.test.mjs` run the JSDOM
+# behavioral tests for the assistant composer controller). Without this
+# override, Nixpacks auto-detects Node from package.json and runs `npm
+# install` during every deploy — wasted bandwidth, slower builds, and
+# fragile against npm registry blips that have nothing to do with the
+# Python app actually being deployed.
+#
+# Python entrypoint stays defined in railway.toml ([deploy] startCommand).
+
+providers = ["python"]
