@@ -8,7 +8,7 @@
       <a href="/projects"><i class="bi bi-arrow-left me-1"></i>{{ t('title.all_projects') }}</a>
     </div>
     <div class="detail-title-row">
-      <div>
+      <div class="detail-title-block">
         <h1 class="detail-title">{{ project.name }}</h1>
         <div class="detail-meta-row">
           {% if project.brand %}<span class="meta-brand">{{ project.brand }}</span>{% endif %}
@@ -16,12 +16,45 @@
           {% if project.product_type %}<span class="meta-type">{{ project.product_type }}</span>{% endif %}
           <span class="status-badge status-{{ project.status }} ms-1">{{ t('status.' ~ project.status) }}</span>
         </div>
+        <div class="project-header-facts">
+          <div class="project-fact">
+            <span>{{ t('form.product_manager') }}</span>
+            <strong>{{ project.product_manager or "—" }}</strong>
+          </div>
+          {% if can_sensitive %}
+          <div class="project-fact">
+            <span>{{ t('form.engineer') }}</span>
+            <strong>{{ project.engineer or "—" }}</strong>
+          </div>
+          <div class="project-fact">
+            <span>{{ t('form.factory') }}</span>
+            <strong>{{ project.factory or "—" }}</strong>
+          </div>
+          {% endif %}
+          {% if project.project_owner %}
+          <div class="project-fact">
+            <span>{{ t('form.owner') }}</span>
+            <strong>{{ project.project_owner }}</strong>
+          </div>
+          {% endif %}
+          <div class="project-fact">
+            <span>{{ t('table.stage') }}</span>
+            <strong>{% if project.current_stage %}{{ project.current_stage }}{% else %}—{% endif %}</strong>
+          </div>
+          <div class="project-fact">
+            <span>{{ t('form.planned_launch_date') }}</span>
+            <strong>{% if project.planned_launch_date %}{{ project.planned_launch_date.strftime('%b %d, %Y') }}{% else %}—{% endif %}</strong>
+          </div>
+          {% if project.estimated_launch_date and delay %}
+          <div class="project-fact project-fact-alert">
+            <span>{{ t('project.estimated_launch_delayed') }}</span>
+            <strong>{{ project.estimated_launch_date.strftime('%b %d, %Y') }}</strong>
+          </div>
+          {% endif %}
+        </div>
       </div>
       <div class="detail-actions">
         {% if can_edit %}
-        <a href="/projects/{{ project.id }}/edit" class="btn btn-sm btn-outline-secondary">
-          <i class="bi bi-pencil me-1"></i>{{ t('btn.edit') }}
-        </a>
         <form method="post" action="/projects/{{ project.id }}/archive" class="d-inline" onsubmit="return confirm('{{ t('project.archive_confirm') }}')">
           <button class="btn btn-sm btn-outline-secondary">
             <i class="bi bi-archive me-1"></i>{{ t('btn.archive') }}
@@ -58,85 +91,40 @@
   </div>
 </div>
 
-<div class="detail-layout">
-  <!-- Sidebar -->
-  <aside class="detail-sidebar">
-    <div class="sidebar-section">
-      <div class="sidebar-label">{{ t('form.product_manager') }}</div>
-      <div class="sidebar-value">{{ project.product_manager or "—" }}</div>
-    </div>
-    {% if can_sensitive %}
-    <div class="sidebar-section">
-      <div class="sidebar-label">{{ t('form.engineer') }}</div>
-      <div class="sidebar-value">{{ project.engineer or "—" }}</div>
-    </div>
-    {% endif %}
-    {% if project.project_owner %}
-    <div class="sidebar-section">
-      <div class="sidebar-label">{{ t('form.owner') }}</div>
-      <div class="sidebar-value">{{ project.project_owner }}</div>
-    </div>
-    {% endif %}
-    {% if can_sensitive %}
-    <div class="sidebar-divider"></div>
-    <div class="sidebar-section">
-      <div class="sidebar-label">{{ t('form.factory') }}</div>
-      <div class="sidebar-value">{{ project.factory or "—" }}</div>
-    </div>
-    <div class="sidebar-divider"></div>
-    <div class="sidebar-section">
-      <div class="sidebar-label">{{ t('form.target_factory_cost') }}</div>
-      <div class="sidebar-value">
-        {% if project.target_factory_cost_display %}<strong>{{ project.target_factory_cost_display }}</strong>{% else %}—{% endif %}
-      </div>
-    </div>
-    {% endif %}
-    <div class="sidebar-section">
-      <div class="sidebar-label">{{ t('form.target_msrp') }}</div>
-      <div class="sidebar-value">
-        {% if project.target_msrp_display %}<strong>{{ project.target_msrp_display }}</strong>{% else %}—{% endif %}
-      </div>
-    </div>
-    <div class="sidebar-divider"></div>
-    <div class="sidebar-section">
-      <div class="sidebar-label">{{ t('form.planned_launch_date') }}</div>
-      <div class="sidebar-value">
-        {% if project.planned_launch_date %}{{ project.planned_launch_date.strftime('%b %d, %Y') }}{% else %}—{% endif %}
-      </div>
-    </div>
-    {% if project.estimated_launch_date and delay %}
-    <div class="sidebar-section">
-      <div class="sidebar-label text-danger">{{ t('project.estimated_launch_delayed') }}</div>
-      <div class="sidebar-value text-danger fw-semibold">{{ project.estimated_launch_date.strftime('%b %d, %Y') }}</div>
-    </div>
-    {% endif %}
-    <div class="sidebar-section">
-      <div class="sidebar-label">{{ t('table.stage') }}</div>
-      <div class="sidebar-value">
-        {% if project.current_stage %}<span class="stage-pill">{{ project.current_stage }}</span>{% else %}—{% endif %}
-      </div>
-    </div>
-    <div class="sidebar-divider"></div>
-    <div class="sidebar-section">
-      <div class="sidebar-label">{{ t('table.created') }}</div>
-      <div class="sidebar-value text-muted small">{{ project.created_at.strftime('%b %d, %Y') }}</div>
-    </div>
-    <div class="sidebar-section">
-      <div class="sidebar-label">{{ t('table.updated') }}</div>
-      <div class="sidebar-value text-muted small">{{ project.updated_at.strftime('%b %d, %Y') }}</div>
-    </div>
-
-    {% if health.recommended_missing %}
-    <div class="sidebar-divider"></div>
-    <div class="sidebar-section">
-      <div class="sidebar-label text-warning">{{ t('project.recommended_to_add') }}</div>
-      <div class="sidebar-value small text-muted">{{ health.recommended_missing | join(', ') | replace('_', ' ') }}</div>
-    </div>
-    {% endif %}
-  </aside>
-
+<div class="detail-layout detail-layout-full">
   <!-- Main Content -->
   <div class="detail-main">
+    <section class="detail-section detail-section-compact" id="commercial-snapshot">
+      <div class="section-header">
+        <h2 class="section-title"><i class="bi bi-cash-coin me-2"></i>{{ t('section.commercial_snapshot') }}</h2>
+      </div>
+      <div class="project-snapshot-grid">
+        {% if can_sensitive %}
+        <div class="project-snapshot-item">
+          <span>{{ t('form.target_factory_cost') }}</span>
+          <strong>{% if project.target_factory_cost_display %}{{ project.target_factory_cost_display }}{% else %}—{% endif %}</strong>
+        </div>
+        {% endif %}
+        <div class="project-snapshot-item">
+          <span>{{ t('form.target_msrp') }}</span>
+          <strong>{% if project.target_msrp_display %}{{ project.target_msrp_display }}{% else %}—{% endif %}</strong>
+        </div>
+        <div class="project-snapshot-item">
+          <span>{{ t('table.created') }}</span>
+          <strong>{{ project.created_at.strftime('%b %d, %Y') }}</strong>
+        </div>
+        <div class="project-snapshot-item">
+          <span>{{ t('table.updated') }}</span>
+          <strong>{{ project.updated_at.strftime('%b %d, %Y') }}</strong>
+        </div>
+      </div>
+      {% if health.recommended_missing %}
+      <div class="snapshot-note">
+        <strong>{{ t('project.recommended_to_add') }}:</strong>
+        {{ health.recommended_missing | join(', ') | replace('_', ' ') }}
+      </div>
+      {% endif %}
+    </section>
 
     <!-- 1. Product Thesis -->
     <section class="detail-section" id="thesis">

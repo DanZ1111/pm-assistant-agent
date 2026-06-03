@@ -176,12 +176,12 @@ def run_tests():
         page.click("button[type='submit']")
         page.wait_for_url(f"**/projects/{full_id}")
 
-        # Verify updated value in sidebar
-        page_text = page.locator(".detail-sidebar").inner_text()
+        # Verify updated value in the project commercial snapshot
+        page_text = page.locator("#commercial-snapshot").inner_text()
         if "139.99" in page_text:
-            ok("Edit saved — updated MSRP visible in sidebar")
+            ok("Edit saved — updated MSRP visible in commercial snapshot")
         else:
-            fail("Edit save", f"new MSRP not found; sidebar text: {page_text[:200]}")
+            fail("Edit save", f"new MSRP not found; snapshot text: {page_text[:200]}")
 
         # Change log should record the edit
         change_log = page.locator(".change-log")

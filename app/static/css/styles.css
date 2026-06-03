@@ -415,6 +415,10 @@ body {
   gap: 16px;
   flex-wrap: wrap;
 }
+.detail-title-block {
+  min-width: min(100%, 620px);
+  flex: 1;
+}
 .detail-title {
   font-size: 26px;
   font-weight: 800;
@@ -428,6 +432,39 @@ body {
   margin-top: 6px;
   flex-wrap: wrap;
 }
+.project-header-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 10px 14px;
+  max-width: 1120px;
+  margin-top: 16px;
+}
+.project-fact {
+  min-width: 0;
+  padding: 0 14px 0 0;
+  border-right: 1px solid var(--color-border);
+}
+.project-fact:last-child { border-right: none; }
+.project-fact span,
+.project-snapshot-item span {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+.project-fact strong {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+  font-size: 13px;
+  line-height: 1.35;
+}
+.project-fact-alert strong,
+.project-fact-alert span { color: var(--color-danger); }
 .detail-actions {
   display: flex;
   gap: 8px;
@@ -459,45 +496,14 @@ body {
   gap: 0;
   min-height: calc(100vh - 200px);
 }
-.detail-sidebar {
-  width: 240px;
-  flex-shrink: 0;
-  padding: 24px 20px 16px;
-  border-right: 1px solid var(--color-border);
-  position: sticky;
-  top: 52px;
-  /* Reserve room for the navbar (52px) + the bottom chat bar (~160px) so
-     the sticky sidebar stops above the fixed chat bar instead of being
-     covered by it. */
-  max-height: calc(100vh - 52px - 160px);
-  overflow-y: auto;
+.detail-layout-full {
+  display: block;
 }
 .detail-main {
   flex: 1;
+  width: 100%;
   padding: 0;
   min-width: 0;
-}
-
-.sidebar-section {
-  margin-bottom: 14px;
-}
-.sidebar-label {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--color-text-muted);
-  margin-bottom: 3px;
-}
-.sidebar-value {
-  font-size: 13px;
-  color: var(--color-text);
-  line-height: 1.4;
-}
-.sidebar-divider {
-  height: 1px;
-  background: var(--color-border);
-  margin: 16px 0;
 }
 
 /* =========================================================
@@ -506,6 +512,10 @@ body {
 .detail-section {
   padding: 28px;
   border-bottom: 1px solid var(--color-border);
+}
+.detail-section-compact {
+  padding-top: 22px;
+  padding-bottom: 22px;
 }
 .detail-section:last-child { border-bottom: none; }
 .section-header {
@@ -534,6 +544,31 @@ body {
   border-color: var(--color-border-dark);
   color: var(--color-text);
   background: var(--color-bg);
+}
+
+.project-snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px 18px;
+}
+.project-snapshot-item {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+.project-snapshot-item strong {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+  font-size: 17px;
+  line-height: 1.3;
+}
+.snapshot-note {
+  margin-top: 14px;
+  color: var(--color-text-muted);
+  font-size: 12px;
 }
 
 /* Product Thesis */
@@ -2173,29 +2208,14 @@ body.has-bottom-chat .main-content { padding-bottom: 104px; }
    Build 25 — Responsive tweaks
    ========================================================= */
 
-/* Project detail page: stack the 240px sidebar above the main content
-   instead of cramming both into a narrow flex row. */
 @media (max-width: 900px) {
   .detail-layout {
-    flex-direction: column;
     min-height: auto;
   }
-  .detail-sidebar {
-    width: 100%;
-    border-right: none;
-    border-bottom: 1px solid var(--color-border);
-    position: static;
-    max-height: none;
-    padding: 16px 20px;
-  }
-  .detail-sidebar .sidebar-divider { display: none; }
-  /* Inline the sidebar sections at narrow widths instead of stacking. */
-  .detail-sidebar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px 24px;
-  }
-  .detail-sidebar .sidebar-section { margin-bottom: 0; }
+  .detail-title-row { gap: 14px; }
+  .project-header-facts { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
+  .detail-actions { width: 100%; }
+  .detail-section { padding-left: 20px; padding-right: 20px; }
 }
 
 /* Navbar: tighten link padding at narrow widths so all items still fit on
@@ -2215,10 +2235,8 @@ body.has-bottom-chat .main-content { padding-bottom: 104px; }
   .bottom-chat-input { font-size: 0.9rem; padding: 6px 10px; }
   .bottom-chat-submit { padding: 6px 10px; }
   body.has-bottom-chat .main-content { padding-bottom: 96px; }
-  /* On phones, the detail-sidebar is stacked above main (per the < 900px
-     rule) so the sticky max-height no longer applies — but if someone
-     resizes between 900px and 600px and back, restore a tighter cap. */
-  .detail-sidebar { max-height: calc(100vh - 52px - 96px); }
+  .project-header-facts,
+  .project-snapshot-grid { grid-template-columns: 1fr; }
 }
 
 /* Mobile assistant is a full-screen app, with no squeezed tracker behind it. */

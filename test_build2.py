@@ -151,11 +151,11 @@ def run_tests():
         page.goto(f"{BASE}/projects/{p2}")
 
         # Stage should be "Design" (first phase not done)
-        sidebar_text = page.locator(".detail-sidebar").inner_text()
-        if "Design" in sidebar_text:
+        header_text = page.locator(".project-header-facts").inner_text()
+        if "Design" in header_text:
             ok("current_stage is 'Design' on fresh double-prototype project")
         else:
-            fail("current_stage initial", f"sidebar: {sidebar_text[:200]}")
+            fail("current_stage initial", f"header facts: {header_text[:200]}")
 
         # Mark Design as done — open modal, set status=done, set actual end
         today_str = date.today().isoformat()
@@ -168,11 +168,11 @@ def run_tests():
         page.wait_for_load_state("networkidle")
 
         # current_stage should now be "Engineering Review"
-        sidebar_text2 = page.locator(".detail-sidebar").inner_text()
-        if "Engineering Review" in sidebar_text2:
+        header_text2 = page.locator(".project-header-facts").inner_text()
+        if "Engineering Review" in header_text2:
             ok("current_stage advances to 'Engineering Review' after Design is done")
         else:
-            fail("current_stage after done", f"sidebar: {sidebar_text2[:200]}")
+            fail("current_stage after done", f"header facts: {header_text2[:200]}")
 
         # ----------------------------------------------------------------
         # 5. Add phase
@@ -251,7 +251,7 @@ def run_tests():
             fail("Phases due this week", f"not found in attention section: {attention_text[:200]}")
 
         # ----------------------------------------------------------------
-        # 8. Estimated launch date in sidebar
+        # 8. Estimated launch date in header facts
         # ----------------------------------------------------------------
         print("\n── Estimated Launch Date ──")
 
@@ -272,11 +272,11 @@ def run_tests():
         page.click("#phaseEditForm button[type='submit']")
         page.wait_for_load_state("networkidle")
 
-        sidebar = page.locator(".detail-sidebar").inner_text().lower()
-        if "est. launch" in sidebar or "estimated" in sidebar or "delayed" in sidebar:
-            ok("Estimated launch date appears in sidebar when delayed")
+        header = page.locator(".project-header-facts").inner_text().lower()
+        if "est. launch" in header or "estimated" in header or "delayed" in header:
+            ok("Estimated launch date appears in header facts when delayed")
         else:
-            fail("Est. launch in sidebar", f"not found; sidebar: {sidebar[:300]}")
+            fail("Est. launch in header facts", f"not found; header: {header[:300]}")
 
         # ----------------------------------------------------------------
         # 9. Modal cancel / close

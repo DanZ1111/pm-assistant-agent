@@ -299,6 +299,24 @@ def main():
     else:
         fail("Project text price columns", "missing target_factory_cost_text or target_msrp_text")
 
+    print("\n── Post-release project detail layout ──")
+    detail_template = read("app/templates/project_detail.html")
+    contains_all(
+        "project_detail.html uses full-width detail layout with header facts + commercial snapshot",
+        detail_template,
+        [
+            "detail-layout detail-layout-full",
+            "project-header-facts",
+            "commercial-snapshot",
+            "project-snapshot-grid",
+            "section.commercial_snapshot",
+        ],
+    )
+    if "class=\"detail-sidebar\"" not in detail_template and "href=\"/projects/{{ project.id }}/edit\"" not in detail_template:
+        ok("project detail removes the old sidebar and top-level Edit link")
+    else:
+        fail("project detail layout cleanup", "old sidebar markup or top-level edit link still present")
+
     print("\n── Regression inventory ──")
     expected_tests = [
         "test_build1.py",

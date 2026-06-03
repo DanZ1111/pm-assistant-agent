@@ -1,7 +1,7 @@
 # CURRENT_TASK.md
 
 ## Task
-Unreleased post-v1.2.0 fix — PM-facing project price strings.
+Post-v1.2.0 project detail layout cleanup — remove the low-value left sidebar.
 
 ## Handoff rule
 Before editing, inspect:
@@ -13,51 +13,35 @@ Git/code is the source of truth. This file is only a short task reminder.
 
 ## Current state
 
-`origin/main` already contains:
-- `7d56198` — Chinese IME composer controller (v2 mature fix)
-- `2bd82bf` — Force Nixpacks Python-only provider after `package.json`
+The project detail sidebar refactor has been prepared as a git checkpoint.
+Pre-refactor rollback anchor: `146526527b82b5ef138bf1e8395d5066d26a2cae`.
 
-The current working tree contains an uncommitted project-price modeling fix.
-
-## Problem
-
-Project Target Factory Cost and Target MSRP were modeled as USD-only floats, but PM notes often use planning expressions:
-- `MSRP $70-100`
-- `under 120 RMB`
-- `约 120 RMB 出厂`
-
-Forcing those into floats made AI intake either guess, clear, or collapse the value incorrectly.
-
-## Architecture Choice
-
-- Add `projects.target_factory_cost_text` and `projects.target_msrp_text` as the PM-facing display/edit source of truth.
-- Keep legacy `projects.target_factory_cost` and `projects.target_msrp` floats as optional derived/simple-USD values for old rows and future profit math.
-- Variant cost/MSRP fields stay numeric because they belong to the future Profit Model calculation layer.
-- No destructive column conversion.
-
-## Implemented
-
-- Model properties display text prices with fallback to old numeric values.
-- Migration `003_v1_2_add_price_text_fields` adds text columns and backfills old numeric rows as strings.
-- Manual project forms and AI-assisted review forms use text inputs.
-- Manual create/edit and AI confirm preserve the entered string and only mirror one clean USD amount into the legacy float.
-- AI extraction prompts now preserve ranges, currencies, and qualifiers instead of requiring USD-only numbers.
-- Parser normalization extracts field-specific price strings such as `约 120 RMB 出厂` and `$70-100`.
-- Project list/detail/sidebar display price strings.
-- Chat project-field updates accept string prices and mirror simple USD only when possible.
-- Role-filtered project context returns display strings.
+Implemented:
+- Removed the rendered `.detail-sidebar` from `app/templates/project_detail.html`.
+- Removed the top-level project Edit link from the header; Archive/Delete remain as whole-project actions.
+- Moved Product Manager, Engineer, Factory, Owner, Stage, Planned Launch, and delayed launch into a compact header facts grid under the project title.
+- Moved Target Factory Cost / Target MSRP into a full-width `Commercial Snapshot` section near the top of the detail content.
+- Kept created/updated timestamps in the Commercial Snapshot for now; they are no longer in a persistent rail.
+- Removed dead sidebar CSS and updated responsive rules for the full-width layout.
+- Added `section.commercial_snapshot` to both English and Chinese i18n bundles.
+- Updated old sidebar expectations in `test_build1.py` and `test_build2.py`.
+- Added a static layout contract to `test_build29.py`.
 
 ## Verification So Far
 
-- `python3 test_build29.py` — 24/24 PASS.
-- `python3 test_build22.py` — 15/15 PASS.
-- `python3 test_build23.py` — 24/24 PASS.
-- `python3 test_build27.py` — 29/29 PASS.
-- Static checks: `python3 -m compileall -q app`, `node --check app/static/js/main.js`, `git diff --check` PASS.
-- Local migration applied successfully.
-- Smoke: `/ai/intake/confirm` saved `under 120 RMB` and `$70-100`, left legacy numeric columns empty, and rendered both strings on project detail.
+- `python3 -m compileall -q app` — PASS.
+- `python3 -m json.tool app/i18n/en.json` — PASS.
+- `python3 -m json.tool app/i18n/zh.json` — PASS.
+- `python3 test_build29.py` — 26/26 PASS.
+- Focused desktop Playwright smoke on `/projects/<latest>` — PASS; screenshot: `/private/tmp/project_detail_layout_smoke.png`.
+- Focused mobile Playwright smoke on `/projects/<latest>` — PASS; screenshot: `/private/tmp/project_detail_layout_mobile_smoke.png`.
+
+## Known Notes
+
+- `test_build1.py` was attempted but its first anonymous-root assertion is stale for the current auth-gated app, so it timed out before reaching the project detail assertions. The updated assertions were not reached in that legacy suite.
+- The existing fixed assistant dock still overlays the lower edge of the viewport on mobile. That predates this sidebar cleanup and should be handled in the assistant workspace/layout build rather than mixed into this narrow refactor.
 
 ## Remaining
 
-- Run final `git status` / optional broader regression.
-- Await explicit commit / push instruction.
+- If the user asks to undo this layout, revert the layout checkpoint commit or reset back to the pre-refactor anchor above after confirming destructive reset intent.
+- The assistant dock mobile overlay remains a separate future layout task.
