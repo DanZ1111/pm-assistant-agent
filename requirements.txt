@@ -9,6 +9,8 @@ python-dateutil
 aiofiles
 pypdf
 python-docx
+openpyxl
+xlrd<2.0
 passlib[bcrypt]
 bcrypt<4
 psycopg2-binary

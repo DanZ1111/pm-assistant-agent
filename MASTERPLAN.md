@@ -3118,6 +3118,35 @@ Close the v1.2 assistant-workspace series (Builds 26-28) with consolidated docum
 - `python3 test_ai_e2e.py` — 10 passed, 7 external-AI skips, 0 failed
 - Browser: navbar shows `v1.2.0` (not `v1.2.0-buildXX`)
 
+### Build 30B — Excel batch intake ✓ SHIPPED (unreleased on v1.2.0)
+
+#### Context
+
+Onboarding a new department (e.g. Beauty) requires importing existing project portfolios from Excel. Spreadsheets often have multiple projects across multiple sheets. Manual re-typing is unacceptable.
+
+#### Scope
+
+- Accept `.xlsx`, `.xlsm`, `.xls`, and `.csv` uploads at `POST /ai/intake/extract-file`.
+- New `app/ai/excel_parser.py` renders workbooks as sheet-aware plain text (capped at 100,000 chars).
+- New `EXCEL_BATCH_INTAKE_PROMPT` returns `{"projects": [...]}` with per-row `source_sheet` + `source_row_hint` for provenance.
+- New `app/ai/parser.py:extract_batch_from_workbook_text()` calls `gpt-5.4` with JSON-object response format. Per-row pricing preserved verbatim (trust the AI for the right cell rather than re-running the windowed sanitizer that would match neighboring date columns).
+- New `crud.create_projects_batch_with_idempotency()` claims one Build 30A token + builds N projects in one transaction. Per-row failures (missing name) are skipped with a reason; the rest commit together.
+- New `POST /ai/intake/confirm-batch` consumes the form's `submission_token`, applies PM defaulting (blank → uploader's username) + display-name normalization, then dispatches per-row to either create / update_existing / skip.
+- New batch review table in `ai_intake_panel.html` (only rendered when `proposed_batch` is set). Each row has an Action select with sensible defaults (Skip for matched rows, Create for new).
+- New deps: `openpyxl`, `xlrd<2.0`. No schema change.
+
+#### Out of scope (deferred)
+
+- Idea bulk-import (project-only for this build).
+- Per-cell column-mapping UI (AI maps headers).
+- Background async import jobs.
+- OCR for image-of-spreadsheet uploads.
+
+#### Verification
+
+- `python3 test_build30b.py` — 19/19, including real `gpt-5.4` extraction on a multi-sheet fixture (~$0.005/run).
+- Regression: `python3 test_build30.py`, `test_build29.py`, `test_build28.py`, `test_build27.py`, `test_build22.py`, `test_build19.py`, `test_ai_e2e.py`.
+
 ### Build 30A — Project creation safety (idempotency + PM ownership) ✓ SHIPPED (unreleased on v1.2.0)
 
 #### Context

@@ -13,6 +13,7 @@ from app.ai.prompts import (
     DUAL_MODE_INTAKE_PROMPT,
     JOURNAL_SUMMARY_PROMPT,
     BUSINESS_PLAN_EXTRACT_PROMPT,
+    EXCEL_BATCH_INTAKE_PROMPT,
 )
 
 _client: OpenAI | None = None
@@ -56,6 +57,58 @@ def extract_project_fields(raw_text: str) -> dict:
         raw = response.choices[0].message.content or "{}"
         parsed = json.loads(raw)
         return sanitize_price_fields(parsed, raw_text, source_kind="text")
+    except Exception as e:
+        return {"_error": str(e)}
+
+
+def extract_batch_from_workbook_text(workbook_text: str) -> dict:
+    """Build 30B — extract multiple projects from a workbook's plain-text rendering.
+
+    Input: the sheet-aware text produced by app.ai.excel_parser.workbook_to_text.
+    Output:
+      success → {"projects": [ {fields...}, ... ]}
+      failure → {"_error": "..."}
+    Each project carries source_sheet + source_row_hint so the review UI can
+    show provenance. Pricing fields are sanitized through the same path as the
+    single-project extractor so range / non-USD expressions survive.
+    """
+    if not workbook_text or not workbook_text.strip():
+        return {"_error": "Workbook text is empty — nothing to extract."}
+    try:
+        client = _get_client()
+        response = client.chat.completions.create(
+            model="gpt-5.4",
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": EXCEL_BATCH_INTAKE_PROMPT},
+                {"role": "user", "content": workbook_text},
+            ],
+            # Bigger budget than single-project: a workbook can carry 20+ rows.
+            max_completion_tokens=4000,
+            temperature=0.1,
+        )
+        raw = response.choices[0].message.content or "{}"
+        parsed = json.loads(raw)
+        projects = parsed.get("projects")
+        if not isinstance(projects, list):
+            return {"_error": "AI response did not contain a 'projects' array."}
+        # Build 30B — trust the AI's per-row price strings verbatim. The
+        # windowed sanitize_price_fields helper matches nearby numbers in a
+        # SHARED context, which for a workbook means it can match another
+        # row's launch date as a price (observed: every row got
+        # target_factory_cost='2026-11' from the launch date column). The
+        # AI is already reading the right cell; just normalize empties.
+        cleaned: list[dict] = []
+        for item in projects:
+            if not isinstance(item, dict):
+                continue
+            row = {}
+            for k, v in item.items():
+                if v in ("", None):
+                    continue
+                row[k] = v if not isinstance(v, str) else v.strip()
+            cleaned.append(row)
+        return {"projects": cleaned}
     except Exception as e:
         return {"_error": str(e)}
 

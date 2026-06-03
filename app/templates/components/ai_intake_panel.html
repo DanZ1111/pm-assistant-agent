@@ -8,8 +8,8 @@
 <div class="alert alert-danger mb-4"><i class="bi bi-exclamation-circle me-2"></i>{{ error }}</div>
 {% endif %}
 
-{% if proposed is none %}
-{# ── State 1: Text input or file upload ── #}
+{% if proposed is none and not proposed_batch %}
+{# ── State 1: Text input or file upload (no extraction yet, no batch) ── #}
 
 {# Option A: Paste text #}
 <form method="post" action="/ai/intake/extract">
@@ -45,9 +45,9 @@
     <p class="text-muted small mb-3">{{ t('intake.upload_help') }}</p>
     <div class="row g-3 align-items-end">
       <div class="col-sm-8">
-        <label class="form-label">{{ t('form.file') }} <small class="text-muted">{{ t('intake.pdf_or_image') }}</small></label>
+        <label class="form-label">{{ t('form.file') }} <small class="text-muted">PDF, image, Excel (.xlsx/.xlsm/.xls), or CSV</small></label>
         <input type="file" name="file" id="intakeFileInput" class="form-control"
-               accept=".pdf,.png,.jpg,.jpeg,.webp,.gif">
+               accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.xlsx,.xlsm,.xls,.csv">
       </div>
       <div class="col-sm-4">
         <label class="form-label">{{ t('form.category') }}</label>
@@ -85,6 +85,97 @@
 </div>
 {% endif %}
 
+{# ─── Build 30B — Excel/CSV batch review table ──────────────────────────────── #}
+{% if proposed_batch %}
+<div class="detail-section mb-4">
+  <div class="section-header">
+    <h2 class="section-title">
+      <i class="bi bi-table me-2"></i>Batch import: review {{ proposed_batch|length }} project{{ '' if proposed_batch|length == 1 else 's' }}
+    </h2>
+  </div>
+  <p class="text-muted small mb-3">
+    Edit any cell before saving. Rows matching an existing project default to <strong>Skip</strong> — flip to
+    <strong>Update Existing</strong> to apply edits, or <strong>Create Anyway</strong> for a separate record.
+    One click on Save Batch commits everything; duplicate submits are blocked by an idempotency token.
+  </p>
+
+  <form method="post" action="/ai/intake/confirm-batch" data-idempotent="true" data-batch-review="true">
+    <input type="hidden" name="submission_token" value="{{ submission_token or '' }}">
+    <input type="hidden" name="prototype_rounds" value="single">
+
+    <div class="table-responsive" style="max-height:65vh">
+      <table class="table table-sm table-hover align-middle" style="font-size:0.85rem">
+        <thead class="sticky-top" style="background:var(--color-bg);z-index:5">
+          <tr>
+            <th style="min-width:140px">Action</th>
+            <th style="min-width:180px">Name <span class="text-danger">*</span></th>
+            <th style="min-width:140px">Brand</th>
+            <th style="min-width:120px">SKU</th>
+            <th style="min-width:140px">PM</th>
+            <th style="min-width:140px">Factory</th>
+            <th style="min-width:130px">Target Cost</th>
+            <th style="min-width:130px">Target MSRP</th>
+            <th style="min-width:140px">Launch Date</th>
+            <th style="min-width:140px">Source</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in proposed_batch %}
+          {% set f = item.fields %}
+          {% set match_id = item.match_project_id %}
+          <tr>
+            <td>
+              <input type="hidden" name="row_match_project_id" value="{{ match_id or '' }}">
+              <select name="row_action" class="form-select form-select-sm">
+                {% if match_id %}
+                <option value="skip" selected>Skip (already exists: {{ item.match_project_name }})</option>
+                <option value="update_existing">Update existing</option>
+                <option value="create_anyway">Create anyway</option>
+                {% else %}
+                <option value="create" selected>Create</option>
+                <option value="skip">Skip</option>
+                {% endif %}
+              </select>
+            </td>
+            <td><input type="text" name="row_name" class="form-control form-control-sm" value="{{ f.get('name', '') or '' }}"></td>
+            <td><input type="text" name="row_brand" class="form-control form-control-sm" value="{{ f.get('brand', '') or '' }}"></td>
+            <td><input type="text" name="row_sku" class="form-control form-control-sm" value="{{ f.get('sku', '') or '' }}"></td>
+            <td><input type="text" name="row_product_manager" class="form-control form-control-sm" value="{{ f.get('product_manager', '') or '' }}" placeholder="(defaults to you)"></td>
+            <td><input type="text" name="row_factory" class="form-control form-control-sm" value="{{ f.get('factory', '') or '' }}"></td>
+            <td><input type="text" name="row_target_factory_cost" class="form-control form-control-sm" value="{{ f.get('target_factory_cost', '') or '' }}"></td>
+            <td><input type="text" name="row_target_msrp" class="form-control form-control-sm" value="{{ f.get('target_msrp', '') or '' }}"></td>
+            <td><input type="text" name="row_planned_launch_date" class="form-control form-control-sm" value="{{ f.get('planned_launch_date', '') or '' }}" placeholder="YYYY-MM-DD"></td>
+            <td class="text-muted small">
+              {% if f.get('source_sheet') or f.get('source_row_hint') %}
+              {{ f.get('source_sheet', '') }}{% if f.get('source_row_hint') %} · row {{ f.get('source_row_hint') }}{% endif %}
+              {% else %}—{% endif %}
+            </td>
+            {# Hidden fields the route also reads, for fields not exposed in the visible columns. #}
+            <input type="hidden" name="row_product_type" value="{{ f.get('product_type', '') or '' }}">
+            <input type="hidden" name="row_engineer" value="{{ f.get('engineer', '') or '' }}">
+            <input type="hidden" name="row_project_thesis" value="{{ f.get('project_thesis', '') or '' }}">
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mt-3">
+      <a href="/projects/new?tab=ai" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-2"></i>Cancel & re-upload
+      </a>
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-cloud-upload me-2"></i>Save Batch
+      </button>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+{# Single-project / idea preview when 'proposed' is set (an empty dict {} is
+   valid for the idea path). The batch flow above (Build 30B) leaves
+   proposed=None entirely and renders its own UI. #}
+{% if proposed is not none %}
 <div class="row g-4">
 
   {# Left column: original text / AI summary reference #}
@@ -378,7 +469,9 @@
 
   </div>
 </div>
-{% endif %}
+{% endif %}{# end if proposed (Build 30B) — single-project preview wrap #}
+
+{% endif %}{# end outer if proposed is none / else #}
 
 <script>
 (function () {

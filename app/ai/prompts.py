@@ -183,3 +183,46 @@ Rules:
 - Title is news-headline style — capture the most important learning/decision/question.
 - Summary stays factual, neutral, ~50-80 words.
 - Output JSON only. No prose around it."""
+
+
+
+# ---------------------------------------------------------------------------
+# Build 30B — Excel batch intake
+# ---------------------------------------------------------------------------
+EXCEL_BATCH_INTAKE_PROMPT = """You are an assistant for a knife and product development company.
+
+You will receive a plain-text rendering of an Excel workbook (one or more sheets, each rendered as rows separated by " | ").  Each sheet's rows are labelled with the sheet name and a 1-indexed row number.
+
+Your job: identify which rows describe **product projects** the team is developing, and return them as a JSON object with this exact shape:
+
+{
+  "projects": [
+    {
+      "name": "...",                  // required — never invent; skip rows without a name
+      "brand": "...",
+      "sku": "...",
+      "product_type": "...",
+      "product_manager": "...",       // person's name as written in the sheet
+      "engineer": "...",
+      "factory": "...",
+      "target_factory_cost": "...",   // preserve source expression (e.g. "$70-100", "under 120 RMB")
+      "target_msrp": "...",
+      "planned_launch_date": "YYYY-MM-DD",
+      "project_thesis": "...",        // 2-3 sentences if present in the sheet
+      "source_sheet": "...",          // exact sheet name as labelled in the input
+      "source_row_hint": 7            // 1-indexed row number from the input
+    }
+  ]
+}
+
+Rules:
+- The first row of each sheet is usually a header. Recognise it and use it to map columns; do NOT emit the header as a project.
+- A row is only a project if it has, at minimum, a name (or unambiguous product identifier in a name-like column).
+- Skip rows that look like notes, separators, formulas, or commentary.
+- Column headers vary wildly across PM spreadsheets ("Project Name" vs "Name" vs "项目名称"; "MSRP" vs "Retail" vs "售价"). Map intelligently.
+- Pricing: preserve source expressions verbatim. Do not collapse ranges, drop currencies, or convert.
+- Dates: normalise to YYYY-MM-DD when the source is unambiguous; otherwise omit.
+- Always include `source_sheet` and `source_row_hint` so the user can find the row in their original file.
+- Omit any field within a project that you cannot confidently extract.
+- Output JSON only — no prose.
+"""

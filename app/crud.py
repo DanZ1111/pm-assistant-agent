@@ -370,6 +370,95 @@ class IdempotencyResult:
         self.project_id = project_id
 
 
+class BatchIdempotencyResult:
+    """Return shape for create_projects_batch_with_idempotency. Either:
+    - status == "created" → projects is the list of newly-inserted Projects;
+        skipped is a list of (row_index, reason) tuples for rows that failed
+        validation (missing name, etc).
+    - status == "duplicate" → project_ids is the list of originally-created
+        project ids from the prior successful batch claim.
+    - status == "invalid" → token missing / wrong user / never minted.
+    """
+    def __init__(
+        self,
+        status: str,
+        projects: list | None = None,
+        project_ids: list[int] | None = None,
+        skipped: list[tuple[int, str]] | None = None,
+    ):
+        self.status = status
+        self.projects = projects or []
+        self.project_ids = project_ids or []
+        self.skipped = skipped or []
+
+
+def create_projects_batch_with_idempotency(
+    db: Session,
+    rows: list[dict],
+    prototype_rounds: str,
+    token: str,
+    user_id: int,
+) -> BatchIdempotencyResult:
+    """Build 30B — atomic token claim + N project inserts in one transaction.
+
+    Rows that fail validation (missing name) are skipped with a reason; the
+    rest commit together. Reuses the Build 30A token table — one token covers
+    the whole batch, so a double-click on "Save Batch" claims once and racing
+    POSTs redirect to the prior batch's project IDs (recorded via comma-
+    separated id list in the token's project_id-as-string convention is too
+    hacky; instead we store the FIRST project id and on duplicate-claim we
+    re-query all projects created with that token via the token timestamp +
+    user. For now, the redirect target is simply /my-projects so the user
+    sees their full set; the stored project_id is the first inserted row for
+    audit pointing).
+    """
+    if not token:
+        return BatchIdempotencyResult("invalid")
+
+    claimed_at = datetime.utcnow()
+    updated = db.execute(
+        update(ProjectCreationToken)
+        .where(ProjectCreationToken.token == token)
+        .where(ProjectCreationToken.user_id == user_id)
+        .where(ProjectCreationToken.claimed_at.is_(None))
+        .values(claimed_at=claimed_at)
+    ).rowcount
+
+    if updated == 0:
+        existing = db.query(ProjectCreationToken).filter(
+            ProjectCreationToken.token == token,
+            ProjectCreationToken.user_id == user_id,
+        ).first()
+        if existing and existing.project_id:
+            return BatchIdempotencyResult("duplicate", project_ids=[existing.project_id])
+        return BatchIdempotencyResult("invalid")
+
+    created: list = []
+    skipped: list[tuple[int, str]] = []
+    for i, data in enumerate(rows):
+        name = (data.get("name") or "").strip()
+        if not name:
+            skipped.append((i, "row missing project name — skipped"))
+            continue
+        try:
+            project = _build_project_in_session(db, data, prototype_rounds)
+            created.append(project)
+        except Exception as exc:
+            skipped.append((i, f"row {i + 1}: {exc}"))
+
+    if created:
+        # Stamp the first created project id on the token for audit; the
+        # batch summary URL is /my-projects?imported=N regardless.
+        db.query(ProjectCreationToken).filter(
+            ProjectCreationToken.token == token
+        ).update({"project_id": created[0].id}, synchronize_session=False)
+
+    db.commit()
+    for project in created:
+        db.refresh(project)
+    return BatchIdempotencyResult("created", projects=created, skipped=skipped)
+
+
 def create_project_with_idempotency(
     db: Session,
     data: dict,
