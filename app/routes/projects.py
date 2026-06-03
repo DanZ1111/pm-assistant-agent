@@ -203,12 +203,18 @@ def project_new_form(request: Request, tab: str = "manual", db: Session = Depend
     # Build 22 — tab=ai opens the AI-Assisted panel; default is Manual Form.
     initial_tab = "ai" if tab == "ai" else "manual"
 
+    # Build 30A — mint a one-shot idempotency token for the Manual Form's POST.
+    # Embedded as a hidden input; claim-by-UPDATE on POST prevents duplicate
+    # rows when a slow submit gets clicked multiple times.
+    submission_token = crud.mint_creation_token(db, current_user.id)
+
     return templates.TemplateResponse(request, "project_form.html", {
         "project": None,
         "is_edit": False,
         "error": None,
         "current_user": current_user,
         "initial_tab": initial_tab,
+        "submission_token": submission_token,
         # Defaults so the AI intake panel renders state-1 (input form)
         "proposed": None,
         "raw_text": "",
@@ -242,6 +248,7 @@ async def project_new_submit(
     planned_launch_date: str = Form(""),
     project_thesis: str = Form(""),
     prototype_rounds: str = Form("single"),
+    submission_token: str = Form(""),
     business_plan: UploadFile = File(None),
     db: Session = Depends(get_db),
 ):
@@ -259,8 +266,20 @@ async def project_new_submit(
             "project": None, "is_edit": False,
             "error": "Project name is required.",
             "current_user": current_user,
+            "submission_token": submission_token,
             **i18n_context(request, current_user),
         })
+
+    # Build 30A — default blank PM to the creator's username; normalize
+    # display-name typed into the PM field to a canonical username when
+    # exactly one user matches (ambiguous typed-in names fall through as-is).
+    pm_value = (product_manager or "").strip()
+    if not pm_value:
+        pm_value = current_user.username
+    else:
+        canonical = crud.normalize_pm_value(db, pm_value)
+        if canonical:
+            pm_value = canonical
 
     data = {
         "name": name,
@@ -268,7 +287,7 @@ async def project_new_submit(
         "sku": sku.strip() or None,
         "product_type": product_type.strip() or None,
         "project_owner": project_owner.strip() or None,
-        "product_manager": product_manager.strip() or None,
+        "product_manager": pm_value or None,
         "engineer": engineer.strip() or None,
         "factory": factory.strip() or None,
         "target_factory_cost_text": target_factory_cost.strip() or None,
@@ -278,7 +297,21 @@ async def project_new_submit(
         "planned_launch_date": parse_date(planned_launch_date),
         "project_thesis": project_thesis.strip() or None,
     }
-    project = crud.create_project(db, data, prototype_rounds=prototype_rounds)
+
+    # Build 30A — claim the idempotency token atomically with the project
+    # insert. A racing POST (slow submit + double-click) sees rowcount=0
+    # and gets redirected to the original project instead of duplicating.
+    result = crud.create_project_with_idempotency(
+        db, data, prototype_rounds, submission_token, current_user.id,
+    )
+    if result.status == "duplicate":
+        return RedirectResponse(url=f"/projects/{result.project_id}", status_code=303)
+    if result.status == "invalid":
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid or expired submission token. Please reload the New Project page and try again.",
+        )
+    project = result.project
 
     # Build 15 — optional business plan upload + thesis extraction
     if business_plan is not None and business_plan.filename:

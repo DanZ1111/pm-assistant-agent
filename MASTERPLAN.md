@@ -3118,6 +3118,36 @@ Close the v1.2 assistant-workspace series (Builds 26-28) with consolidated docum
 - `python3 test_ai_e2e.py` — 10 passed, 7 external-AI skips, 0 failed
 - Browser: navbar shows `v1.2.0` (not `v1.2.0-buildXX`)
 
+### Build 30A — Project creation safety (idempotency + PM ownership) ✓ SHIPPED (unreleased on v1.2.0)
+
+#### Context
+
+A PM hit Submit on the manual New Project form, the request was slow, she clicked Submit 6 times → 6 duplicate rows, all linked to admin (not to her) in My Projects. Two bugs in one incident: (A) no server-side idempotency, (B) blank `product_manager` defaulted to NULL → PM's My Projects empty, admin sees all.
+
+#### Scope
+
+- New `project_creation_tokens` table (migration 004), additive only.
+- One-shot `submission_token` minted on `GET /projects/new` (manual + AI tabs) and on every AI-confirm preview render.
+- Atomic claim-by-UPDATE-rowcount on `POST /projects/new` and `POST /ai/intake/confirm`. Racing POSTs see rowcount=0 and redirect to the originally-created project. Works on both SQLite (write serialization) and PostgreSQL (row lock).
+- 24-hour TTL with opportunistic cleanup on every mint. No worker.
+- Refactor `crud.create_project()` → split internal `_build_project_in_session()` + public commit wrapper + new `create_project_with_idempotency()`. Existing callers (tests, future Excel intake) keep working.
+- Blank PM defaults to `current_user.username` on create.
+- New `crud.normalize_pm_value()` resolves typed display_names to canonical usernames when exactly one user matches (ambiguous typed-in names fall through as-is).
+- `crud.get_projects_for_user()` extended to match PM by username OR display_name (legacy rows surface in their owner's My Projects).
+- Client-side spinner / submit-disable on idempotent forms — UX layer only; token is the load-bearing protection.
+- No version bump. Joins the existing `## Unreleased` patch list (IME v2 + nixpacks + price strings + layout) on v1.2.0. v1.2.1 release-hardening will roll them up.
+
+#### Out of scope (Build 30A explicitly)
+
+- Excel batch intake → **Build 30B**.
+- PM draft delete → **Build 30C** (gated on user policy decision: 48h vs "until first phase advance" vs other).
+- One-time cleanup of the existing 6 admin-linked duplicates — admin manual task documented in CURRENT_TASK.
+
+#### Verification
+
+- `python3 test_build30.py` — 23/23 including a 5-parallel-POST stress test that proves exactly 1 row gets created from concurrent submissions sharing one token.
+- Regression: `python3 test_build19.py`, `test_build22.py`, `test_build26.py`, `test_build27.py`, `test_build28.py`, `test_build29.py`, `test_ai_e2e.py`.
+
 ---
 
 ## Requirements (Build 1)

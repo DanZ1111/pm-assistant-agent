@@ -195,6 +195,26 @@ class UserSession(Base):
     user = relationship("User", back_populates="sessions")
 
 
+class ProjectCreationToken(Base):
+    """Build 30A — one-shot idempotency token for project create POSTs.
+
+    Minted on GET of the New Project form (manual and AI-assisted). Claimed
+    atomically on POST via an UPDATE-rowcount check. If a racing POST
+    (e.g. user double-clicked Submit during a slow request) sees the token
+    already claimed, the route redirects to the originally-created project
+    instead of inserting a duplicate.
+
+    24h TTL; opportunistic cleanup on every mint.
+    """
+    __tablename__ = "project_creation_tokens"
+
+    token = Column(String, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    claimed_at = Column(DateTime, nullable=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
+
+
 # ---------------------------------------------------------------------------
 # Ideas (Good Ideas board) + Project ↔ Idea many-to-many linkage
 # ---------------------------------------------------------------------------

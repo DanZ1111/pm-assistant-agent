@@ -126,7 +126,38 @@ MIGRATIONS = [
         "003_v1_2_add_price_text_fields",
         lambda eng: _add_project_price_text_fields(eng),
     ),
+    (
+        "004_v1_2_add_project_creation_tokens",
+        lambda eng: _create_project_creation_tokens(eng),
+    ),
 ]
+
+
+def _create_project_creation_tokens(engine):
+    """Build 30A — additive table for project-create idempotency tokens.
+
+    Idempotent: CREATE TABLE IF NOT EXISTS + CREATE INDEX IF NOT EXISTS.
+    Works on both SQLite (live dev) and PostgreSQL (Railway prod).
+    """
+    inspector = inspect(engine)
+    if "project_creation_tokens" in inspector.get_table_names():
+        log.info("project_creation_tokens table already present — skip create")
+    else:
+        with engine.begin() as conn:
+            conn.execute(text(
+                "CREATE TABLE project_creation_tokens ("
+                "  token VARCHAR PRIMARY KEY,"
+                "  user_id INTEGER NOT NULL REFERENCES users(id),"
+                "  created_at DATETIME NOT NULL,"
+                "  claimed_at DATETIME NULL,"
+                "  project_id INTEGER NULL REFERENCES projects(id)"
+                ")"
+            ))
+    with engine.begin() as conn:
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_pct_user_created "
+            "ON project_creation_tokens(user_id, created_at)"
+        ))
 
 
 def _add_project_price_text_fields(engine):

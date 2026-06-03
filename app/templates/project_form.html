@@ -41,7 +41,14 @@
   <div class="alert alert-danger mb-4"><i class="bi bi-exclamation-circle me-2"></i>{{ error }}</div>
   {% endif %}
 
-  <form method="post" action="{% if is_edit %}/projects/{{ project.id }}/edit{% else %}/projects/new{% endif %}" enctype="multipart/form-data">
+  <form method="post" action="{% if is_edit %}/projects/{{ project.id }}/edit{% else %}/projects/new{% endif %}" enctype="multipart/form-data"{% if not is_edit %} data-idempotent="true"{% endif %}>
+
+    {% if not is_edit %}
+    {# Build 30A — server-side idempotency token. The hidden input is the
+       load-bearing protection against duplicate creates from double-clicks
+       on a slow submit. The client-side spinner below is UX help only. #}
+    <input type="hidden" name="submission_token" value="{{ submission_token or '' }}">
+    {% endif %}
 
     <!-- Project Identity -->
     <div class="form-section">
@@ -266,5 +273,19 @@
     textarea.addEventListener('input', updateThesisCounter);
     updateThesisCounter();
   }
+
+  // Build 30A — disable the submit button on first click + show a spinner.
+  // UX layer only; the load-bearing protection against duplicate creates
+  // is the server-side submission_token (see app/crud.py:create_project_with_idempotency).
+  document.querySelectorAll('form[data-idempotent="true"]').forEach(function (form) {
+    form.addEventListener('submit', function () {
+      var btn = form.querySelector('button[type="submit"]');
+      if (btn && !btn.disabled) {
+        btn.dataset.originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving…';
+      }
+    });
+  });
 </script>
 {% endblock %}

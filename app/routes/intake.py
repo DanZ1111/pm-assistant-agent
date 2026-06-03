@@ -71,17 +71,24 @@ def _health_from_dict(extracted: dict):
     return crud.get_project_health(proj_ns, [], [])
 
 
-def _ai_panel_response(request, current_user, **overrides):
+def _ai_panel_response(request, current_user, db=None, **overrides):
     """Build 22 — render the AI-Assisted panel inside /projects/new with
     the AI tab active. Fills in safe defaults for any intake context key
     the caller doesn't supply.
+
+    Build 30A — when a `db` Session is supplied, also mint a fresh
+    submission_token so the rendered preview form can POST idempotently.
     """
+    submission_token = ""
+    if db is not None and current_user is not None:
+        submission_token = crud.mint_creation_token(db, current_user.id)
     ctx = {
         # project_form.html scaffolding
         "project": None,
         "is_edit": False,
         "initial_tab": "ai",
         "current_user": current_user,
+        "submission_token": submission_token,
         # AI intake panel defaults
         "proposed": None,
         "raw_text": "",
@@ -126,14 +133,14 @@ async def intake_extract(
     if not can_use_ai_intake(current_user):
         return RedirectResponse(url="/projects", status_code=303)
     if not raw_text.strip():
-        return _ai_panel_response(request, current_user,
+        return _ai_panel_response(request, current_user, db=db,
             raw_text=raw_text,
             error="Please enter some text to extract from.")
 
     # Dual-mode classification: project vs idea
     result = extract_intake(raw_text)
     if "_error" in result:
-        return _ai_panel_response(request, current_user,
+        return _ai_panel_response(request, current_user, db=db,
             raw_text=raw_text,
             error=f"AI extraction failed: {result['_error']}")
 
@@ -157,7 +164,7 @@ async def intake_extract(
 
     # `proposed` is the project_fields dict (for backward compat with template),
     # idea_fields is passed separately
-    return _ai_panel_response(request, current_user,
+    return _ai_panel_response(request, current_user, db=db,
         proposed=project_fields, raw_text=raw_text, health=health,
         matched_project=matched_project, match_score=match_score,
         classification=classification, idea_fields=idea_fields)
@@ -178,12 +185,12 @@ async def intake_extract_file(
     if not can_use_ai_intake(current_user):
         return RedirectResponse(url="/projects", status_code=303)
     if not file or not file.filename:
-        return _ai_panel_response(request, current_user, error="No file selected.")
+        return _ai_panel_response(request, current_user, db=db, error="No file selected.")
 
     file_type = detect_file_type(file.filename, file.content_type or "")
 
     if file_type not in SUPPORTED_INTAKE_TYPES:
-        return _ai_panel_response(request, current_user,
+        return _ai_panel_response(request, current_user, db=db,
             error=f"Unsupported file type '{file_type}'. Upload a PDF or image (PNG, JPG, WEBP).")
 
     # Save to UPLOAD_DIR immediately (same pattern as files.py)
@@ -203,7 +210,7 @@ async def intake_extract_file(
         result = extract_from_pdf(disk_path)
         if "_error" in result:
             os.remove(disk_path)
-            return _ai_panel_response(request, current_user,
+            return _ai_panel_response(request, current_user, db=db,
                 error=f"PDF extraction failed: {result['_error']}")
         extracted = result["extracted"]
         raw_text_from_file = result.get("raw_text", "")
@@ -213,7 +220,7 @@ async def intake_extract_file(
         result = extract_from_image(disk_path)
         if "_error" in result:
             os.remove(disk_path)
-            return _ai_panel_response(request, current_user,
+            return _ai_panel_response(request, current_user, db=db,
                 error=f"Image analysis failed: {result['_error']}")
         extracted = result["extracted"]
         ai_summary = result.get("ai_summary", "")
@@ -226,7 +233,7 @@ async def intake_extract_file(
 
     matched_project, match_score = _find_match(extracted, db)
 
-    return _ai_panel_response(request, current_user,
+    return _ai_panel_response(request, current_user, db=db,
         proposed=extracted,
         raw_text=raw_text_from_file,
         health=health,
@@ -264,6 +271,7 @@ def intake_confirm(
     uploaded_ai_summary: str = Form(""),
     project_id: str = Form(""),
     action: str = Form("create"),
+    submission_token: str = Form(""),
     db: Session = Depends(get_db),
 ):
     current_user = get_current_user(request, db)
@@ -276,7 +284,7 @@ def intake_confirm(
 
     name = name.strip()
     if not name:
-        return _ai_panel_response(request, current_user,
+        return _ai_panel_response(request, current_user, db=db,
             raw_text=raw_text,
             error="Project name is required to confirm.",
             uploaded_filename=uploaded_filename,
@@ -285,12 +293,22 @@ def intake_confirm(
             uploaded_file_category=uploaded_file_category,
             uploaded_ai_summary=uploaded_ai_summary)
 
+    # Build 30A — default blank PM to the AI-intake submitter; normalize
+    # display-name typed into the PM field when unambiguous.
+    pm_value = (product_manager or "").strip()
+    if not pm_value:
+        pm_value = current_user.username
+    else:
+        canonical = crud.normalize_pm_value(db, pm_value)
+        if canonical:
+            pm_value = canonical
+
     data = {
         "name": name,
         "brand": brand.strip() or None,
         "sku": sku.strip() or None,
         "product_type": product_type.strip() or None,
-        "product_manager": product_manager.strip() or None,
+        "product_manager": pm_value or None,
         "engineer": engineer.strip() or None,
         "factory": factory.strip() or None,
         "target_factory_cost_text": target_factory_cost.strip() or None,
@@ -303,12 +321,14 @@ def intake_confirm(
     }
 
     # ── Update existing project ──────────────────────────────────────────────
+    # Update path is naturally idempotent (no new row inserted), so the
+    # submission token only gates the CREATE path below.
     if action == "update" and project_id.isdigit():
         pid = int(project_id)
         update_data = {k: v for k, v in data.items() if v is not None and k != "status"}
         project = crud.update_project(db, pid, update_data, changed_by="ai")
         if not project:
-            return _ai_panel_response(request, current_user,
+            return _ai_panel_response(request, current_user, db=db,
                 raw_text=raw_text,
                 error=f"Project {pid} not found.")
         crud.write_change(
@@ -323,8 +343,17 @@ def intake_confirm(
             {"source": "intake_update", "fields_updated": list(update_data.keys())})
         return RedirectResponse(url=f"/projects/{project.id}", status_code=303)
 
-    # ── Create new project ───────────────────────────────────────────────────
-    project = crud.create_project(db, data, prototype_rounds=prototype_rounds)
+    # ── Create new project (Build 30A: token-gated) ─────────────────────────
+    result = crud.create_project_with_idempotency(
+        db, data, prototype_rounds, submission_token, current_user.id,
+    )
+    if result.status == "duplicate":
+        return RedirectResponse(url=f"/projects/{result.project_id}", status_code=303)
+    if result.status == "invalid":
+        return _ai_panel_response(request, current_user, db=db,
+            raw_text=raw_text,
+            error="This intake session expired. Please reload the page and try again.")
+    project = result.project
 
     # Attach uploaded file to the new project if one was provided
     if uploaded_filename and uploaded_original_filename:
@@ -385,7 +414,7 @@ def intake_confirm_idea(
         return RedirectResponse(url="/ideas", status_code=303)
     name = name.strip()
     if not name:
-        return _ai_panel_response(request, current_user,
+        return _ai_panel_response(request, current_user, db=db,
             raw_text=raw_text,
             error="Idea name is required to confirm.",
             classification="idea")

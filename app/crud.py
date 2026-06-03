@@ -1,8 +1,12 @@
 import os
+import uuid
 from datetime import datetime, date, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import func
-from app.models import Project, ProjectPhase, ProjectFile, ProjectChange, AIMessage
+from sqlalchemy import func, or_, update
+from app.models import (
+    Project, ProjectPhase, ProjectFile, ProjectChange, AIMessage,
+    ProjectCreationToken, User,
+)
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app", "uploads")
 
@@ -224,8 +228,12 @@ def get_all_brands(db: Session) -> list[str]:
 
 def get_projects_for_user(db: Session, user) -> list[Project]:
     """Build 19 — projects the given user is the PM of.
-    Admin sees all projects; PM sees only projects where product_manager matches their username
-    (case-insensitive); viewer gets an empty list (the /my-projects route also redirects them away).
+
+    Admin sees all projects; PM sees projects where product_manager matches
+    their username OR their display_name (case-insensitive). Build 30A
+    extended the match to display_name so legacy rows where the form was
+    filled with a person's display name still surface for that PM. Viewer
+    gets an empty list (the /my-projects route also redirects them away).
     """
     if user is None:
         return []
@@ -235,20 +243,51 @@ def get_projects_for_user(db: Session, user) -> list[Project]:
         uname = (user.username or "").strip().lower()
         if not uname:
             return []
+        dname = (getattr(user, "display_name", "") or "").strip().lower()
+        candidates = [uname]
+        if dname and dname != uname:
+            candidates.append(dname)
         return (
             db.query(Project)
-            .filter(func.lower(Project.product_manager) == uname)
+            .filter(func.lower(Project.product_manager).in_(candidates))
             .order_by(Project.updated_at.desc())
             .all()
         )
     return []  # viewer
 
-def create_project(db: Session, data: dict, prototype_rounds: str = "single") -> Project:
+
+def normalize_pm_value(db: Session, raw: str) -> str | None:
+    """Build 30A — resolve a free-text PM field to a canonical username.
+
+    Matches against User.username and User.display_name (case-insensitive).
+    Returns the canonical username only when exactly one user matches —
+    that way ambiguous typed-in names (e.g. two users with display_name
+    "John") fall through unchanged and the caller stores the raw text.
+    """
+    needle = (raw or "").strip().lower()
+    if not needle:
+        return None
+    matches = db.query(User).filter(
+        or_(
+            func.lower(User.username) == needle,
+            func.lower(User.display_name) == needle,
+        )
+    ).all()
+    if len(matches) == 1:
+        return matches[0].username
+    return None
+
+
+def _build_project_in_session(db: Session, data: dict, prototype_rounds: str) -> Project:
+    """Build 30A — internal helper that inserts a Project + phases + change-log
+    row inside the caller's transaction. Does NOT commit. The public
+    create_project() commits; create_project_with_idempotency() commits once
+    after also claiming the idempotency token in the same transaction.
+    """
     project = Project(**{k: v for k, v in data.items() if v != "" and v is not None})
     db.add(project)
     db.flush()
 
-    # Apply phase template
     template = PHASE_TEMPLATES.get(prototype_rounds, PHASE_TEMPLATES["single"])
     for phase_name, phase_type, order in template:
         phase = ProjectPhase(
@@ -261,7 +300,12 @@ def create_project(db: Session, data: dict, prototype_rounds: str = "single") ->
         db.add(phase)
 
     db.flush()
-    phases = db.query(ProjectPhase).filter(ProjectPhase.project_id == project.id).order_by(ProjectPhase.phase_order).all()
+    phases = (
+        db.query(ProjectPhase)
+        .filter(ProjectPhase.project_id == project.id)
+        .order_by(ProjectPhase.phase_order)
+        .all()
+    )
     project.current_stage = derive_current_stage(phases)
 
     write_change(
@@ -269,10 +313,108 @@ def create_project(db: Session, data: dict, prototype_rounds: str = "single") ->
         summary=f"Project '{project.name}' created with {prototype_rounds}-prototype template ({len(template)} phases).",
         source_type="manual_edit",
     )
+    return project
 
+
+def create_project(db: Session, data: dict, prototype_rounds: str = "single") -> Project:
+    """Public create-project entry point. Commits in a single transaction.
+
+    Callers that need idempotency (HTTP forms) should use
+    create_project_with_idempotency() instead so the project insert and
+    the token claim land atomically.
+    """
+    project = _build_project_in_session(db, data, prototype_rounds)
     db.commit()
     db.refresh(project)
     return project
+
+
+# ---------------------------------------------------------------------------
+# Build 30A — idempotency tokens for the project-create POST handlers
+# ---------------------------------------------------------------------------
+
+TOKEN_TTL = timedelta(hours=24)
+
+
+def mint_creation_token(db: Session, user_id: int) -> str:
+    """Mint a fresh single-use idempotency token for a user, and opportunistically
+    sweep tokens older than TOKEN_TTL that were never claimed.
+
+    Returns the token string for the form to embed as a hidden input.
+    """
+    cutoff = datetime.utcnow() - TOKEN_TTL
+    db.query(ProjectCreationToken).filter(
+        ProjectCreationToken.created_at < cutoff,
+        ProjectCreationToken.claimed_at.is_(None),
+    ).delete(synchronize_session=False)
+
+    token = uuid.uuid4().hex
+    db.add(ProjectCreationToken(
+        token=token,
+        user_id=user_id,
+        created_at=datetime.utcnow(),
+    ))
+    db.commit()
+    return token
+
+
+class IdempotencyResult:
+    """Return shape for create_project_with_idempotency. Either:
+    - status == "created" → project is the freshly-inserted Project.
+    - status == "duplicate" → project_id is the originally-created project's id.
+    - status == "invalid" → token missing / wrong user / never minted.
+    """
+    def __init__(self, status: str, project=None, project_id: int | None = None):
+        self.status = status
+        self.project = project
+        self.project_id = project_id
+
+
+def create_project_with_idempotency(
+    db: Session,
+    data: dict,
+    prototype_rounds: str,
+    token: str,
+    user_id: int,
+) -> IdempotencyResult:
+    """Build 30A — atomic token-claim + project insert.
+
+    Claim-by-UPDATE-rowcount: the first POST's UPDATE acquires the write
+    lock and flips claimed_at; racing POSTs see rowcount=0 and we redirect
+    to the originally-created project_id instead of inserting a duplicate.
+    Works on both SQLite (which serializes writes) and PostgreSQL (which
+    acquires a row lock on the matched row).
+    """
+    if not token:
+        return IdempotencyResult("invalid")
+
+    claimed_at = datetime.utcnow()
+    updated = db.execute(
+        update(ProjectCreationToken)
+        .where(ProjectCreationToken.token == token)
+        .where(ProjectCreationToken.user_id == user_id)
+        .where(ProjectCreationToken.claimed_at.is_(None))
+        .values(claimed_at=claimed_at)
+    ).rowcount
+
+    if updated == 0:
+        # Either: token doesn't exist / wrong user / already-claimed.
+        existing = db.query(ProjectCreationToken).filter(
+            ProjectCreationToken.token == token,
+            ProjectCreationToken.user_id == user_id,
+        ).first()
+        if existing and existing.project_id:
+            return IdempotencyResult("duplicate", project_id=existing.project_id)
+        return IdempotencyResult("invalid")
+
+    # We hold the claim; build the project in the same transaction.
+    project = _build_project_in_session(db, data, prototype_rounds)
+    db.query(ProjectCreationToken).filter(
+        ProjectCreationToken.token == token
+    ).update({"project_id": project.id}, synchronize_session=False)
+    db.commit()
+    db.refresh(project)
+    return IdempotencyResult("created", project=project)
 
 def update_project(
     db: Session, project_id: int, data: dict,

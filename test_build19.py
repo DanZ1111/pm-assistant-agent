@@ -23,8 +23,18 @@ def login(u, p):
 
 
 def make_pm_owned_project(admin_s, pm_username, name):
+    # Build 30A — POST /projects/new now requires a submission_token minted
+    # by the GET. Grab one before each create.
+    import re as _re
+    form_page = admin_s.get(f"{BASE}/projects/new").text
+    tok_match = _re.search(r'name="submission_token"\s+value="([a-f0-9]+)"', form_page)
+    submission_token = tok_match.group(1) if tok_match else ""
     r = admin_s.post(f"{BASE}/projects/new",
-                     data={"name": name, "prototype_rounds": "single"},
+                     data={
+                         "name": name,
+                         "prototype_rounds": "single",
+                         "submission_token": submission_token,
+                     },
                      allow_redirects=False)
     pid = int(r.headers["location"].rstrip("/").split("/")[-1])
     admin_s.post(f"{BASE}/projects/{pid}/edit",

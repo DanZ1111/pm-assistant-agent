@@ -15,6 +15,15 @@ def ok(n): PASS.append(n); print(f"  ✓  {n}")
 def fail(n, r): FAIL.append((n, r)); print(f"  ✗  {n}: {r}")
 
 
+
+
+def _mint_build30_token(session):
+    """Build 30A — POST /projects/new requires a submission_token from the GET."""
+    import re as _r
+    page = session.get(f"{BASE}/projects/new").text
+    m = _r.search(r'name="submission_token"\s+value="([a-f0-9]+)"', page)
+    return m.group(1) if m else ""
+
 def login(u, p):
     s = requests.Session()
     r = s.post(f"{BASE}/auth/login", data={"username": u, "password": p}, allow_redirects=False)
@@ -28,7 +37,8 @@ def get_or_create_project(admin_s, name):
     if m:
         return int(m.group(1))
     r = admin_s.post(f"{BASE}/projects/new",
-                     data={"name": name, "prototype_rounds": "single"}, allow_redirects=False)
+                     data={"name": name, "prototype_rounds": "single",
+                           "submission_token": _mint_build30_token(admin_s)}, allow_redirects=False)
     return int(r.headers["location"].rstrip("/").split("/")[-1])
 
 

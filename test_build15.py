@@ -18,6 +18,15 @@ def ok(n): PASS.append(n); print(f"  ✓  {n}")
 def fail(n, r): FAIL.append((n, r)); print(f"  ✗  {n}: {r}")
 
 
+
+
+def _mint_build30_token(session):
+    """Build 30A — POST /projects/new requires a submission_token from the GET."""
+    import re as _r
+    page = session.get(f"{BASE}/projects/new").text
+    m = _r.search(r'name="submission_token"\s+value="([a-f0-9]+)"', page)
+    return m.group(1) if m else ""
+
 def login(u, p):
     s = requests.Session()
     r = s.post(f"{BASE}/auth/login", data={"username": u, "password": p}, allow_redirects=False)
@@ -51,7 +60,8 @@ def get_pm_owned_project(admin_s, pm_username):
             return pid
     # Create one and assign PM
     r = admin_s.post(f"{BASE}/projects/new",
-                     data={"name": "Build15 PM Project", "prototype_rounds": "single"},
+                     data={"name": "Build15 PM Project", "prototype_rounds": "single",
+                           "submission_token": _mint_build30_token(admin_s)},
                      allow_redirects=False)
     new_id = int(r.headers["location"].rstrip("/").split("/")[-1])
     admin_s.post(f"{BASE}/projects/{new_id}/edit",
@@ -104,7 +114,8 @@ def main():
     # Make a project NOT owned by PM (so we can test PM-blocked extract)
     r = admin_s.post(f"{BASE}/projects/new",
                      data={"name": f"Build15 Admin Only {os.getpid()}",
-                           "prototype_rounds": "single"},
+                           "prototype_rounds": "single",
+                           "submission_token": _mint_build30_token(admin_s)},
                      allow_redirects=False)
     admin_proj = int(r.headers["location"].rstrip("/").split("/")[-1])
     admin_s.post(f"{BASE}/projects/{admin_proj}/edit",

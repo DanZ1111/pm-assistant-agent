@@ -153,6 +153,12 @@ def main():
 
     # ── Confirm flow still creates a project (regression — no UI change to logic) ──
     print("\n── /ai/intake/confirm still creates a project ──")
+    # Build 30A — the AI confirm POST now requires a submission_token minted
+    # by the GET that renders the form. Grab one from the AI tab page first.
+    import re as _re
+    ai_page = admin_s.get(f"{BASE}/projects/new?tab=ai").text
+    tok_match = _re.search(r'name="submission_token"\s+value="([a-f0-9]+)"', ai_page)
+    submission_token = tok_match.group(1) if tok_match else ""
     proj_name = f"Build22 Confirm Test {os.getpid()}"
     r = admin_s.post(
         f"{BASE}/ai/intake/confirm",
@@ -161,6 +167,7 @@ def main():
             "brand": "Acme",
             "project_thesis": "Build 22 regression test — this thesis is at least eighty characters so it passes the health check.",
             "prototype_rounds": "single",
+            "submission_token": submission_token,
         },
         allow_redirects=False,
     )

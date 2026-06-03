@@ -220,7 +220,10 @@
       </div>
       <p class="text-muted small mb-4">{{ t('intake.review_before_save') }}</p>
 
-      <form method="post" action="/ai/intake/confirm">
+      <form method="post" action="/ai/intake/confirm" data-idempotent="true">
+        {# Build 30A — server-side idempotency token for the AI confirm POST.
+           Re-used from the same context as the manual form. #}
+        <input type="hidden" name="submission_token" value="{{ submission_token or '' }}">
         <input type="hidden" name="raw_text" value="{{ raw_text | e }}">
         <input type="hidden" name="uploaded_filename" value="{{ uploaded_filename | e }}">
         <input type="hidden" name="uploaded_original_filename" value="{{ uploaded_original_filename | e }}">
