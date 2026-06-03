@@ -1,10 +1,10 @@
-# v1.3 Build 02 - Overview Project Pulse
+# v1.3 Build 02 - Overview Project Pulse v1 (Rules-Based)
 
 ## Summary
 
 Add Project Pulse as the first Overview section. It should answer: what is happening now, what needs attention, and what should the PM do next?
 
-This build is derived display only. No new writes.
+This build is Project Pulse v1: a rules-based display layer using existing project state. It is not the final intelligent PM pulse. No new writes.
 
 ## Implementation Changes
 
@@ -36,8 +36,20 @@ This build is derived display only. No new writes.
 ## Explicit Deferrals
 
 - No AI-generated nudge yet.
+- No conversation-history nudge.
+- No time-since-last-update drift detection.
+- No velocity comparison against typical phase duration or peer projects.
 - No blocker model.
 - No command buttons beyond links to existing sections.
+
+## Future Pulse Intelligence
+
+Future builds may make Project Pulse smarter after honest sources and tests exist:
+
+- Project drift detection from time since last update.
+- Velocity vs typical phase duration, such as "Design has taken 30 days; similar projects cleared it in 14."
+- AI-suggested nudge from assistant conversation history and confirmed project changes.
+- Active blocker state if Build 07 approves a first-class blocker source of truth.
 
 ## Tests
 
@@ -47,6 +59,7 @@ This build is derived display only. No new writes.
 - Verify missing-critical project shows missing-field action.
 - Verify healthy project shows no urgent action.
 - Verify viewer does not see sensitive factory/cost details.
+- Verify the section is labeled or documented as rules-based v1 behavior, not final AI intelligence.
 - Run `python3 test_build_v121.py`.
 
 ## Acceptance Criteria

@@ -6,6 +6,19 @@ Wire real Timeline Command Center actions only after mapping each action to sour
 
 This is the highest-risk build in v1.3.
 
+## Pre-Build Blocker Decision Gate
+
+Before implementation begins, write an Architecture Review for Add Blocker and choose the source of truth:
+
+| Option | Choose if | Do not choose if |
+|---|---|---|
+| `project_blockers` table | Blockers need active/resolved state, owner, due date, severity, cross-phase aggregation, Project Pulse impact, or Timeline Command Center pressure. | Build 07 cannot absorb schema/service/test scope. |
+| `ProjectJournalEntry.entry_type = "blocker"` | Blockers are only narrative updates and do not need active state or resolution tracking. | PMs expect blockers to drive health, next action, overdue pressure, or filters. |
+
+Default planning assumption: Add Blocker probably needs a first-class `project_blockers` model if it is meant to behave like command-center state instead of a note.
+
+If this decision is not complete, Build 07 must leave Add Blocker as a placeholder.
+
 ## Required Action Mapping
 
 Before implementation, complete this table in the build notes:
@@ -14,7 +27,7 @@ Before implementation, complete this table in the build notes:
 |---|---|---|---|---|---|
 | Finish Current Phase | existing/new service | phase status + actual end | current_stage recalculated | change log/phase update | required |
 | Add Update | journal or timeline event | journal/change/event | command/history refresh | journal/change log | required |
-| Add Blocker | journal or new event | TBD after architecture review | pulse/timeline blocker display | required | required |
+| Add Blocker | blocked until Architecture Review chooses model | `project_blockers` or journal blocker type | pulse/timeline blocker display if implemented | required if implemented | required if implemented |
 | Adjust Due Date | phase edit/plan change service | planned date + reason | delay recalculated | phase_plan_changes | required |
 | AI Intake | existing assistant confirmation | confirmed tool proposal | target section refresh | AI/change log | required |
 
@@ -22,7 +35,7 @@ If a row cannot be completed honestly, that action remains placeholder.
 
 ## Architecture Review Trigger
 
-If Add Blocker or Add Update cannot be represented cleanly with existing Project Journal, phase notes, phase plan changes, or change log, write a schema Architecture Review before adding any new table/column.
+Add Blocker always requires the pre-build Architecture Review above. Add Update also requires review if it cannot be represented cleanly with existing Project Journal, phase notes, phase plan changes, or change log.
 
 ## Implementation Changes
 
