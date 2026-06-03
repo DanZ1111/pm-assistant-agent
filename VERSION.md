@@ -1,9 +1,23 @@
 # PM Product Tracker — Version
 
-**Current Version:** v1.2.0
-**Current Build:** Build 29 — v1.2.0 release hardening
-**Status:** v1.1.0 released; v1.2.0 released
-**Last Updated:** 2026-06-02
+**Current Version:** v1.2.1
+**Current Build:** v1.2.1 — Release-hardening rollup (Builds 30A/30B/30C + IME / nixpacks / price-strings / layout patches)
+**Status:** v1.1.0 released; v1.2.0 released; v1.2.1 released
+**Last Updated:** 2026-06-03
+
+## What's new in v1.2.1
+
+The v1.2.1 release packages 7 unreleased patches that landed on the v1.2.0 line. Frame: a workflow-polish + onboarding-unlock release. PMs onboarding from existing Excel sheets, day-to-day PM ergonomics, and Chinese-keyboard typing all see meaningful improvements.
+
+- **Excel batch intake (Build 30B)** — upload `.xlsx` / `.xlsm` / `.xls` / `.csv` portfolios; AI extracts a `projects` array preserving source sheet + row hint and pricing fidelity (`$32-38`, `under 120 RMB`); per-row review table with Create / Skip / Update Existing actions; one click commits everything atomically through a single Build 30A idempotency token. Unblocks new-department onboarding (Beauty etc.).
+- **Project creation safety (Build 30A)** — server-side idempotency tokens prevent the "PM clicked Submit 6 times on a slow form, got 6 duplicate rows" failure mode. Blank `product_manager` defaults to the creator's username so PM-created projects land in their My Projects, not orphaned on admin. `get_projects_for_user` now matches by username OR display_name for legacy rows.
+- **PM draft delete (Build 30C)** — PMs can now hard-delete their own projects when **no phase has started** (every phase still `status='not_started'` with no `actual_start_date`). Once any phase advances, the project leaves draft state and PM must use Archive instead. Admin retains unrestricted delete; viewer can delete nothing. Workflow-tied, not clock-tied.
+- **Chinese IME chat fix (v2, mature composer controller)** — both assistant composers (bottom dock + side panel) now share a reusable controller with four-layer IME defense including a one-shot post-`compositionend` suppression window (`IME_CONFIRM_ENTER_SUPPRESS_MS = 80`). Chinese-keyboard typing of English fragments like `LC200N` no longer fires premature submits. Locked by 10 JSDOM behavioral cases.
+- **PM-facing price strings** — `target_factory_cost_text` / `target_msrp_text` VARCHAR fields preserve real-world planning expressions like `"under 120 RMB"`, `"$70-100"`, `"约 120 RMB 出厂"`. Legacy float columns kept for back-compat and future profit math. AI extraction preserves the source expression verbatim.
+- **Project detail layout refactor** — removed the low-value left sidebar; promoted PM / Engineer / Factory / Stage / Launch into a compact header facts grid under the project title; added a full-width Commercial Snapshot section near the top. Denser, cleaner, less wasted space.
+- **Railway build fix (nixpacks)** — `nixpacks.toml` pins `providers = ["python"]` so Nixpacks ignores the new `package.json` (which exists only for local JSDOM tests) and stops trying to run `npm install` during deploy.
+
+No database schema change in this release-hardening build itself. Build 30A's `project_creation_tokens` table (migration 004) shipped with that patch and is preserved.
 
 ## What's new in v1.2.0
 

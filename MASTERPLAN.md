@@ -3118,7 +3118,40 @@ Close the v1.2 assistant-workspace series (Builds 26-28) with consolidated docum
 - `python3 test_ai_e2e.py` — 10 passed, 7 external-AI skips, 0 failed
 - Browser: navbar shows `v1.2.0` (not `v1.2.0-buildXX`)
 
-### Build 30C — PM draft delete ✓ SHIPPED (unreleased on v1.2.0)
+### v1.2.1 — Release-hardening rollup ✓ SHIPPED v1.2.1
+
+#### Goal
+
+Roll up 7 post-v1.2.0 patches into a single release: workflow polish + Excel batch intake + PM draft delete + a handful of quality-of-life fixes. Mirrors the Build 29 release-hardening pattern for v1.2.0.
+
+#### Patches rolled up
+
+1. IME composer fix v2 (commit `7d56198`) — Chinese-keyboard typing of English fragments no longer fires premature submits.
+2. Nixpacks Python-only (commit `2bd82bf`) — Railway build no longer tries to npm-install jsdom on deploy.
+3. PM-facing price strings (commit `1465265`) — `target_factory_cost_text` / `target_msrp_text` VARCHAR fields preserve `$70-100` and `under 120 RMB`-style expressions.
+4. Project detail layout refactor (commit `36a787e`) — sidebar removed, header facts grid + Commercial Snapshot section.
+5. Build 30A — project creation safety (commit `cab8884`) — idempotency tokens + PM ownership default.
+6. Build 30B — Excel batch intake (commit `1d811b9`) — xlsx/xlsm/xls/csv → review table → batch save.
+7. Build 30C — PM draft delete (commit `b0f6ad3`) — workflow-tied PM delete capability.
+
+#### Scope (this hardening build itself)
+
+- Bump `app/version.py` from `1.2.0` → `1.2.1`.
+- Write `test_build_v121.py` modeled on `test_build29.py` — asserts runtime constants, VERSION.md / CHANGELOG.md / MASTERPLAN.md release-proof strings, USER_GUIDE.md v1.2.1 coverage, full regression-file inventory (31 files), i18n parity, and 7 behavior locks (one per patch).
+- Update VERSION.md header to `v1.2.1` and add `## What's new in v1.2.1` summarizing the 7 patches.
+- Add the `## v1.2.1 — Workflow polish + Excel batch intake + draft delete` mega entry to CHANGELOG.md; reset `## Unreleased` to empty placeholder.
+- Add v1.2.1 sections to USER_GUIDE.md (English summary + short 中文速览 block).
+- Loosen tolerant version assertions in test_build24, test_build25, test_build29 to `startswith("1.2.")` / `startswith(("1.1.", "1.2."))` so post-release patches don't break the older release-proof tests.
+
+No database schema change. No new dependencies.
+
+#### Verification
+
+- `python3 test_build_v121.py` — release-proof regression.
+- Regression: `test_build20.py` through `test_build30.py`, `test_build30b.py`, `test_build30c.py`, `test_ai_e2e.py`, JSDOM composer suite.
+- Browser: navbar Help button shows `v1.2.1`.
+
+### Build 30C — PM draft delete ✓ SHIPPED (rolled into v1.2.1)
 
 #### Context
 
@@ -3148,7 +3181,7 @@ User-reported incident (Build 30A backstory): a PM ended up with 6 duplicate pro
 - `python3 test_build30c.py` — 23/23, covering all six role × draft-state combinations (admin/PM/viewer × fresh/advanced) at both the HTTP and helper level.
 - Regression: `python3 test_build30.py`, `test_build30b.py`, plus the post-v1.2.0 suite.
 
-### Build 30B — Excel batch intake ✓ SHIPPED (unreleased on v1.2.0)
+### Build 30B — Excel batch intake ✓ SHIPPED (rolled into v1.2.1)
 
 #### Context
 
@@ -3177,7 +3210,7 @@ Onboarding a new department (e.g. Beauty) requires importing existing project po
 - `python3 test_build30b.py` — 19/19, including real `gpt-5.4` extraction on a multi-sheet fixture (~$0.005/run).
 - Regression: `python3 test_build30.py`, `test_build29.py`, `test_build28.py`, `test_build27.py`, `test_build22.py`, `test_build19.py`, `test_ai_e2e.py`.
 
-### Build 30A — Project creation safety (idempotency + PM ownership) ✓ SHIPPED (unreleased on v1.2.0)
+### Build 30A — Project creation safety (idempotency + PM ownership) ✓ SHIPPED (rolled into v1.2.1)
 
 #### Context
 

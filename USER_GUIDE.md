@@ -6,6 +6,46 @@ This is a structured product project tracker for knife and product development. 
 
 ---
 
+## v1.2.1 速览
+
+v1.2.1 是一个工作流打磨 + 新部门入驻解锁版。重点更新：
+
+- **Excel 批量导入**：直接上传 `.xlsx` / `.xlsm` / `.xls` / `.csv`，AI 提取每个项目（保留来源表名 + 行号 + 价格表达），逐行可编辑（Create / Skip / Update Existing），一键提交。原来手动一条条录入的工作量直接归零。
+- **PM 草稿删除**：PM 现在可以直接删除自己创建、且**所有阶段都还没启动**的项目。一旦某个阶段被推进过，项目就脱离 draft 状态，需要 Admin 或 Archive。
+- **创建防重复**：之前出现过的"页面卡了点了 6 次 Submit → 6 条重复项目"问题彻底修复。后端 idempotency token 保证一次点击只生成一条；空白 PM 字段会自动填创建者的 username，所以 PM 创建的项目能在 My Projects 看到。
+- **价格字段更聪明**：Target Factory Cost / Target MSRP 现在支持 `under 120 RMB`、`$70-100`、`约 120 RMB 出厂` 这样的真实表达。
+- **AI 工作区 Chinese IME 修复**：用中文输入法打英文片段（比如 `LC200N`）时，中间确认候选词的 Enter 不会再被误判为 "发送消息"。
+- **项目详情布局重做**：去掉了左侧低价值的侧边栏，PM/工程师/工厂/阶段/上市日期压缩到标题下面的紧凑条；Commercial Snapshot 单独成段。
+
+完整列表见 `CHANGELOG.md` 中的 `## v1.2.1`。
+
+---
+
+## What's new in v1.2.1
+
+A workflow-polish + new-department onboarding-unlock release. Seven patches that landed on the v1.2.0 line.
+
+### Onboarding + intake
+
+- **Excel batch intake** — `/projects/new?tab=ai` accepts `.xlsx`, `.xlsm`, `.xls`, and `.csv` portfolios. AI extracts a `projects` array (preserving source sheet + row hint and pricing fidelity like `$32-38`). Per-row review table lets you edit any field and choose Create / Skip / Update Existing per row. One click commits all confirmed rows atomically through a single idempotency token.
+- **PM-facing price strings** — Target Factory Cost / Target MSRP now preserve real-world planning expressions like `under 120 RMB` or `$70-100`. Simple USD values still mirror into the legacy numeric column for future profit math.
+
+### Project workflow safety
+
+- **Project creation safety** — server-side idempotency tokens make the New Project form safe against double-clicks during slow submits. Blank `product_manager` defaults to the creator's username so PM-created projects land in their My Projects, not orphaned on admin. Display-name typed into the PM field is normalized to the canonical username when exactly one user matches.
+- **PM draft delete** — PMs can now delete their own projects when no phase has started. Once any phase advances, the project leaves draft state and PM must use Archive instead. Admin retains unrestricted delete; viewer can delete nothing.
+
+### Day-to-day ergonomics
+
+- **Chinese IME** — both assistant composers (bottom dock + side panel) now share a four-layer IME defense including a one-shot post-`compositionend` suppression window. Chinese-keyboard typing of English fragments like `LC200N` no longer fires premature submits.
+- **Project detail layout** — removed the low-value left sidebar; promoted PM / Engineer / Factory / Stage / Launch into a compact header facts grid under the project title; added a full-width Commercial Snapshot section near the top.
+
+### Ops
+
+- **Railway build fix** — `nixpacks.toml` pins Python-only so deploys no longer try to npm-install the JSDOM dev dependency.
+
+---
+
 ## v1.2 中文速览
 
 v1.2 把 AI 从底部聊天框升级成专业的 **AI 工作区**：桌面上以可调宽度的右侧分屏出现，移动端则是全屏面板；折叠时只保留一个紧凑的输入栏。

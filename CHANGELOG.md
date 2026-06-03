@@ -1,21 +1,36 @@
 # PM Product Tracker — Changelog
 
 ## Unreleased
+
+_(no unreleased patches — v1.2.1 just shipped)_
+
+## v1.2.1 — Workflow polish + Excel batch intake + draft delete
 _2026-06-03_
 
-- **PM draft delete (Build 30C).** PMs can now hard-delete their own projects when **no phase has started** (every phase still `status='not_started'` with no `actual_start_date`). Once any phase advances, the project leaves draft state and PM must use Archive instead. Admin retains unrestricted delete; viewer can delete nothing. Policy is workflow-tied, not clock-tied — a PM who created a project, went away, and came back can still clean up an untouched draft. Direct POST to `/projects/{id}/delete` from an unauthorized caller returns 403 with a clear message ("If work has started, use Archive instead"). Helper `can_delete_project(user, project)` added to `app/dependencies.py` and exposed as `can_delete` in project detail context. Locked by `test_build30c.py` (23/23 covering all six role × draft-state combinations).
+A workflow-polish + onboarding-unlock release. PMs onboarding from existing Excel sheets, day-to-day PM ergonomics, and Chinese-keyboard typing all see meaningful improvements. Packages 7 patches that landed on the v1.2.0 line between 2026-06-02 and 2026-06-03.
 
-- **Excel batch intake (Build 30B).** PMs onboarding a department can now upload an `.xlsx`, `.xlsm`, `.xls`, or `.csv` workbook with one or more projects across one or more sheets. AI extracts a `projects` array (preserving source sheet + row hint and pricing fidelity like `$32-38` and `under 120 RMB`), the user reviews in an inline batch table (edit any field, choose Create / Skip / Update Existing per row), and one click commits everything via a single Build 30A idempotency token. Per-row failure semantics commit the valid rows and report skipped ones in the redirect URL (`/my-projects?imported=N&updated=M&skipped=K`). Blank `product_manager` defaults to the uploader's username (consistent with Build 30A); named PMs from the spreadsheet are preserved as-typed per CLAUDE.md non-negotiable §3 (no silent overwrite). Locked by `test_build30b.py` (19/19, ~$0.005 OpenAI cost per run on real `gpt-5.4`). New deps: `openpyxl`, `xlrd<2.0`.
+**Onboarding + intake unlocks**
 
-- **Project creation safety (Build 30A).** Manual New Project and AI single-project Confirm forms now embed a one-shot server-side `submission_token`. The claim is atomic with the project insert (UPDATE-rowcount pattern, works on both SQLite and PostgreSQL). A racing POST — e.g. a PM clicking Submit 6 times while the request was slow — sees `rowcount = 0` and gets redirected to the originally-created project instead of inserting a duplicate. Client-side spinner / submit-disable layered on top as UX help, but the token is the load-bearing protection. Tokens live in the new additive `project_creation_tokens` table (migration 004), with a 24-hour TTL and opportunistic cleanup on every mint. Also, blank `product_manager` on create now defaults to the creator's username (so PM-created projects appear in their **My Projects** instead of orphaned on admin), and a display-name typed into the PM field is normalized to the canonical username when exactly one user matches. `get_projects_for_user()` now matches PM by username OR display_name so legacy rows surface correctly. Behavioral coverage: `test_build30.py` 23/23 including a 5-parallel-POST stress test that proves exactly 1 row gets created.
-- **Chinese IME chat fix (v2, mature composer controller).** The initial isComposing / keyCode 229 guards did not catch the Chrome + Sogou Pinyin and Edge + Microsoft Pinyin case, where `compositionend` fires BEFORE the Enter keydown that triggered it — all three guards were already cleared by the time the Enter handler ran, so the IME-confirmation Enter sent the message prematurely.
-  - Both composers (bottom dock + assistant side panel) now share a new `createComposerController` helper in `app/static/js/composer_controller.js` (ES module).
-  - Four defense layers: local `isComposing` flag, `e.isComposing`, `e.keyCode === 229`, AND a one-shot `suppressNextEnterUntil` window (`IME_CONFIRM_ENTER_SUPPRESS_MS = 80`) seeded on every `compositionend`. The window self-clears after blocking exactly one Enter so a deliberate rapid follow-up Enter still sends.
-  - Single shared `maybeSubmitComposer()` entry point — keyboard Enter and send-button clicks both route through it for consistent trim / disabled / final-submit logic. The send button click is intentionally NOT IME-gated (explicit user intent); send buttons keep `type="submit"` for accessibility but the click handler intercepts via `preventDefault`.
-  - Plain Enter still sends. Shift+Enter still inserts a newline.
-  - Locked by JSDOM behavioral tests (`npm run test:composer`, 10 cases), folded into `test_build29.py` as a subprocess assertion that skips cleanly on environments without Node/jsdom.
-  - main.js is now loaded as `type="module"` (still IIFE-wrapped; no global behavior change).
+- **Excel batch intake (Build 30B).** Upload `.xlsx` / `.xlsm` / `.xls` / `.csv` portfolios; AI extracts a `projects` array preserving source-sheet provenance and pricing fidelity; per-row review table with Create / Skip / Update Existing; one click commits everything atomically via a Build 30A idempotency token.
 - **PM-facing price strings.** Project Target Factory Cost and Target MSRP now preserve real-world planning expressions such as `under 120 RMB` and `$70-100` instead of forcing USD-only floats. Simple USD values still mirror into the legacy numeric columns for old displays and future profit math.
+
+**Project workflow safety**
+
+- **Project creation safety (Build 30A).** Server-side idempotency tokens prevent duplicate creates from slow-submit double-clicks. Blank `product_manager` defaults to the creator's username so PM-created projects land in their My Projects, not orphaned on admin. `get_projects_for_user` matches by username OR display_name for legacy rows.
+- **PM draft delete (Build 30C).** PMs can now hard-delete their own projects when no phase has started (every phase still `status='not_started'` with no `actual_start_date`). Once any phase advances, the project leaves draft state and PM must use Archive instead. Admin retains unrestricted delete; viewer can delete nothing. Workflow-tied, not clock-tied.
+
+**Day-to-day ergonomics**
+
+- **Chinese IME chat fix (v2).** Both assistant composers (dock + side panel) now share a reusable controller with four-layer IME defense including a one-shot post-`compositionend` suppression window (`IME_CONFIRM_ENTER_SUPPRESS_MS = 80`). Chinese-keyboard typing of English fragments like `LC200N` no longer fires premature submits. 10 JSDOM behavioral cases.
+- **Project detail layout refactor.** Removed the low-value left sidebar; promoted PM / Engineer / Factory / Stage / Launch into a compact header facts grid under the project title; added a full-width Commercial Snapshot section near the top.
+
+**Ops**
+
+- **Railway build fix (nixpacks).** `nixpacks.toml` pins `providers = ["python"]` so Nixpacks ignores the new `package.json` (which exists only for local JSDOM tests) and stops trying to run `npm install` during deploy.
+
+**No database schema change** in this release-hardening build itself. Build 30A's `project_creation_tokens` table (migration 004) shipped with that patch and is preserved.
+
+**Test:** `test_build_v121.py` is the release-proof regression. Full Build 20-30C suite + `test_ai_e2e.py` (15P/2S/0F baseline) must stay green. JSDOM IME suite 10/10.
 
 ## v1.2.0 — Assistant Workspace Release
 _2026-06-02_

@@ -1,9 +1,7 @@
 # CURRENT_TASK.md
 
 ## Task
-Build 30C — PM draft delete. Complete. **Awaiting user authorization to commit + push.**
-
-After this lands, the natural next move is **v1.2.1 release-hardening** to roll up all 7 unreleased patches.
+Idle — v1.2.1 just shipped. Awaiting next direction.
 
 ## Handoff rule
 Before editing, inspect:
@@ -13,65 +11,48 @@ Before editing, inspect:
 
 Git/code is the source of truth.
 
-## What changed in Build 30C
+## What just shipped (v1.2.1)
 
-### Backend
-- New `can_delete_project(user, project)` helper in `app/dependencies.py`:
-  - Admin: always True (preserves pre-30C behavior).
-  - PM: True if (a) project's `product_manager` matches their username OR display_name (via `can_edit_project`), AND (b) every phase is `status='not_started'` with `actual_start_date is None`. "Until first phase advance" workflow-tied policy.
-  - Viewer: always False.
-  - None user: False (defense in depth).
-- `POST /projects/{id}/delete` in `app/routes/projects.py`: permission expanded from `require_admin` to `can_delete_project`. Returns 403 with a clear "use Archive instead" message when refused, rather than the previous silent redirect.
+Release-hardening rollup of 7 patches that landed on the v1.2.0 line:
 
-### Frontend
-- `app/templates/project_detail.html`: Delete button visibility changed from `current_user.role == 'admin'` to `can_delete` (new context var). PM sees a helpful tooltip explaining the draft-state condition.
-- `app/routes/projects.py:project_detail` exposes `can_delete = can_delete_project(current_user, project)` in template context.
+| # | Patch | Commit |
+|---|---|---|
+| 1 | Chinese IME composer fix v2 | `7d56198` |
+| 2 | Railway nixpacks Python-only | `2bd82bf` |
+| 3 | PM-facing price strings | `1465265` |
+| 4 | Project detail layout refactor | `36a787e` |
+| 5 | Build 30A — project creation safety | `cab8884` |
+| 6 | Build 30B — Excel batch intake | `1d811b9` |
+| 7 | Build 30C — PM draft delete | `b0f6ad3` |
 
-### Tests
-- New `test_build30c.py` — **23/23 PASS**. Six role × draft-state combinations:
-  - admin + fresh draft → can delete ✓
-  - admin + advanced project → can delete ✓
-  - PM + own fresh draft → can delete ✓
-  - PM + own advanced project → CANNOT delete (403) ✓
-  - PM + another PM's project → CANNOT delete (403) ✓
-  - Viewer + any → CANNOT delete (403) ✓
-  - Helper unit tests against fresh + advanced fixtures
-- HTTP-level + template-render + DB-persistence assertions.
+Plus the v1.2.1 release-hardening commit itself (test_build_v121, docs rollup, version bump).
 
-### Docs
-- `CHANGELOG.md` — Build 30C entry added to `## Unreleased` (top of patch list).
-- `MASTERPLAN.md` — Build 30C detail section above 30B.
+## Verification at ship time
+- `python3 test_build_v121.py` — 19/19 (release-proof regression covering version source, docs strings, USER_GUIDE coverage, regression-file inventory, i18n parity, and 7 behavior locks).
+- Regression: `test_build14`, `test_build16-30c` all green. `test_ai_e2e.py` 15P/2S/0F baseline preserved.
+- Browser: navbar Help button shows `v1.2.1`, footer shows `PM Product Tracker v1.2.1`, Help modal shows the new build name.
+- i18n parity: 538/538.
 
-No schema change. No new dependencies.
+## v1.2 patch series — empty queue
+`## Unreleased` in CHANGELOG is now empty. The next patch can either:
+- Land directly on `v1.2.1` and join a fresh Unreleased queue, OR
+- Trigger a v1.3.0 minor release if it's a real new feature (e.g., the deferred Native-speaker zh review, Profit Model implementation, etc.)
 
-## Pre-existing assumption verified
-- The Design phase does NOT auto-start on project creation. Checked 5 recent projects: all have `advanced_phases=0`, `started_phases=0`. The "Stage: Design" label is `project.current_stage` (a cached string showing the first not-started phase's NAME) — not an indication the phase has started.
+## Known v1.2.1 outstanding items (admin-only, no code)
+- **One-time cleanup of the original 6 admin-linked duplicates** from the Build 30A backstory incident. Build 30A prevented new ones; this cleanup is for the existing rows. Either delete 5 (keep the last) via admin UI, or reassign their PM to the real PM and let her use the Build 30C delete capability.
 
-## Verification at this point
-
-- `python3 test_build30c.py` — **23/23**.
-- `python3 test_build30b.py` — 19/19 (unchanged).
-- `python3 test_build30.py` — 23/23 (unchanged).
-- `python3 test_build29.py` — 26/26 (unchanged).
-- `python3 test_ai_e2e.py` — 15P/2S/0F (unchanged).
-- Manual smoke: log in as PM, create a fresh project (no phases advanced) → Delete button visible → click → project gone. Repeat with a phase manually set to in_progress → no Delete button.
-
-## v1.2 patch series (queued for v1.2.1 release-hardening)
-
-Now 7 patches on `## Unreleased` against `v1.2.0`:
-1. IME composer fix v2 (`7d56198`)
-2. Nixpacks Python-only (`2bd82bf`)
-3. Price strings (`1465265`)
-4. Layout refactor (`36a787e`)
-5. Build 30A — project creation safety (`cab8884`)
-6. Build 30B — Excel batch intake (`1d811b9`)
-7. Build 30C — PM draft delete (this commit, pending)
+## Deferred to future v1.3
+- Native-speaker Chinese review of strings added in Builds 26-30C.
+- AI prompt translation, Help modal body translation, `/admin/*` page translation.
+- Full Profit Model implementation (placeholder still ships).
+- Row-level multi-tenancy (`Organization` table + `org_id` everywhere). Deployment-level isolation (Build 25) remains the answer for ≤3 departments.
+- Bulk delete from the projects list / soft-delete with undo window.
+- Auto-provisioning script for Railway (the DEPLOYMENT.md runbook is still manual).
+- Pruning the now-historical "Claude Review Request" block at the end of `BUILD26_CODEX_PLAN.md`.
 
 ## Next step
 
-Awaiting commit/push authorization. After that: **v1.2.1 release-hardening** (per user direction: "After [30C] we can do release hardening all together"). That build will:
-- Bump `app/version.py` from `1.2.0` → `1.2.1`.
-- Write `test_build_v121.py` mirroring `test_build29.py`'s release-proof pattern.
-- Update VERSION.md / CHANGELOG.md / MASTERPLAN.md / USER_GUIDE.md with the rollup release notes.
-- Full regression sweep across all v1.0+ builds.
-- Loosen any strict version assertions in the post-30 test files for the bump.
+Wait for user direction. Suggested directions:
+1. **Admin one-time duplicate cleanup** — 5 minutes of SQL or admin-UI work; closes the loop on the original Build 30A incident.
+2. **v1.3 planning** — start with what's painful in the live app and prioritize from there.
+3. **Push** — confirm v1.2.1 ships to Railway and verify the navbar shows v1.2.1 in prod.

@@ -41,10 +41,11 @@ def main():
     print("\n── Runtime version source ──")
     from app.version import CURRENT_BUILD_NAME, CURRENT_VERSION, LAST_UPDATED
 
-    # Build 24's purpose was to release v1.1.0. We keep this check tolerant
-    # of post-release patch / extension builds (e.g. v1.1.0-build25) so that
-    # adding a follow-up build doesn't invalidate the "v1.1.0 shipped" proof.
-    if CURRENT_VERSION.startswith(("1.1.0", "1.2.0")):
+    # Build 24's purpose was to release v1.1.0. Tolerant of any post-release
+    # patch / extension on the same v1.1.x or v1.2.x major line so adding a
+    # follow-up patch doesn't invalidate the "v1.1.0 shipped" proof.
+    # Forward-compatible: 1.2.1 / 1.2.2 / 1.3.x will all need a similar update.
+    if CURRENT_VERSION.startswith(("1.1.", "1.2.")):
         ok(f"app.version CURRENT_VERSION is on the v1.1+ line ({CURRENT_VERSION})")
     else:
         fail("CURRENT_VERSION", CURRENT_VERSION)

@@ -46,11 +46,11 @@ def main():
     print("\n── Runtime version source ──")
     from app.version import CURRENT_BUILD_NAME, CURRENT_VERSION, LAST_UPDATED
 
-    # Build 29's purpose was to release v1.2.0. We keep this check tolerant
-    # of post-release patch / extension builds (e.g. v1.2.0-build30) so that
-    # adding a follow-up build doesn't invalidate the "v1.2.0 shipped" proof.
-    if CURRENT_VERSION.startswith("1.2.0"):
-        ok(f"app.version CURRENT_VERSION is on the v1.2.0 line ({CURRENT_VERSION})")
+    # Build 29's purpose was to release v1.2.0. Tolerant of any post-release
+    # patch / extension on the v1.2.x line (1.2.0-build30, 1.2.1, 1.2.2 …)
+    # so adding a follow-up build doesn't invalidate the "v1.2.0 shipped" proof.
+    if CURRENT_VERSION.startswith("1.2."):
+        ok(f"app.version CURRENT_VERSION is on the v1.2.x line ({CURRENT_VERSION})")
     else:
         fail("CURRENT_VERSION", CURRENT_VERSION)
 
@@ -75,11 +75,13 @@ def main():
     # v1.2.0 release proof: the "What's new in v1.2.0" block and the
     # "v1.2.0 released" status line must persist even as later builds
     # (30, 31, ...) update the Current Version / Current Build header.
+    # Release-proof strings only (NOT the Current Version header, which moves
+    # forward with each post-release patch). The v1.2.0 "shipped" fact must
+    # survive even when v1.2.1 / v1.3.x has bumped the header.
     contains_all(
         "VERSION.md documents the v1.2.0 release",
         version_md,
         [
-            "**Current Version:** v1.2.0",
             "v1.2.0 released",
             "## What's new in v1.2.0",
         ],

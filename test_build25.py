@@ -116,7 +116,7 @@ def main():
     # Tolerant of post-release builds on the 1.1 or 1.2 line so that
     # adding follow-up builds (or shipping plain v1.2.0) doesn't
     # invalidate the "Build 25 still in the runtime line" proof.
-    if CURRENT_VERSION.startswith(("1.1.0", "1.2.0")):
+    if CURRENT_VERSION.startswith(("1.1.", "1.2.")):
         ok(f"app.version CURRENT_VERSION preserves Build 25 or newer ({CURRENT_VERSION})")
     else:
         fail("CURRENT_VERSION", CURRENT_VERSION)
