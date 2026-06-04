@@ -66,3 +66,18 @@ Future builds may make Project Pulse smarter after honest sources and tests exis
 
 - PM can open Overview and understand immediate project health before reading details.
 - No new database state is introduced.
+
+## Implementation Notes
+
+- Implemented `#project-pulse` as the first Overview section in `project_detail.html`, before Product Thesis.
+- Uses existing context only: `project`, `health`, `delay`, `current_phase`, `linked_ideas`, and role visibility flags.
+- Action priority is delay, missing Thesis, first remaining critical missing field, early-stage missing inspiration, then no urgent action.
+- Sensitive engineer/factory details render only when `can_sensitive` is true; project-level costs are not shown in Pulse.
+- Added EN/ZH i18n keys under `pulse.*` and `common.unknown`.
+- No schema, route, service, AI tool, or mutating behavior changes.
+
+## Verification
+
+- `env BASE_URL=http://localhost:8001 python3 test_v13_build02.py` — 11/11 passed.
+- `env BASE_URL=http://localhost:8001 python3 test_v13_build01.py` — 16/16 passed.
+- `python3 test_build_v121.py` — 19/19 passed.

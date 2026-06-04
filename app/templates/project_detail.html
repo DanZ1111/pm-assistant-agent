@@ -114,6 +114,85 @@
     <div class="workspace-panel workspace-panel-overview" id="workspacePanelOverview"
          data-workspace-panel="overview" role="tabpanel" aria-labelledby="workspaceTabOverview">
 
+    <!-- v1.3 Build 02: Project Pulse v1 (rules-based) -->
+    <section class="detail-section project-pulse-section" id="project-pulse" data-pulse-version="rules-v1">
+      <div class="section-header">
+        <h2 class="section-title"><i class="bi bi-activity me-2"></i>{{ t('pulse.title') }}</h2>
+        <span class="pulse-version-badge">{{ t('pulse.rules_based_v1') }}</span>
+      </div>
+
+      <div class="project-pulse-grid">
+        <div class="pulse-card pulse-status-card">
+          <div class="pulse-card-label">{{ t('pulse.current_status') }}</div>
+          <div class="pulse-stage-row">
+            <span class="pulse-stage">{{ project.current_stage or t('common.unknown') }}</span>
+            <span class="status-badge status-{{ project.status }}">{{ t('status.' ~ project.status) }}</span>
+          </div>
+          <dl class="pulse-facts">
+            <div>
+              <dt>{{ t('form.product_manager') }}</dt>
+              <dd>{{ project.product_manager or "—" }}</dd>
+            </div>
+            {% if project.project_owner %}
+            <div>
+              <dt>{{ t('form.owner') }}</dt>
+              <dd>{{ project.project_owner }}</dd>
+            </div>
+            {% endif %}
+            {% if can_sensitive %}
+            <div>
+              <dt>{{ t('form.engineer') }}</dt>
+              <dd>{{ project.engineer or "—" }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('form.factory') }}</dt>
+              <dd>{{ project.factory or "—" }}</dd>
+            </div>
+            {% endif %}
+            <div>
+              <dt>{{ t('pulse.launch_target') }}</dt>
+              <dd>
+                {% if delay and delay.estimated_launch %}
+                  {{ delay.estimated_launch.strftime('%b %d, %Y') }} <span class="pulse-muted">({{ t('pulse.estimated') }})</span>
+                {% elif project.planned_launch_date %}
+                  {{ project.planned_launch_date.strftime('%b %d, %Y') }}
+                {% else %}
+                  —
+                {% endif %}
+              </dd>
+            </div>
+          </dl>
+        </div>
+
+        <div class="pulse-card pulse-action-card{% if delay %} pulse-action-danger{% elif health.needs_info %} pulse-action-warning{% endif %}">
+          <div class="pulse-card-label">{{ t('pulse.attention_needed') }}</div>
+          {% if delay %}
+            <div class="pulse-action-title">{{ t('pulse.delayed_title') }}</div>
+            <p class="pulse-action-copy">{{ t('pulse.delayed_copy', phase=delay.blocking_phase, days=delay.days_late) }}</p>
+            <a href="#timeline" class="pulse-action-link" onclick="setProjectWorkspace('timeline', true)">
+              <i class="bi bi-calendar-range me-1"></i>{{ t('pulse.open_timeline') }}
+            </a>
+          {% elif 'project_thesis' in health.critical_missing %}
+            <div class="pulse-action-title">{{ t('pulse.thesis_needed_title') }}</div>
+            <p class="pulse-action-copy">{{ t('pulse.thesis_needed_copy') }}</p>
+            <a href="#thesis" class="pulse-action-link">{{ t('pulse.complete_thesis') }}</a>
+          {% elif health.needs_info %}
+            {% set missing_field = health.critical_missing[0] %}
+            <div class="pulse-action-title">{{ t('pulse.missing_field_title') }}</div>
+            <p class="pulse-action-copy">{{ t('pulse.missing_field_copy', field=t('pulse.field.' ~ missing_field)) }}</p>
+            <span class="pulse-action-link pulse-action-muted">{{ t('pulse.use_edit_or_ai') }}</span>
+          {% elif not linked_ideas and current_phase and current_phase.phase_order <= 3 %}
+            <div class="pulse-action-title">{{ t('pulse.inspiration_title') }}</div>
+            <p class="pulse-action-copy">{{ t('pulse.inspiration_copy') }}</p>
+            <a href="#inspired-by" class="pulse-action-link">{{ t('pulse.add_inspiration') }}</a>
+          {% else %}
+            <div class="pulse-action-title">{{ t('pulse.no_urgent_title') }}</div>
+            <p class="pulse-action-copy">{{ t('pulse.no_urgent_copy') }}</p>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+
     <!-- 1. Product Thesis -->
     <section class="detail-section" id="thesis">
       <div class="section-header">

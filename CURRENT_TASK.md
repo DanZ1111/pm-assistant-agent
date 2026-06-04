@@ -1,7 +1,7 @@
 # CURRENT_TASK.md
 
 ## Task
-v1.3 Build 01 — Workspace Shell implemented and tested. Awaiting review/commit direction.
+v1.3 Build 02 — Project Pulse v1 (rules-based) implemented and tested. Awaiting review/commit direction.
 
 ## Handoff rule
 Before editing, inspect:
@@ -53,12 +53,22 @@ Plus the v1.2.1 release-hardening commit itself (test_build_v121, docs rollup, v
 ## Next step
 
 Wait for user direction. Suggested directions:
-1. **Review v1.3 Build 01** — Project Detail now has Overview / Timeline tabs; Overview is default and `#timeline` opens Timeline.
-2. **Commit v1.3 Build 01** — changes are docs/templates/CSS/i18n/test only; no schema or route changes.
-3. **Start v1.3 Build 02** — Overview Project Pulse v1 (rules-based), after Build 01 is accepted.
+1. **Review v1.3 Build 02** — Overview now starts with rules-based Project Pulse v1.
+2. **Commit v1.3 Build 02** — changes are template/CSS/i18n/test/docs only; no schema, route, service, or AI mutation changes.
+3. **Plan v1.3 Build 03** — create and review/commit `V13_BUILD03_EXECUTION_PLAN.md` before any Build 03 code.
+
+## v1.3 process update
+
+Starting with v1.3 Build 03, every build gets a short build-specific execution plan before coding. The execution plan should be committed/reviewed first and include exact files/components, source-of-truth fields, permissions, i18n labels, tests, deferrals, and rollback/safety notes.
 
 ## v1.3 Build 01 verification
 
 - `env BASE_URL=http://localhost:8001 python3 test_v13_build01.py` — 16/16 passed.
 - `python3 test_build_v121.py` — 19/19 passed.
 - Screenshots generated during test under ignored `test_artifacts/`.
+
+## v1.3 Build 02 verification
+
+- `env BASE_URL=http://localhost:8001 python3 test_v13_build02.py` — 11/11 passed.
+- `env BASE_URL=http://localhost:8001 python3 test_v13_build01.py` — 16/16 passed.
+- `python3 test_build_v121.py` — 19/19 passed.

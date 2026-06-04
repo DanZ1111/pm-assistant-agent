@@ -96,10 +96,33 @@ Default expectation: if blockers need to drive Pulse/Timeline status, use a firs
 - Build 10 adds a release-proof regression such as `test_v13_build10.py` that verifies `app/version.py`, visible version strings, docs rollup, v1.3 regression inventory, and the v1.2.1 baseline still pass.
 - i18n bundle parity must remain exact for all new visible labels.
 
+## Per-Build Execution Planning Gate
+
+Starting with v1.3 Build 03, each build must have a short build-specific execution plan before any code changes. This plan is separate from the high-level build plan and should be committed/reviewed first.
+
+Expected file name:
+
+- `V13_BUILDNN_EXECUTION_PLAN.md`
+
+Minimum contents:
+
+- exact user problem for this build
+- exact UI sections/components to touch
+- source-of-truth fields and derived rules
+- routes/services/schema impact, explicitly saying "none" if none
+- permissions and sensitive-field handling
+- i18n labels to add/change
+- tests to create/run
+- explicit deferrals
+- rollback/safety notes
+
+Workflow rule: do not implement the build until the user approves the execution plan. If ChatGPT or Claude reviews the execution plan, revise and recommit the plan before coding.
+
 ## Review Workflow
 
-1. Commit this plan series only.
+1. Commit the v1.3 master plan series.
 2. Have ChatGPT and Claude review the plan files.
 3. Revise plan files if review finds scope or ordering problems.
-4. Implement only the approved next v1.3 build.
-5. Stop after each build for report, review, and commit.
+4. For each build, create `V13_BUILDNN_EXECUTION_PLAN.md` and commit it for review before coding.
+5. Implement only the approved next v1.3 build.
+6. Stop after each build for report, review, and commit.
