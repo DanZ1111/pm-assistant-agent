@@ -42,3 +42,19 @@ This build reuses existing files/rendering history. No new rendering backend.
 
 - PM can visually identify the project early in Overview.
 - Rendering history remains available without dominating the top of the page.
+
+## Implementation Notes
+
+- Implemented as a display-only section using existing `project_files` rows.
+- Latest visual is chosen by `ProjectFile.uploaded_at` only: newest rendering image first, newest prototype image second, newest non-image rendering/prototype fallback third.
+- Inline images are constrained with section-safe max dimensions so large uploads cannot dominate the page.
+- Non-image rendering/prototype files render as a document fallback card with file metadata.
+- Designer Portal remains a disabled placeholder.
+
+## Verification
+
+- `env BASE_URL=http://127.0.0.1:8001 python3 test_v13_build04.py` — 20/20 passed.
+- `env BASE_URL=http://127.0.0.1:8001 python3 test_v13_build03.py` — 20/20 passed.
+- `env BASE_URL=http://127.0.0.1:8001 python3 test_v13_build02.py` — 11/11 passed.
+- `env BASE_URL=http://127.0.0.1:8001 python3 test_v13_build01.py` — 16/16 passed.
+- `python3 test_build_v121.py` — 19/19 passed.

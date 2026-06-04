@@ -2,8 +2,10 @@
 
 ## Unreleased
 
+- **v1.3 Build 04 — Overview Renderings Section.** Overview now has a standalone Renderings section immediately after Product Concept, showing the latest existing rendering/prototype visual by upload time with bounded preview sizing, metadata, history links, non-image document fallback, and a disabled Designer Portal placeholder. No schema, service, new route, AI, pinning, or lightbox behavior changes.
 - **v1.3 Build 01 — Workspace Shell.** Project Detail now has explicit Overview / Timeline workspaces under the project header. Overview is the default; `#timeline` opens Timeline directly. The old promoted Commercial Snapshot section is removed; created/updated dates plus project-level price estimates now live in a quiet Project Metadata section near Change Log. Existing Timeline table and phase edit modal are preserved without behavior/schema changes.
 - **v1.3 Build 02 — Project Pulse v1 (rules-based).** Overview now starts with a two-column Project Pulse that summarizes current stage/status, PM/owner, sensitive team/factory facts for PM/admin, launch target, and the next suggested PM action from existing data. Actions are rules-only: delay → Timeline, missing Thesis → Thesis, other missing critical field → fill it, early no-inspiration → Inspired By, otherwise no urgent action. No schema, route, AI, or mutation changes.
+- **v1.3 Build 03 — Overview Product Concept.** The old Product Thesis detail section is reframed as Product Concept with a primary `#product-concept` anchor and hidden `#thesis` compatibility anchor. Inspired By is no longer a standalone peer section; linked Ideas now render as compact internal concept-reference chips inside Product Concept, while existing Link / Create & Link / unlink modals and thesis edit/re-extract routes are preserved. Build 02 Pulse wording now points to Product Concept. No schema, route, service, or AI behavior changes.
 
 ## v1.2.1 — Workflow polish + Excel batch intake + draft delete
 _2026-06-03_

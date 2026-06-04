@@ -1,7 +1,7 @@
 # CURRENT_TASK.md
 
 ## Task
-v1.3 Build 03 execution plan created. Awaiting review before any Build 03 code.
+v1.3 Build 05 — Variant Command Cards execution plan drafted for review. Build 03 and Build 04 remain implemented/tested but uncommitted.
 
 ## Handoff rule
 Before editing, inspect:
@@ -53,9 +53,10 @@ Plus the v1.2.1 release-hardening commit itself (test_build_v121, docs rollup, v
 ## Next step
 
 Wait for user direction. Suggested directions:
-1. **Review v1.3 Build 03 execution plan** — `V13_BUILD03_EXECUTION_PLAN.md`.
-2. **Revise/commit the Build 03 plan if needed** — no Build 03 product code until approved.
-3. **Implement v1.3 Build 03** — only after the execution plan is accepted.
+1. **Review/commit v1.3 Build 03 + Build 04** — current working tree contains both implemented builds.
+2. **Review v1.3 Build 05 execution plan** — `V13_BUILD05_EXECUTION_PLAN.md`.
+3. **Revise/commit the Build 05 plan** after Claude/ChatGPT review.
+4. **Implement v1.3 Build 05** only after the execution plan is approved.
 
 ## v1.3 process update
 
@@ -77,4 +78,45 @@ Starting with v1.3 Build 03, every build gets a short build-specific execution p
 
 - Added `V13_BUILD03_EXECUTION_PLAN.md`.
 - Revised per Claude review: Inspired By is locked as an internal Product Concept chip-row, Product Concept gets primary `id="product-concept"` plus a hidden `#thesis` compatibility anchor, exact EN/ZH i18n strings are specified, and Build 02 Pulse wording must change from Product Thesis to Product Concept.
-- No Build 03 code has been written yet.
+
+## v1.3 Build 03 verification
+
+- `env BASE_URL=http://localhost:8001 python3 test_v13_build03.py` — 20/20 passed.
+- `env BASE_URL=http://localhost:8001 python3 test_v13_build01.py` — 16/16 passed.
+- `env BASE_URL=http://localhost:8001 python3 test_v13_build02.py` — 11/11 passed.
+- `python3 test_build_v121.py` — 19/19 passed.
+
+## v1.3 Build 04 planning
+
+- Added `V13_BUILD04_EXECUTION_PLAN.md`.
+- Plan locks Renderings as a standalone Overview section after Product Concept and before Variants.
+- Source of truth is existing `project_files` rows already loaded as `renderings` and `prototype_photos`.
+- Latest visual rule: newest image rendering first by `ProjectFile.uploaded_at`, newest image prototype photo second by `uploaded_at`, newest non-image rendering/prototype by `uploaded_at` as document fallback, otherwise empty state.
+- Revised per Claude review: preview image maxes out at section-safe dimensions, non-image fallback is a defined file card, mixed rendering/prototype test must prove the rendering wins while the prototype link still appears, mobile width gets a real no-overflow assertion, and lightbox integration is explicitly deferred.
+- No schema, service, new route, AI behavior, pinning workflow, or Designer Portal backend.
+
+## v1.3 Build 04 implementation
+
+- Added `latest_overview_visual` derived context on project detail; no new query/service/schema.
+- Added standalone `#renderings-overview` section after Product Concept, before Variants.
+- Section displays newest rendering image by `uploaded_at`, falls back to newest prototype image, then newest non-image rendering/prototype document card.
+- Added safe CSS sizing so large uploaded visuals cannot dominate the page.
+- Added EN/ZH i18n keys and `test_v13_build04.py`.
+- Designer Portal is a disabled placeholder only; no lightbox integration.
+
+## v1.3 Build 04 verification
+
+- `env BASE_URL=http://127.0.0.1:8001 python3 test_v13_build04.py` — 20/20 passed.
+- `env BASE_URL=http://127.0.0.1:8001 python3 test_v13_build03.py` — 20/20 passed.
+- `env BASE_URL=http://127.0.0.1:8001 python3 test_v13_build02.py` — 11/11 passed.
+- `env BASE_URL=http://127.0.0.1:8001 python3 test_v13_build01.py` — 16/16 passed.
+- `python3 test_build_v121.py` — 19/19 passed.
+- Screenshots generated under ignored `test_artifacts/`.
+
+## v1.3 Build 05 planning
+
+- Added `V13_BUILD05_EXECUTION_PLAN.md`.
+- Plan locks Build 05 as a Variants display refactor: expandable command cards using existing `project_variants` and `project_variant_components`.
+- Existing add/edit/set-primary/delete routes and CRUD services stay unchanged.
+- Packaging & Accessories remains the management section; variant cards summarize project-wide and variant-specific components.
+- No schema, migration, AI behavior, real profit model, variant thumbnail model, or drag/drop ordering.

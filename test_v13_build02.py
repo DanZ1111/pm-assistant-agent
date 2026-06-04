@@ -193,10 +193,10 @@ def main():
 
     print("\n── Static locks ──")
     template = (ROOT / "app/templates/project_detail.html").read_text(encoding="utf-8")
-    if template.find('id="project-pulse"') < template.find('id="thesis"'):
-        ok("Project Pulse appears before Product Thesis in template")
+    if template.find('id="project-pulse"') < template.find('id="product-concept"'):
+        ok("Project Pulse appears before Product Concept in template")
     else:
-        fail("Project Pulse order", "Pulse does not precede Thesis")
+        fail("Project Pulse order", "Pulse does not precede Product Concept")
     if 'data-pulse-version="rules-v1"' in template and "pulse.rules_based_v1" in template:
         ok("Project Pulse explicitly identifies rules-based v1")
     else:
@@ -212,10 +212,10 @@ def main():
         page.goto(f"{BASE}/projects/{delayed_id}")
         page.wait_for_load_state("networkidle")
         pulse = page.locator("#project-pulse")
-        if pulse.is_visible() and pulse.bounding_box()["y"] < page.locator("#thesis").bounding_box()["y"]:
-            ok("Project Pulse renders before Product Thesis")
+        if pulse.is_visible() and pulse.bounding_box()["y"] < page.locator("#product-concept").bounding_box()["y"]:
+            ok("Project Pulse renders before Product Concept")
         else:
-            fail("Pulse visual order", "Pulse not visible before Thesis")
+            fail("Pulse visual order", "Pulse not visible before Product Concept")
         delayed_text = pulse.inner_text()
         if "Timeline needs attention" in delayed_text and "Open Timeline" in delayed_text:
             ok("Delayed project shows Timeline action")

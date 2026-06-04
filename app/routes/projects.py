@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Request, Form, HTTPException, UploadFile
 from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from datetime import date
+from datetime import date, datetime
 
 from app.database import get_db
 from app.models import Project
@@ -58,6 +58,26 @@ def _resolve_business_plan_type(filename: str) -> str | None:
         return None
     ext = filename.rsplit(".", 1)[-1].lower()
     return _BUSINESS_PLAN_TYPES.get(ext)
+
+
+def _pick_latest_overview_visual(renderings: list, prototype_photos: list):
+    """Build 04: choose the Overview visual from existing ProjectFile lists.
+
+    Lists are already newest-first by ProjectFile.uploaded_at. "Latest" is
+    upload time only; comments or other engagement do not affect ordering.
+    """
+    for f in renderings:
+        if f.file_type == "image":
+            return f
+    for f in prototype_photos:
+        if f.file_type == "image":
+            return f
+    candidates = list(renderings) + list(prototype_photos)
+    return sorted(
+        candidates,
+        key=lambda f: f.uploaded_at or datetime.min,
+        reverse=True,
+    )[0] if candidates else None
 
 
 def _save_uploaded_business_plan(
@@ -386,6 +406,7 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
     # Build 18 — Rendering History + Prototype Photos
     renderings = crud.get_files_by_category(db, project_id, "rendering")
     prototype_photos = crud.get_files_by_category(db, project_id, "prototype_photo")
+    latest_overview_visual = _pick_latest_overview_visual(renderings, prototype_photos)
 
     # Build 17 — Timeline 2.0: plan-change history per phase + error flash
     plan_changes_by_phase = crud.get_plan_changes_by_project(db, project_id)
@@ -429,6 +450,7 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
         "current_phase": current_phase,
         "renderings": renderings,
         "prototype_photos": prototype_photos,
+        "latest_overview_visual": latest_overview_visual,
         # Build 21 — for bottom chat scope toggle
         "current_project_id": project.id,
         "current_project_name": project.name,

@@ -103,7 +103,7 @@ def create_project(session):
     token = mint_token(session)
     thesis = (
         "A workspace-shell test knife concept with enough thesis detail to keep "
-        "Product Thesis visible in Overview while Timeline remains a separate "
+        "Product Concept visible in Overview while Timeline remains a separate "
         "execution workspace for phases, dates, owners, and plan changes."
     )
     r = session.post(
@@ -187,10 +187,10 @@ def main():
         else:
             fail("default overview tab", "Overview tab not active")
 
-        if page.locator("#thesis").is_visible() and not page.locator("#timeline").is_visible():
-            ok("Overview shows Product Thesis and hides Timeline by default")
+        if page.locator("#product-concept").is_visible() and not page.locator("#timeline").is_visible():
+            ok("Overview shows Product Concept and hides Timeline by default")
         else:
-            fail("default panel visibility", "expected thesis visible and timeline hidden")
+            fail("default panel visibility", "expected product concept visible and timeline hidden")
 
         if page.locator("#commercial-snapshot").count() == 0:
             ok("Rendered page has no #commercial-snapshot")
@@ -207,10 +207,10 @@ def main():
             fail("project metadata", "metadata section not visible in Overview")
 
         timeline_panel_text = page.locator("#workspacePanelTimeline").inner_text()
-        if "Product Thesis" not in timeline_panel_text:
-            ok("Product Thesis is not inside Timeline workspace")
+        if "Product Concept" not in timeline_panel_text:
+            ok("Product Concept is not inside Timeline workspace")
         else:
-            fail("timeline contents", "Product Thesis leaked into Timeline panel")
+            fail("timeline contents", "Product Concept leaked into Timeline panel")
 
         page.screenshot(path=str(ARTIFACTS / "v13_build01_desktop_overview.png"), full_page=True)
         ok("Desktop Overview screenshot captured")
@@ -222,10 +222,10 @@ def main():
         else:
             fail("timeline tab click", "Timeline did not become active/visible")
 
-        if not page.locator("#thesis").is_visible():
+        if not page.locator("#product-concept").is_visible():
             ok("Overview content is hidden while Timeline is active")
         else:
-            fail("overview hidden on timeline", "Product Thesis stayed visible")
+            fail("overview hidden on timeline", "Product Concept stayed visible")
 
         edit_buttons = page.locator(".btn-phase-edit")
         if edit_buttons.count() >= 1:

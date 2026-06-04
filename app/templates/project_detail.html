@@ -175,7 +175,7 @@
           {% elif 'project_thesis' in health.critical_missing %}
             <div class="pulse-action-title">{{ t('pulse.thesis_needed_title') }}</div>
             <p class="pulse-action-copy">{{ t('pulse.thesis_needed_copy') }}</p>
-            <a href="#thesis" class="pulse-action-link">{{ t('pulse.complete_thesis') }}</a>
+            <a href="#product-concept" class="pulse-action-link">{{ t('pulse.complete_thesis') }}</a>
           {% elif health.needs_info %}
             {% set missing_field = health.critical_missing[0] %}
             <div class="pulse-action-title">{{ t('pulse.missing_field_title') }}</div>
@@ -193,10 +193,11 @@
       </div>
     </section>
 
-    <!-- 1. Product Thesis -->
-    <section class="detail-section" id="thesis">
+    <!-- 1. Product Concept -->
+    <section class="detail-section product-concept-section" id="product-concept">
+      <span id="thesis" class="visually-hidden" aria-hidden="true"></span>
       <div class="section-header">
-        <h2 class="section-title"><i class="bi bi-lightbulb me-2"></i>{{ t('section.thesis') }}</h2>
+        <h2 class="section-title"><i class="bi bi-lightbulb me-2"></i>{{ t('section.product_concept') }}</h2>
         {% if can_edit %}
         <div class="d-flex gap-2">
           <button type="button" class="btn btn-sm btn-ghost" onclick="toggleThesisEdit()">
@@ -221,9 +222,9 @@
 
       <div id="thesisDisplay">
         {% if project.project_thesis and project.project_thesis|length >= 80 %}
-        <div class="thesis-box thesis-scrollable">
-          <div class="thesis-guide">
-            <span>{{ t('project.thesis_guide') }}</span>
+        <div class="concept-box thesis-box thesis-scrollable">
+          <div class="concept-guide">
+            <span>{{ t('concept.thesis_label') }}</span>
           </div>
           <p class="thesis-text">{{ project.project_thesis }}</p>
         </div>
@@ -258,6 +259,144 @@
           <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleThesisExtractForm()">{{ t('btn.cancel') }}</button>
         </div>
       </form>
+      {% endif %}
+
+      <div class="concept-references" id="inspired-by">
+        <div class="concept-references-head">
+          <div>
+            <div class="concept-reference-label">{{ t('concept.references') }}</div>
+            {% if linked_ideas %}<div class="concept-reference-count">{{ linked_ideas|length }} {{ t('section.inspired_by') }}</div>{% endif %}
+          </div>
+          {% if can_edit %}
+          <div class="concept-reference-actions">
+            {% if available_ideas %}
+            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#linkIdeaModal">
+              <i class="bi bi-link-45deg me-1"></i>{{ t('btn.link_idea') }}
+            </button>
+            {% endif %}
+            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#createLinkIdeaModal">
+              <i class="bi bi-plus-lg me-1"></i>{{ t('concept.add_reference') }}
+            </button>
+          </div>
+          {% endif %}
+        </div>
+
+        {% if linked_ideas %}
+        <div class="concept-reference-list">
+          {% for li in linked_ideas %}
+          <div class="concept-reference-chip">
+            <span class="ib-serial">{{ li.idea.serial_number }}</span>
+            <span class="ib-type">{{ t('idea_type.' ~ li.idea.idea_type) }}</span>
+            <a href="/ideas?highlight={{ li.idea.id }}" class="ib-name text-decoration-none">{{ li.idea.name }}</a>
+            {% if li.note %}<span class="ib-note">· "{{ li.note }}"</span>{% endif %}
+            {% if li.linked_by_user %}
+            <span class="ib-by">{{ t('common.by') }} {{ li.linked_by_user.display_name or li.linked_by_user.username }}</span>
+            {% endif %}
+            {% if can_edit %}
+            <form method="post" action="/projects/{{ project.id }}/ideas/{{ li.idea.id }}/unlink"
+                  onsubmit="return confirm('{{ t('project.unlink_idea_confirm', serial=li.idea.serial_number) }}')">
+              <button class="btn btn-sm btn-link text-muted p-0" title="{{ t('btn.unlink') }}"><i class="bi bi-x-lg"></i></button>
+            </form>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="concept-empty-reference mb-0">
+          {{ t('concept.no_references') }}
+          {% if can_edit %}{{ t('project.capture_idea_hint') }}{% endif %}
+        </p>
+        {% endif %}
+      </div>
+    </section>
+
+    <!-- v1.3 Build 04: standalone Renderings overview -->
+    <section class="detail-section renderings-overview-section" id="renderings-overview">
+      <div class="section-header">
+        <h2 class="section-title">
+          <i class="bi bi-image me-2"></i>{{ t('section.renderings_overview') }}
+        </h2>
+        <span class="text-muted small">{{ t('renderings.latest_visual') }}</span>
+      </div>
+
+      {% if latest_overview_visual %}
+      <div class="renderings-overview-card">
+        <div class="renderings-overview-preview">
+          {% if latest_overview_visual.file_type == 'image' %}
+          <a href="/uploads/{{ latest_overview_visual.filename }}" target="_blank"
+             title="{{ t('files.open_full_size') }}">
+            <img src="/uploads/{{ latest_overview_visual.filename }}"
+                 alt="{{ latest_overview_visual.original_filename or latest_overview_visual.filename }}"
+                 loading="lazy">
+          </a>
+          {% else %}
+          <a href="/uploads/{{ latest_overview_visual.filename }}" target="_blank"
+             class="renderings-overview-doc" title="{{ t('renderings.open_file') }}">
+            {% if latest_overview_visual.file_type == 'pdf' %}
+            <i class="bi bi-file-earmark-pdf text-danger"></i>
+            {% elif latest_overview_visual.file_type == 'word' %}
+            <i class="bi bi-file-earmark-word text-primary"></i>
+            {% elif latest_overview_visual.file_type == 'excel' %}
+            <i class="bi bi-file-earmark-spreadsheet text-success"></i>
+            {% else %}
+            <i class="bi bi-file-earmark text-muted"></i>
+            {% endif %}
+          </a>
+          {% endif %}
+        </div>
+        <div class="renderings-overview-meta">
+          <div class="renderings-overview-label">{{ t('renderings.latest_visual') }}</div>
+          <h3 class="renderings-overview-name">{{ latest_overview_visual.original_filename or latest_overview_visual.filename }}</h3>
+          <div class="renderings-overview-facts">
+            <span>{{ t('file_category.' ~ latest_overview_visual.file_category) }}</span>
+            <span>{{ latest_overview_visual.uploaded_at.strftime('%b %d, %Y') }}</span>
+            {% if latest_overview_visual.file_size %}
+            <span>{{ (latest_overview_visual.file_size / 1024) | round(1) }} KB</span>
+            {% endif %}
+          </div>
+          {% if latest_overview_visual.source_note %}
+          <p class="renderings-overview-note">{{ latest_overview_visual.source_note }}</p>
+          {% endif %}
+          <div class="renderings-overview-links">
+            <a href="/uploads/{{ latest_overview_visual.filename }}" target="_blank" class="btn btn-sm btn-outline-primary">
+              <i class="bi bi-box-arrow-up-right me-1"></i>
+              {% if latest_overview_visual.file_type == 'image' %}{{ t('files.open_full_size') }}{% else %}{{ t('renderings.open_file') }}{% endif %}
+            </a>
+            <a href="#renderings" class="btn btn-sm btn-ghost">
+              <i class="bi bi-clock-history me-1"></i>{{ t('renderings.open_history') }}
+            </a>
+            {% if latest_overview_visual.file_category == 'prototype_photo' or prototype_photos %}
+            <a href="#prototype-photos" class="btn btn-sm btn-ghost">
+              <i class="bi bi-camera me-1"></i>{{ t('renderings.open_prototype_photos') }}
+            </a>
+            {% endif %}
+          </div>
+        </div>
+        <div class="renderings-designer-placeholder" aria-disabled="true">
+          <div class="renderings-designer-title">
+            <i class="bi bi-palette me-1"></i>{{ t('renderings.designer_portal') }}
+          </div>
+          <p>{{ t('renderings.designer_portal_future') }}</p>
+        </div>
+      </div>
+      {% else %}
+      <div class="renderings-overview-empty">
+        <div>
+          <div class="renderings-empty-title">{{ t('renderings.no_visual_title') }}</div>
+          <p>{{ t('renderings.no_visual_copy') }}</p>
+          {% if can_edit %}
+          <a href="#files" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-upload me-1"></i>{{ t('files.upload_in_files') }}
+          </a>
+          {% endif %}
+        </div>
+        <div class="renderings-designer-placeholder" aria-disabled="true">
+          <div class="renderings-designer-title">
+            <i class="bi bi-palette me-1"></i>{{ t('renderings.designer_portal') }}
+          </div>
+          <p>{{ t('renderings.designer_portal_future') }}</p>
+        </div>
+      </div>
       {% endif %}
     </section>
 
@@ -295,56 +434,6 @@
     {% if can_view_journal %}
       {% include "components/journal_section.html" %}
     {% endif %}
-
-    <!-- 1b. Inspired By (linked ideas) -->
-    <section class="detail-section" id="inspired-by">
-      <div class="section-header">
-        <h2 class="section-title"><i class="bi bi-lightbulb me-2"></i>{{ t('section.inspired_by') }}
-          {% if linked_ideas %}<span class="text-muted small ms-2">({{ linked_ideas|length }})</span>{% endif %}
-        </h2>
-        {% if can_edit %}
-        <div class="d-flex gap-2">
-          {% if available_ideas %}
-          <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#linkIdeaModal">
-            <i class="bi bi-link-45deg me-1"></i>{{ t('btn.link_idea') }}
-          </button>
-          {% endif %}
-          <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#createLinkIdeaModal">
-            <i class="bi bi-plus-lg me-1"></i>{{ t('btn.create_link_idea') }}
-          </button>
-        </div>
-        {% endif %}
-      </div>
-
-      {% if linked_ideas %}
-      <div class="inspired-by-list">
-        {% for li in linked_ideas %}
-        <div class="inspired-by-row">
-          <span class="ib-serial">{{ li.idea.serial_number }}</span>
-          <span class="ib-type">{{ t('idea_type.' ~ li.idea.idea_type) }}</span>
-          <a href="/ideas?highlight={{ li.idea.id }}" class="ib-name text-decoration-none">{{ li.idea.name }}</a>
-          {% if li.note %}<span class="text-muted small">· "{{ li.note }}"</span>{% endif %}
-          {% if li.linked_by_user %}
-          <span class="ib-by">{{ t('common.by') }} {{ li.linked_by_user.display_name or li.linked_by_user.username }}</span>
-          {% endif %}
-          {% if can_edit %}
-          <form method="post" action="/projects/{{ project.id }}/ideas/{{ li.idea.id }}/unlink" class="ms-auto"
-                onsubmit="return confirm('{{ t('project.unlink_idea_confirm', serial=li.idea.serial_number) }}')">
-            <button class="btn btn-sm btn-link text-muted p-0" title="{{ t('btn.unlink') }}"><i class="bi bi-x-lg"></i></button>
-          </form>
-          {% endif %}
-        </div>
-        {% endfor %}
-      </div>
-      {% else %}
-      <p class="text-muted small mb-0">
-        {{ t('empty.no_linked_ideas') }}
-        {% if can_edit %}
-          {{ t('project.capture_idea_hint') }}
-        {% endif %}
-      </p>
-      {% endif %}
-    </section>
 
     {# ── Link Idea modal ── #}
     {% if can_edit and available_ideas %}

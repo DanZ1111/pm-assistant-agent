@@ -764,6 +764,242 @@ body {
 }
 
 /* Product Thesis */
+.product-concept-section {
+  background: #fff;
+}
+.concept-box {
+  background: #fff;
+}
+.concept-guide {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-bottom: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+.concept-references {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+}
+.concept-references-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.concept-reference-label {
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 800;
+}
+.concept-reference-count {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  margin-top: 2px;
+}
+.concept-reference-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.concept-reference-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.concept-reference-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  gap: 7px;
+  padding: 7px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  font-size: 12px;
+}
+.concept-reference-chip .ib-serial {
+  font-family: monospace;
+  color: var(--color-text-muted);
+}
+.concept-reference-chip .ib-type {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  color: #4b5563;
+  white-space: nowrap;
+}
+.concept-reference-chip .ib-name {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+  font-weight: 700;
+}
+.concept-reference-chip .ib-note,
+.concept-reference-chip .ib-by {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.concept-empty-reference {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+/* v1.3 Build 04 — Overview Renderings */
+.renderings-overview-section {
+  background: #fff;
+}
+.renderings-overview-card,
+.renderings-overview-empty {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.95fr) minmax(260px, 1fr) minmax(220px, 0.55fr);
+  gap: 18px;
+  align-items: stretch;
+}
+.renderings-overview-empty {
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.35fr);
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: #fff;
+}
+.renderings-overview-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 220px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: #f8fafc;
+  overflow: hidden;
+}
+.renderings-overview-preview a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  text-decoration: none;
+}
+.renderings-overview-preview img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  max-height: 360px;
+  object-fit: contain;
+}
+.renderings-overview-doc {
+  flex-direction: column;
+  gap: 10px;
+  color: var(--color-text-muted);
+  font-size: 56px;
+}
+.renderings-overview-meta {
+  min-width: 0;
+  padding: 4px 0;
+}
+.renderings-overview-label {
+  margin-bottom: 6px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.renderings-overview-name {
+  margin: 0 0 8px;
+  color: var(--color-text);
+  font-size: 20px;
+  font-weight: 850;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.renderings-overview-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 10px;
+}
+.renderings-overview-facts span {
+  padding: 3px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+.renderings-overview-note {
+  margin: 0 0 12px;
+  color: var(--color-text);
+  font-size: 13px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.renderings-overview-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.renderings-designer-placeholder {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding: 14px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  background: #f8fafc;
+  color: var(--color-text-muted);
+}
+.renderings-designer-title {
+  margin-bottom: 5px;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 850;
+}
+.renderings-designer-placeholder p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.renderings-empty-title {
+  margin-bottom: 5px;
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 850;
+}
+.renderings-overview-empty p {
+  margin: 0 0 12px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+@media (max-width: 900px) {
+  .renderings-overview-card,
+  .renderings-overview-empty {
+    grid-template-columns: 1fr;
+  }
+  .renderings-overview-preview {
+    min-height: 180px;
+  }
+  .renderings-overview-preview img {
+    max-height: 300px;
+  }
+}
+
 .thesis-box {
   background: #fafafa;
   border: 1px solid var(--color-border);
