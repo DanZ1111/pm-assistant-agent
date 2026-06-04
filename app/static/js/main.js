@@ -688,3 +688,30 @@ import { createComposerController } from './composer_controller.js';
 
   refreshHistory();
 })();
+
+
+// v1.3 Build 05 — variant-N anchor bootstrap.
+// If the URL hash matches an existing #variant-N <details> card, force-open
+// that card (closing the default-open one) and scroll it into view. Without
+// this, native <details> doesn't honor URL hash + the page would open the
+// primary-or-first variant regardless of which one was deep-linked.
+(function () {
+  function applyVariantHash() {
+    var hash = window.location.hash;
+    if (!hash || !hash.startsWith('#variant-')) return;
+    var target = document.querySelector(hash);
+    if (!target || target.tagName !== 'DETAILS') return;
+    document.querySelectorAll('details.variant-command-card[open]').forEach(function (d) {
+      if (d !== target) d.open = false;
+    });
+    target.open = true;
+    // Scroll into view, accounting for sticky workspace tabs above the section.
+    target.scrollIntoView({ behavior: 'auto', block: 'start' });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applyVariantHash);
+  } else {
+    applyVariantHash();
+  }
+  window.addEventListener('hashchange', applyVariantHash);
+})();

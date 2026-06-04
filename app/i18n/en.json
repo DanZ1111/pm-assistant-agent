@@ -12,7 +12,6 @@
   "nav.lang_zh": "中文",
   "nav.lang_en_title": "English",
   "nav.lang_zh_title": "Chinese",
-
   "title.all_projects": "All Projects",
   "title.projects": "Projects",
   "title.my_projects": "My Projects",
@@ -25,7 +24,6 @@
   "title.register": "Register",
   "title.new_idea": "New Idea",
   "title.edit_idea": "Edit Idea",
-
   "section.thesis": "Product Thesis",
   "section.product_concept": "Product Concept",
   "section.timeline": "Timeline",
@@ -53,10 +51,8 @@
   "section.categorize": "Categorize",
   "section.attribution": "Attribution",
   "section.idea_basics": "What's the idea?",
-
   "workspace.project_workspaces": "Project workspaces",
   "workspace.overview": "Overview",
-
   "pulse.title": "Project Pulse",
   "pulse.rules_based_v1": "Rules-based v1",
   "pulse.current_status": "Current status",
@@ -86,12 +82,10 @@
   "pulse.field.planned_launch_date": "planned launch date",
   "pulse.field.project_thesis": "Product Concept",
   "pulse.field.timeline_phases": "timeline phases",
-
   "concept.thesis_label": "What is this product, and why?",
   "concept.references": "Concept references",
   "concept.no_references": "No concept references linked yet.",
   "concept.add_reference": "Add reference",
-
   "renderings.latest_visual": "Latest visual",
   "renderings.open_history": "Open rendering history",
   "renderings.open_prototype_photos": "Open prototype photos",
@@ -100,7 +94,6 @@
   "renderings.no_visual_copy": "Upload a rendering or prototype photo in Files to show the newest visual here automatically.",
   "renderings.designer_portal": "Designer Portal",
   "renderings.designer_portal_future": "Future workspace for design handoff. Not active yet.",
-
   "btn.save": "Save",
   "btn.save_changes": "Save Changes",
   "btn.cancel": "Cancel",
@@ -136,7 +129,6 @@
   "btn.reextract": "Re-extract",
   "btn.upload_extract": "Upload & Extract",
   "btn.unlink": "Unlink",
-
   "form.project_name": "Project Name",
   "form.brand": "Brand",
   "form.sku": "SKU",
@@ -187,7 +179,6 @@
   "form.thesis_min_hint": "Needs at least 80 characters",
   "form.thesis_min_parenthetical": "(≥ 80 characters)",
   "form.thesis_help": "This is the soul of the product. Answer: why does this product exist? Who is it for? What's the core problem? What makes it different? Why does it fit this brand? What's the target price logic? What are the main risks or unknowns?",
-
   "badge.required": "Required",
   "badge.critical": "Critical",
   "badge.recommended": "Recommended",
@@ -203,14 +194,12 @@
   "status.in_progress": "In progress",
   "status.done": "Done",
   "status.skipped": "Skipped",
-
   "filter.all": "All",
   "filter.delayed": "Delayed",
   "filter.needs_info": "Needs Info",
   "filter.completed": "Completed",
   "filter.archived": "Archived",
   "filter.active": "Active",
-
   "alert.needs_attention": "Needs Attention",
   "alert.days_late": "{days}d late",
   "alert.critical_missing": "{count} missing",
@@ -220,7 +209,6 @@
   "alert.no_file_selected": "No file selected.",
   "alert.days_late_long": "{days} days late",
   "alert.phase_due": "{phase} due {date}",
-
   "empty.no_journal": "No journal entries yet.",
   "empty.no_variants": "No variants yet.",
   "empty.no_quotation": "No quotation files yet.",
@@ -231,7 +219,6 @@
   "empty.no_prototype_photos": "No prototype photos yet.",
   "empty.no_projects": "No projects yet.",
   "empty.no_ideas": "No ideas yet.",
-
   "chat.mode.ask": "Ask",
   "chat.mode.intake": "Intake",
   "chat.mode.capture": "Capture",
@@ -258,10 +245,8 @@
   "chat.attachment_upload": "Attach PDF, DOCX, or image",
   "chat.attachment_remove": "Remove attachment",
   "chat.attachment_error": "Unable to attach file.",
-
   "tab.manual": "Manual",
   "tab.ai": "AI",
-
   "placeholder.username": "your username",
   "placeholder.min_8_chars": "Min 8 characters",
   "placeholder.name": "Name",
@@ -295,7 +280,6 @@
   "placeholder.reset_token": "Paste the EMERGENCY_RESET_TOKEN value",
   "placeholder.admin_username": "e.g. admin",
   "placeholder.component_name": "e.g. Hard plastic case, Pouch, Sharpening stone",
-
   "auth.sign_in_subtitle": "Sign in to your account",
   "auth.account_created": "Account created. Please sign in.",
   "auth.new_team_member": "New team member?",
@@ -315,7 +299,6 @@
   "auth.after_recovery": "once you have recovered access.",
   "auth.reset_token_help": "Must exactly match the env var set on the server.",
   "auth.new_username_help": "Lowercased. If an admin already exists, they'll be renamed and re-keyed.",
-
   "projects.subtitle_counts": "{total} total — {active} active",
   "projects.card_view": "Card view",
   "projects.table_view": "Table view",
@@ -324,7 +307,6 @@
   "my_projects.pm_subtitle": "Projects where you are the listed PM ({count} total).",
   "my_projects.empty_pm": "You're not listed as the PM on any projects yet. Ask an admin to assign you, or create one yourself.",
   "my_projects.empty_admin": "No projects in the system yet.",
-
   "calendar.subtitle": "Planned vs. actual project launches, by month",
   "calendar.prev_year": "Previous year",
   "calendar.next_year": "Next year",
@@ -352,7 +334,6 @@
   "month.10": "October",
   "month.11": "November",
   "month.12": "December",
-
   "ideas.subtitle": "Materials, structures, features & aesthetics from across the team — combine across columns to make new products.",
   "ideas.all_sources": "All sources",
   "ideas.used_in_projects": "Used in {count} projects",
@@ -377,7 +358,6 @@
   "idea_source.team": "Team",
   "idea_source.competitor": "Competitor",
   "idea_source.other": "Other",
-
   "intake.paste_help": "Paste any raw notes, emails, WhatsApp messages, or meeting notes about the product. AI will pull out what it can.",
   "intake.upload_help": "Upload a PDF (spec sheet, quotation, email export) or an image of the product. AI will extract fields and generate a summary.",
   "intake.pdf_or_image": "(PDF or image)",
@@ -402,7 +382,6 @@
   "intake.review_before_save": "Review what AI extracted. Edit any field before confirming. Nothing is saved until you click Confirm & Create.",
   "intake.confirm_or_update_hint": "Confirm & Create creates a new project. Update applies extracted fields to the existing match (only non-empty fields are changed).",
   "intake.new_project_hint": "Project will be created with a single-prototype phase template. You can adjust phases on the project detail page.",
-
   "project.archive_confirm": "Archive this project?",
   "project.delete_confirm": "Permanently delete this project? This cannot be undone.",
   "project.phase_overdue": "{phase} is overdue.",
@@ -428,7 +407,6 @@
   "project.capture_idea_hint": "Capture a new inspiration here or link one from the Good Ideas board.",
   "project.link_note": "How this inspires the project",
   "project.pick_an_idea": "Pick an idea",
-
   "timeline.plan_reality_hint": "Plan ↔ Reality. * marks a planned date that's been adjusted.",
   "timeline.reason_required": "Plan-date changes require a reason. Open the phase, enter a reason in the Reason for plan change field, and save again.",
   "timeline.action_error": "Something went wrong with that timeline action.",
@@ -455,7 +433,6 @@
   "phase_type.review": "Review",
   "phase_type.production": "Production",
   "phase_type.launch": "Launch",
-
   "files.count": "{count} files",
   "files.drop_file_here": "Drop file here or",
   "files.click_to_browse": "click to browse",
@@ -480,7 +457,6 @@
   "file_category.packaging": "Packaging",
   "file_category.business_plan": "Business plan",
   "file_category.other": "Other",
-
   "journal.show": "Show Project Journal",
   "journal.hide": "Hide Project Journal",
   "journal.entry_count": "{count} entries",
@@ -508,7 +484,6 @@
   "journal_type.packaging": "Packaging",
   "journal_type.variant": "Variant",
   "journal_type.other": "Other",
-
   "variant.add": "Add Variant",
   "variant.name": "Variant name",
   "variant.primary": "Primary",
@@ -530,7 +505,6 @@
   "variant_status.selected": "Selected",
   "variant_status.rejected": "Rejected",
   "variant_status.launched": "Launched",
-
   "component.add": "Add Component",
   "component.applies_to": "Applies to",
   "component.all_variants_project_wide": "All variants (project-wide)",
@@ -543,11 +517,9 @@
   "component.empty_hint": "Click Add Component to record packaging, accessories, or anything that ships with the product.",
   "component_type.packaging": "Packaging",
   "component_type.accessory": "Accessory",
-
   "quotation.pm_admin_only": "Quotations are PM/admin only",
   "quotation.delete_confirm": "Delete this quotation file?",
   "quotation.upload_hint": "Use the Files section below to upload a factory quotation — pick Quotation as the category.",
-
   "profit.placeholder_badge": "Placeholder · coming in v1.2",
   "profit.intended_formula": "Intended formula",
   "profit.total_profit": "Total profit",
@@ -559,7 +531,6 @@
   "profit.estimated_margin_preview": "Estimated per-unit margin (preview)",
   "profit.preview_ignores": "This preview ignores overhead and forecast volume. v1.2 will add both.",
   "profit.no_primary_hint": "Once a primary variant is set, this section will preview the per-unit margin. Set a variant as primary in the Variants section above.",
-
   "thesis_preview.title": "Review Thesis Extraction",
   "thesis_preview.source": "Source",
   "thesis_preview.extracted_in": "extracted in {seconds}s",
@@ -578,7 +549,6 @@
   "thesis_preview.create_new": "Create new",
   "thesis_preview.skip": "Skip",
   "thesis_preview.confirm_write": "Confirm — Write Thesis + Selected Ideas",
-
   "table.project": "Project",
   "table.brand": "Brand",
   "table.stage": "Stage",
@@ -593,9 +563,7 @@
   "table.phase": "Phase",
   "table.start": "Start",
   "table.end": "End",
-
   "filter.all_brands": "All brands",
-
   "common.yes": "Yes",
   "common.no": "No",
   "common.or": "OR",
@@ -615,5 +583,24 @@
   "common.delete_admin_only": "Delete (admin only)",
   "common.not_available": "Not available",
   "common.unknown": "Unknown",
-  "common.untitled": "(untitled)"
+  "common.untitled": "(untitled)",
+  "variant.command_cards": "Variant command cards",
+  "variant.thumbnail_placeholder": "Variant preview",
+  "variant.specs": "Specs",
+  "variant.pricing_cost": "Pricing & Cost",
+  "variant.profit": "Profit",
+  "variant.components_summary": "Packaging & Accessories",
+  "variant.project_wide_components": "Project-wide components",
+  "variant.variant_components": "Variant-specific components",
+  "variant.no_components": "No linked components yet.",
+  "variant.no_specs": "No specs summarized yet.",
+  "variant.open_details": "Open details",
+  "variant.manage_components": "Manage components",
+  "variant.naive_margin": "Naive margin",
+  "variant.margin_other_missing": "(other value not set)",
+  "variant.margin_no_data": "Not enough data for a margin preview yet.",
+  "variant.profit_future_note": "Full profit model coming in v1.4 — see Profit Model section below.",
+  "variant.not_tracked": "Not tracked",
+  "variant.count_summary_full": "{shared} shared + {variant} for this variant",
+  "variant.count_summary_shared_only": "{shared} shared"
 }

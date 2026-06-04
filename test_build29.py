@@ -302,16 +302,20 @@ def main():
         fail("Project text price columns", "missing target_factory_cost_text or target_msrp_text")
 
     print("\n── Post-release project detail layout ──")
+    # The full-width layout + header facts are still required.
+    # Note: Commercial Snapshot (commercial-snapshot / project-snapshot-grid /
+    # section.commercial_snapshot) was DEMOTED by v1.3 Build 01 per the
+    # locked v1.3 product decision ("Commercial Snapshot is removed as a
+    # promoted first section"). The price information now lives inside
+    # variant command cards (v1.3 Build 05). Those assertions are
+    # therefore not part of the v1.2.0 release proof anymore.
     detail_template = read("app/templates/project_detail.html")
     contains_all(
-        "project_detail.html uses full-width detail layout with header facts + commercial snapshot",
+        "project_detail.html uses full-width detail layout with header facts",
         detail_template,
         [
             "detail-layout detail-layout-full",
             "project-header-facts",
-            "commercial-snapshot",
-            "project-snapshot-grid",
-            "section.commercial_snapshot",
         ],
     )
     if "class=\"detail-sidebar\"" not in detail_template and "href=\"/projects/{{ project.id }}/edit\"" not in detail_template:

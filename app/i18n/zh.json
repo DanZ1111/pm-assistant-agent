@@ -12,7 +12,6 @@
   "nav.lang_zh": "中文",
   "nav.lang_en_title": "英文",
   "nav.lang_zh_title": "中文",
-
   "title.all_projects": "全部项目",
   "title.projects": "项目",
   "title.my_projects": "我的项目",
@@ -25,7 +24,6 @@
   "title.register": "注册",
   "title.new_idea": "新建灵感",
   "title.edit_idea": "编辑灵感",
-
   "section.thesis": "产品 Thesis",
   "section.product_concept": "产品理念",
   "section.timeline": "时间线",
@@ -53,10 +51,8 @@
   "section.categorize": "分类",
   "section.attribution": "归属信息",
   "section.idea_basics": "这个灵感是什么？",
-
   "workspace.project_workspaces": "项目工作区",
   "workspace.overview": "总览",
-
   "pulse.title": "项目脉搏",
   "pulse.rules_based_v1": "规则版 v1",
   "pulse.current_status": "当前状态",
@@ -86,12 +82,10 @@
   "pulse.field.planned_launch_date": "计划上市日期",
   "pulse.field.project_thesis": "产品理念",
   "pulse.field.timeline_phases": "时间线阶段",
-
   "concept.thesis_label": "这款产品是什么？为什么存在？",
   "concept.references": "灵感来源",
   "concept.no_references": "暂无关联的灵感记录。",
   "concept.add_reference": "添加灵感",
-
   "renderings.latest_visual": "最新视觉稿",
   "renderings.open_history": "查看渲染图历史",
   "renderings.open_prototype_photos": "查看样品照片",
@@ -100,7 +94,6 @@
   "renderings.no_visual_copy": "在文件区上传渲染图或样品照片后，这里会自动显示最新视觉资料。",
   "renderings.designer_portal": "设计师入口",
   "renderings.designer_portal_future": "未来用于设计交接的工作区，当前尚未启用。",
-
   "btn.save": "保存",
   "btn.save_changes": "保存修改",
   "btn.cancel": "取消",
@@ -136,7 +129,6 @@
   "btn.reextract": "重新提取",
   "btn.upload_extract": "上传并提取",
   "btn.unlink": "取消关联",
-
   "form.project_name": "项目名称",
   "form.brand": "品牌",
   "form.sku": "SKU",
@@ -187,7 +179,6 @@
   "form.thesis_min_hint": "至少 80 个字符",
   "form.thesis_min_parenthetical": "(至少 80 个字符)",
   "form.thesis_help": "这是产品的核心。请回答：这个产品为什么存在？给谁用？解决什么问题？差异点是什么？为什么适合这个品牌？目标价格逻辑是什么？主要风险或未知点是什么？",
-
   "badge.required": "必填",
   "badge.critical": "关键",
   "badge.recommended": "建议",
@@ -203,14 +194,12 @@
   "status.in_progress": "进行中",
   "status.done": "已完成",
   "status.skipped": "已跳过",
-
   "filter.all": "全部",
   "filter.delayed": "延期",
   "filter.needs_info": "缺信息",
   "filter.completed": "已完成",
   "filter.archived": "已归档",
   "filter.active": "进行中",
-
   "alert.needs_attention": "需要关注",
   "alert.days_late": "晚 {days} 天",
   "alert.critical_missing": "缺 {count} 项",
@@ -220,7 +209,6 @@
   "alert.no_file_selected": "未选择文件。",
   "alert.days_late_long": "延期 {days} 天",
   "alert.phase_due": "{phase} 截止 {date}",
-
   "empty.no_journal": "暂无项目日志。",
   "empty.no_variants": "暂无 SKU 变体。",
   "empty.no_quotation": "暂无报价文件。",
@@ -231,7 +219,6 @@
   "empty.no_prototype_photos": "暂无样品照片。",
   "empty.no_projects": "暂无项目。",
   "empty.no_ideas": "暂无灵感。",
-
   "chat.mode.ask": "问答",
   "chat.mode.intake": "录入",
   "chat.mode.capture": "录入",
@@ -258,10 +245,8 @@
   "chat.attachment_upload": "添加 PDF、DOCX 或图片",
   "chat.attachment_remove": "移除附件",
   "chat.attachment_error": "无法添加附件。",
-
   "tab.manual": "手动",
   "tab.ai": "AI",
-
   "placeholder.username": "你的用户名",
   "placeholder.min_8_chars": "至少 8 个字符",
   "placeholder.name": "姓名",
@@ -295,7 +280,6 @@
   "placeholder.reset_token": "粘贴 EMERGENCY_RESET_TOKEN 的值",
   "placeholder.admin_username": "例如：admin",
   "placeholder.component_name": "例如：硬塑料盒、布袋、磨刀石",
-
   "auth.sign_in_subtitle": "登录你的账号",
   "auth.account_created": "账号已创建，请登录。",
   "auth.new_team_member": "新团队成员？",
@@ -315,7 +299,6 @@
   "auth.after_recovery": "。",
   "auth.reset_token_help": "必须与服务器环境变量完全一致。",
   "auth.new_username_help": "会转为小写。如果管理员已存在，会被重命名并重新设密钥。",
-
   "projects.subtitle_counts": "共 {total} 个 — 进行中 {active} 个",
   "projects.card_view": "卡片视图",
   "projects.table_view": "表格视图",
@@ -324,7 +307,6 @@
   "my_projects.pm_subtitle": "你被列为 PM 的项目（共 {count} 个）。",
   "my_projects.empty_pm": "你暂时还没有被列为任何项目的 PM。请让管理员分配，或自己创建一个项目。",
   "my_projects.empty_admin": "系统内暂无项目。",
-
   "calendar.subtitle": "按月份查看计划与实际上市项目",
   "calendar.prev_year": "上一年",
   "calendar.next_year": "下一年",
@@ -352,7 +334,6 @@
   "month.10": "10 月",
   "month.11": "11 月",
   "month.12": "12 月",
-
   "ideas.subtitle": "收集团队发现的材料、结构、功能与外观灵感，可跨列组合成新产品。",
   "ideas.all_sources": "全部来源",
   "ideas.used_in_projects": "已用于 {count} 个项目",
@@ -377,7 +358,6 @@
   "idea_source.team": "团队",
   "idea_source.competitor": "竞品",
   "idea_source.other": "其他",
-
   "intake.paste_help": "粘贴任何原始笔记、邮件、WhatsApp 消息或会议记录。AI 会尽量提取可用字段。",
   "intake.upload_help": "上传 PDF（规格书、报价、邮件导出）或产品图片。AI 会提取字段并生成摘要。",
   "intake.pdf_or_image": "(PDF 或图片)",
@@ -402,7 +382,6 @@
   "intake.review_before_save": "检查 AI 提取的内容。确认前可修改任何字段。点击确认创建前不会保存。",
   "intake.confirm_or_update_hint": "确认并创建会创建新项目；更新会把非空提取字段应用到匹配的现有项目。",
   "intake.new_project_hint": "项目会使用单轮打样阶段模板创建。你可以在项目详情页调整阶段。",
-
   "project.archive_confirm": "归档这个项目？",
   "project.delete_confirm": "永久删除这个项目？此操作不可撤销。",
   "project.phase_overdue": "{phase} 已逾期。",
@@ -428,7 +407,6 @@
   "project.capture_idea_hint": "可在此录入新灵感，或从灵感库关联已有灵感。",
   "project.link_note": "这个灵感如何启发本项目",
   "project.pick_an_idea": "选择灵感",
-
   "timeline.plan_reality_hint": "计划 ↔ 实际。* 表示计划日期被调整过。",
   "timeline.reason_required": "修改计划日期必须填写原因。打开阶段，在计划变更原因字段填写原因后再保存。",
   "timeline.action_error": "时间线操作出现问题。",
@@ -455,7 +433,6 @@
   "phase_type.review": "评审",
   "phase_type.production": "生产",
   "phase_type.launch": "上市",
-
   "files.count": "{count} 个文件",
   "files.drop_file_here": "把文件拖到这里，或",
   "files.click_to_browse": "点击浏览",
@@ -480,7 +457,6 @@
   "file_category.packaging": "包装",
   "file_category.business_plan": "商业计划",
   "file_category.other": "其他",
-
   "journal.show": "显示项目日志",
   "journal.hide": "隐藏项目日志",
   "journal.entry_count": "{count} 条",
@@ -508,7 +484,6 @@
   "journal_type.packaging": "包装",
   "journal_type.variant": "变体",
   "journal_type.other": "其他",
-
   "variant.add": "添加变体",
   "variant.name": "变体名称",
   "variant.primary": "主变体",
@@ -530,7 +505,6 @@
   "variant_status.selected": "已选定",
   "variant_status.rejected": "已拒绝",
   "variant_status.launched": "已上市",
-
   "component.add": "添加组件",
   "component.applies_to": "适用于",
   "component.all_variants_project_wide": "全部变体（项目级）",
@@ -543,11 +517,9 @@
   "component.empty_hint": "点击添加组件来记录包装、配件或随产品出货的其他内容。",
   "component_type.packaging": "包装",
   "component_type.accessory": "配件",
-
   "quotation.pm_admin_only": "报价仅 PM / 管理员可见",
   "quotation.delete_confirm": "删除这个报价文件？",
   "quotation.upload_hint": "使用下方文件区上传工厂报价，并选择“报价”分类。",
-
   "profit.placeholder_badge": "占位 · v1.2 实现",
   "profit.intended_formula": "计划公式",
   "profit.total_profit": "总利润",
@@ -559,7 +531,6 @@
   "profit.estimated_margin_preview": "单件利润预览",
   "profit.preview_ignores": "此预览暂不包含 overhead 和预测销量，v1.2 会补充。",
   "profit.no_primary_hint": "设置主变体后，本区会预览单件利润。请先在上方变体区设定主变体。",
-
   "thesis_preview.title": "检查 Thesis 提取结果",
   "thesis_preview.source": "来源",
   "thesis_preview.extracted_in": "{seconds}s 内提取完成",
@@ -578,7 +549,6 @@
   "thesis_preview.create_new": "新建",
   "thesis_preview.skip": "跳过",
   "thesis_preview.confirm_write": "确认 — 写入 Thesis 和所选灵感",
-
   "table.project": "项目",
   "table.brand": "品牌",
   "table.stage": "阶段",
@@ -593,9 +563,7 @@
   "table.phase": "阶段",
   "table.start": "开始",
   "table.end": "结束",
-
   "filter.all_brands": "全部品牌",
-
   "common.yes": "是",
   "common.no": "否",
   "common.or": "或",
@@ -615,5 +583,24 @@
   "common.delete_admin_only": "删除（仅管理员）",
   "common.not_available": "不可用",
   "common.unknown": "未知",
-  "common.untitled": "(未命名)"
+  "common.untitled": "(未命名)",
+  "variant.command_cards": "变体指挥卡",
+  "variant.thumbnail_placeholder": "变体预览",
+  "variant.specs": "规格",
+  "variant.pricing_cost": "价格与成本",
+  "variant.profit": "利润",
+  "variant.components_summary": "包装与配件",
+  "variant.project_wide_components": "项目级组件",
+  "variant.variant_components": "变体专属组件",
+  "variant.no_components": "暂无关联组件。",
+  "variant.no_specs": "暂无规格摘要。",
+  "variant.open_details": "展开详情",
+  "variant.manage_components": "管理组件",
+  "variant.naive_margin": "估算毛利",
+  "variant.margin_other_missing": "（另一项未填）",
+  "variant.margin_no_data": "暂无足够数据估算毛利。",
+  "variant.profit_future_note": "完整的利润模型将在 v1.4 推出，详见下方利润模型区。",
+  "variant.not_tracked": "暂未记录",
+  "variant.count_summary_full": "共享 {shared} 个 + 本变体 {variant} 个",
+  "variant.count_summary_shared_only": "共享 {shared} 个"
 }

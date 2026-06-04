@@ -1,7 +1,7 @@
 # CURRENT_TASK.md
 
 ## Task
-v1.3 Build 05 — Variant Command Cards execution plan drafted for review. Build 03 and Build 04 remain implemented/tested but uncommitted.
+v1.3 Build 05 — Variant Command Cards. Implemented + tested. Awaiting push.
 
 ## Handoff rule
 Before editing, inspect:
@@ -11,112 +11,78 @@ Before editing, inspect:
 
 Git/code is the source of truth.
 
-## What just shipped (v1.2.1)
+## What just shipped in this session
 
-Release-hardening rollup of 7 patches that landed on the v1.2.0 line:
+- **Builds 03 + 04** committed as one atomic commit (`bc80506`) — Product Concept (renamed thesis section + chip-row Inspired By with `#thesis` compatibility anchor) + Renderings Overview (standalone section with 4-tier cascade, document fallback, disabled Designer Portal placeholder).
+- **V13_BUILD05_EXECUTION_PLAN.md** revised with 4 locks + Option A scope decision committed at `3a63a94`.
+- **Build 05** implemented + committed (see latest `git log`):
+  - `app/templates/components/variants_section.html` — rewritten with `<details class="variant-command-card">` cards + wireframe-derived 2×2 grid.
+  - `app/routes/projects.py` — `components_by_variant` derived grouping in `project_detail` (single O(C) pass, no new DB query).
+  - `app/static/css/styles.css` — `.variant-command-*` styles (native marker suppression + `bi-chevron-right` custom marker, 2×2 grid, single-column at ≤768px).
+  - `app/static/js/main.js` — `#variant-N` anchor bootstrap (force-opens targeted card, scrolls into view).
+  - `app/i18n/en.json` + `zh.json` — 19 new Build 05 keys; parity 604/604.
+  - `test_v13_build05.py` — **34/34 PASS** (i18n parity, 4-cell grid, naive margin computation, viewer permission, anchor markup, route grouping, custom chevron CSS, CRUD preservation, manage-components link).
+  - `test_build29.py` — removed stale `commercial-snapshot` assertion (section was demoted by v1.3 Build 01).
 
-| # | Patch | Commit |
-|---|---|---|
-| 1 | Chinese IME composer fix v2 | `7d56198` |
-| 2 | Railway nixpacks Python-only | `2bd82bf` |
-| 3 | PM-facing price strings | `1465265` |
-| 4 | Project detail layout refactor | `36a787e` |
-| 5 | Build 30A — project creation safety | `cab8884` |
-| 6 | Build 30B — Excel batch intake | `1d811b9` |
-| 7 | Build 30C — PM draft delete | `b0f6ad3` |
+## Build 05 — 4 Locked decisions
 
-Plus the v1.2.1 release-hardening commit itself (test_build_v121, docs rollup, version bump).
+1. **Route-side `components_by_variant` grouping** — O(C) once vs O(V × C) per render.
+2. **Component count format**: `"X shared + Y for this variant"` / `"X shared"` / omitted.
+3. **`#variant-N` JS bootstrap** — overrides default-open primary, force-opens target, scrolls into view.
+4. **Native `<details>` marker suppressed + custom `bi-chevron-right`** rotates 90° when open.
+
+Plus **Option A (layout-only)**: structured spec schema (`sales_format`, `blade_steel`, `handle_material`, `lock_type`, `dimensions`, separate `packaging_cost`) **deferred to Build 05B**. Build 05 ships the wireframe-matched LAYOUT using existing free-text summary fields.
+
+Plus **Profit Placeholder content**: naive margin for `can_view_costs` when both prices set; "(other value not set)" when one; "Not enough data..." when neither; v1.4 footnote always. Viewer never sees the Profit cell.
 
 ## Verification at ship time
-- `python3 test_build_v121.py` — 19/19 (release-proof regression covering version source, docs strings, USER_GUIDE coverage, regression-file inventory, i18n parity, and 7 behavior locks).
-- Regression: `test_build14`, `test_build16-30c` all green. `test_ai_e2e.py` 15P/2S/0F baseline preserved.
-- Browser: navbar Help button shows `v1.2.1`, footer shows `PM Product Tracker v1.2.1`, Help modal shows the new build name.
-- i18n parity: 538/538.
 
-## v1.2 patch series — empty queue
-`## Unreleased` in CHANGELOG is now empty. The next patch can either:
-- Land directly on `v1.2.1` and join a fresh Unreleased queue, OR
-- Trigger a v1.3.0 minor release if it's a real new feature (e.g., the deferred Native-speaker zh review, Profit Model implementation, etc.)
+- `python3 test_v13_build05.py` — **34/34 PASS**.
+- Regression: `test_v13_build01-04` all green; `test_build29` 26/26 (after stale-assertion fix); `test_build_v121` 19/19; `test_build30/30b/30c` all green; `test_ai_e2e.py` 15P/2S/0F.
+- Browser smoke: project 29 renders variant cards with all 4 grid cells, primary badge, custom chevron, component-count summary.
+- i18n parity: 604/604.
 
-## Known v1.2.1 outstanding items (admin-only, no code)
-- **One-time cleanup of the original 6 admin-linked duplicates** from the Build 30A backstory incident. Build 30A prevented new ones; this cleanup is for the existing rows. Either delete 5 (keep the last) via admin UI, or reassign their PM to the real PM and let her use the Build 30C delete capability.
+## Reference: uploaded v1.3 product spec docs
 
-## Deferred to future v1.3
-- Native-speaker Chinese review of strings added in Builds 26-30C.
-- AI prompt translation, Help modal body translation, `/admin/*` page translation.
-- Full Profit Model implementation (placeholder still ships).
-- Row-level multi-tenancy (`Organization` table + `org_id` everywhere). Deployment-level isolation (Build 25) remains the answer for ≤3 departments.
-- Bulk delete from the projects list / soft-delete with undo window.
-- Auto-provisioning script for Railway (the DEPLOYMENT.md runbook is still manual).
-- Pruning the now-historical "Claude Review Request" block at the end of `BUILD26_CODEX_PLAN.md`.
+User-provided canonical references for v1.3:
+- `project_overview_redesign_plan.md` (Overview tab; covers Builds 01-05)
+- `timeline_command_center_redesign_plan.md` (Timeline tab; covers Builds 06-09)
+
+These are the canonical product vision. Existing `V13_BUILD0N_EXECUTION_PLAN.md` files are implementation slices that match those docs.
+
+## v1.3 Build series status
+
+| Build | Status | Commit |
+|---|---|---|
+| 01 — Workspace Shell | shipped | `448364e` |
+| 02 — Project Pulse v1 | shipped | `ea0460c` |
+| 03 — Product Concept | shipped (with 04) | `bc80506` |
+| 04 — Renderings Overview | shipped (with 03) | `bc80506` |
+| **05 — Variant Command Cards** | **shipped this session** | latest |
+| 05B — Structured spec schema | deferred | — |
+| 06 — Timeline Command Center Shell | planned | — |
+| 07 — Timeline Command Actions Backend | planned | — |
+| 08 — Timeline History | planned | — |
+| 09 — Planning Sandbox (design-only) | planned | — |
 
 ## Next step
 
-Wait for user direction. Suggested directions:
-1. **Review/commit v1.3 Build 03 + Build 04** — current working tree contains both implemented builds.
-2. **Review v1.3 Build 05 execution plan** — `V13_BUILD05_EXECUTION_PLAN.md`.
-3. **Revise/commit the Build 05 plan** after Claude/ChatGPT review.
-4. **Implement v1.3 Build 05** only after the execution plan is approved.
+Wait for user direction. Suggested next moves:
+1. **Push** to origin (currently several commits ahead).
+2. **Build 05B** — structured spec schema (`sales_format`, blade/handle/mechanism fields, separate `packaging_cost`). Schema change + migration 005 + edit form expansion + AI tool registry updates. ~2-3 sessions.
+3. **Build 06** — Timeline Command Center Shell per `timeline_command_center_redesign_plan.md` Section 1. Per the user's "high-risk, move slowly" guidance: should have a Backend Honesty Mapping per visible field BEFORE coding starts.
+4. **Browser walkthrough** of the Build 05 result on a project with multiple variants + components before pushing, to catch any UX issues the test missed.
 
-## v1.3 process update
+## Deferred to future builds (carried forward from v1.2.1)
 
-Starting with v1.3 Build 03, every build gets a short build-specific execution plan before coding. The execution plan should be committed/reviewed first and include exact files/components, source-of-truth fields, permissions, i18n labels, tests, deferrals, and rollback/safety notes.
+- Native-speaker Chinese review of strings added in Builds 26-30C + 01-05.
+- AI prompt translation, Help modal body translation, `/admin/*` page translation.
+- Full Profit Model implementation (variant cell shows naive margin now; full model is v1.4).
+- Row-level multi-tenancy (`Organization` table + `org_id` everywhere). Deployment-level isolation (Build 25) remains the answer for ≤3 departments.
+- Bulk delete from the projects list / soft-delete with undo window.
+- Auto-provisioning script for Railway (the DEPLOYMENT.md runbook is still manual).
+- One-time admin cleanup of the original 6 admin-linked duplicates from the Build 30A incident.
 
-## v1.3 Build 01 verification
+## v1.3 process pattern (continues)
 
-- `env BASE_URL=http://localhost:8001 python3 test_v13_build01.py` — 16/16 passed.
-- `python3 test_build_v121.py` — 19/19 passed.
-- Screenshots generated during test under ignored `test_artifacts/`.
-
-## v1.3 Build 02 verification
-
-- `env BASE_URL=http://localhost:8001 python3 test_v13_build02.py` — 11/11 passed.
-- `env BASE_URL=http://localhost:8001 python3 test_v13_build01.py` — 16/16 passed.
-- `python3 test_build_v121.py` — 19/19 passed.
-
-## v1.3 Build 03 planning
-
-- Added `V13_BUILD03_EXECUTION_PLAN.md`.
-- Revised per Claude review: Inspired By is locked as an internal Product Concept chip-row, Product Concept gets primary `id="product-concept"` plus a hidden `#thesis` compatibility anchor, exact EN/ZH i18n strings are specified, and Build 02 Pulse wording must change from Product Thesis to Product Concept.
-
-## v1.3 Build 03 verification
-
-- `env BASE_URL=http://localhost:8001 python3 test_v13_build03.py` — 20/20 passed.
-- `env BASE_URL=http://localhost:8001 python3 test_v13_build01.py` — 16/16 passed.
-- `env BASE_URL=http://localhost:8001 python3 test_v13_build02.py` — 11/11 passed.
-- `python3 test_build_v121.py` — 19/19 passed.
-
-## v1.3 Build 04 planning
-
-- Added `V13_BUILD04_EXECUTION_PLAN.md`.
-- Plan locks Renderings as a standalone Overview section after Product Concept and before Variants.
-- Source of truth is existing `project_files` rows already loaded as `renderings` and `prototype_photos`.
-- Latest visual rule: newest image rendering first by `ProjectFile.uploaded_at`, newest image prototype photo second by `uploaded_at`, newest non-image rendering/prototype by `uploaded_at` as document fallback, otherwise empty state.
-- Revised per Claude review: preview image maxes out at section-safe dimensions, non-image fallback is a defined file card, mixed rendering/prototype test must prove the rendering wins while the prototype link still appears, mobile width gets a real no-overflow assertion, and lightbox integration is explicitly deferred.
-- No schema, service, new route, AI behavior, pinning workflow, or Designer Portal backend.
-
-## v1.3 Build 04 implementation
-
-- Added `latest_overview_visual` derived context on project detail; no new query/service/schema.
-- Added standalone `#renderings-overview` section after Product Concept, before Variants.
-- Section displays newest rendering image by `uploaded_at`, falls back to newest prototype image, then newest non-image rendering/prototype document card.
-- Added safe CSS sizing so large uploaded visuals cannot dominate the page.
-- Added EN/ZH i18n keys and `test_v13_build04.py`.
-- Designer Portal is a disabled placeholder only; no lightbox integration.
-
-## v1.3 Build 04 verification
-
-- `env BASE_URL=http://127.0.0.1:8001 python3 test_v13_build04.py` — 20/20 passed.
-- `env BASE_URL=http://127.0.0.1:8001 python3 test_v13_build03.py` — 20/20 passed.
-- `env BASE_URL=http://127.0.0.1:8001 python3 test_v13_build02.py` — 11/11 passed.
-- `env BASE_URL=http://127.0.0.1:8001 python3 test_v13_build01.py` — 16/16 passed.
-- `python3 test_build_v121.py` — 19/19 passed.
-- Screenshots generated under ignored `test_artifacts/`.
-
-## v1.3 Build 05 planning
-
-- Added `V13_BUILD05_EXECUTION_PLAN.md`.
-- Plan locks Build 05 as a Variants display refactor: expandable command cards using existing `project_variants` and `project_variant_components`.
-- Existing add/edit/set-primary/delete routes and CRUD services stay unchanged.
-- Packaging & Accessories remains the management section; variant cards summarize project-wide and variant-specific components.
-- No schema, migration, AI behavior, real profit model, variant thumbnail model, or drag/drop ordering.
+Every build gets a short build-specific execution plan before coding. Plan files are committed/reviewed first. Locks (route choices, anchor strategies, i18n keys with EN/zh translations) are resolved in-plan before implementation starts.

@@ -403,6 +403,16 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
     quotation_files = crud.get_quotation_files_for_project(db, project_id)
     can_costs = can_view_costs(current_user)
 
+    # v1.3 Build 05 — group components by variant_id for variant command
+    # cards. Project-wide components (variant_id IS NULL) live in [None];
+    # variant-specific components live in [v.id]. Single O(C) pass over
+    # the already-loaded components list — no new DB query.
+    components_by_variant = {None: []}
+    for v in variants:
+        components_by_variant[v.id] = []
+    for c in components:
+        components_by_variant.setdefault(c.variant_id, []).append(c)
+
     # Build 18 — Rendering History + Prototype Photos
     renderings = crud.get_files_by_category(db, project_id, "rendering")
     prototype_photos = crud.get_files_by_category(db, project_id, "prototype_photo")
@@ -443,6 +453,7 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
         "variants": variants,
         "primary_variant": primary_variant,
         "components": components,
+        "components_by_variant": components_by_variant,
         "quotation_files": quotation_files,
         "can_view_costs": can_costs,
         "plan_changes_by_phase": plan_changes_by_phase,
