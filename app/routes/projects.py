@@ -15,6 +15,7 @@ from app.dependencies import (
     get_current_user, require_auth, require_admin,
     can_edit_project, can_delete_project,
     can_view_sensitive_fields, can_view_journal, can_view_costs,
+    can_use_ai_intake,
     _RedirectException
 )
 from app.i18n import i18n_context
@@ -430,6 +431,65 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
             None,
         )
 
+    # v1.3 Build 06 — Timeline Command Center state.
+    # Per V13_BUILD06_EXECUTION_PLAN.md "Backend Honesty Mapping" — derive
+    # display-only state from existing phase data in one O(N) pass. No new
+    # DB query, no schema change. Blocker and AI Nudge stay placeholders
+    # until Build 07.
+    today_date = date.today()
+    sorted_phases = sorted(phases, key=lambda p: p.phase_order)
+    current_id = current_phase.id if current_phase else None
+    current_order = current_phase.phase_order if current_phase else None
+    phase_strip = []
+    for p in sorted_phases:
+        if p.status == "done":
+            state = "done"
+        elif p.status == "skipped":
+            state = "skipped"
+        elif current_id is not None and p.id == current_id:
+            state = "current"
+        elif current_order is not None and p.phase_order == current_order + 1:
+            state = "next"
+        else:
+            state = "later"
+        phase_strip.append({"phase": p, "state": state})
+
+    # days_left + pressure derivation (Locks 4 & 5 in the plan)
+    days_left = None
+    days_overdue = None
+    pressure_dots = 0
+    if current_phase and current_phase.planned_end_date:
+        delta = (current_phase.planned_end_date - today_date).days
+        if delta < 0:
+            days_overdue = -delta
+            pressure_dots = 3
+        else:
+            days_left = delta
+            if delta <= 3:
+                pressure_dots = 2
+            elif delta <= 7:
+                pressure_dots = 1
+
+    # health_band (Lock 3): derived from delay + current_phase scheduling
+    if delay is None:
+        if current_phase and not current_phase.planned_end_date and current_phase.status == "not_started":
+            health_band = "not_scheduled"
+        else:
+            health_band = "on_track"
+    elif delay.get("days_late", 0) <= 3:
+        health_band = "at_risk"
+    else:
+        health_band = "delayed"
+
+    command_center_state = {
+        "phase_strip": phase_strip,
+        "days_left": days_left,
+        "days_overdue": days_overdue,
+        "pressure_dots": pressure_dots,
+        "health_band": health_band,
+        "today": today_date,
+    }
+
     return templates.TemplateResponse(request, "project_detail.html", {
         "project": project,
         "phases": phases,
@@ -459,6 +519,8 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
         "plan_changes_by_phase": plan_changes_by_phase,
         "timeline_error": timeline_error,
         "current_phase": current_phase,
+        "command_center_state": command_center_state,
+        "can_use_ai_intake_user": can_use_ai_intake(current_user),
         "renderings": renderings,
         "prototype_photos": prototype_photos,
         "latest_overview_visual": latest_overview_visual,

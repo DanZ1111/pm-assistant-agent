@@ -227,6 +227,11 @@ def main():
         else:
             fail("overview hidden on timeline", "Product Concept stayed visible")
 
+        # v1.3 Build 06 — Detailed Table is now wrapped in a <details>
+        # collapsed by default. Expand it before clicking edit buttons.
+        details = page.locator("#timelineDetailedTable")
+        if details.count() == 1:
+            page.evaluate("document.getElementById('timelineDetailedTable').open = true")
         edit_buttons = page.locator(".btn-phase-edit")
         if edit_buttons.count() >= 1:
             edit_buttons.first.click()

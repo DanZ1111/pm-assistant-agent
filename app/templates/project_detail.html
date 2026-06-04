@@ -543,7 +543,183 @@
 
     <div class="workspace-panel workspace-panel-timeline" id="workspacePanelTimeline"
          data-workspace-panel="timeline" role="tabpanel" aria-labelledby="workspaceTabTimeline">
-    <!-- 2. Timeline (Build 17 — Plan / Reality split) -->
+
+    {# v1.3 Build 06 — Timeline Command Center (display-only shell).
+       Per V13_BUILD06_EXECUTION_PLAN.md: phase strip + 3-tile row + placeholders.
+       Action buttons link to existing controls in the Detailed Table below;
+       dedicated wiring is Build 07. Blocker + AI Nudge are EXPLICIT placeholders
+       per the doc §1.5 "no fake intelligence" discipline. #}
+    {% if phases %}
+    <section class="detail-section timeline-command-center" id="timeline-command-center">
+      <div class="section-header">
+        <h2 class="section-title">
+          <i class="bi bi-speedometer2 me-2"></i>{{ t('timeline.command_center') }}
+        </h2>
+      </div>
+
+      {# Phase strip — horizontal-scroll on narrow widths per Lock 1 #}
+      <div class="timeline-phase-strip" aria-label="{{ t('timeline.phase_strip') }}">
+        {% for entry in command_center_state.phase_strip %}
+        {% set p = entry.phase %}
+        {% set state = entry.state %}
+        <div class="timeline-phase-block" data-status="{{ state }}" title="{{ p.phase_name }}">
+          {% if state == 'done' %}
+            <i class="bi bi-check-circle-fill"></i>
+          {% elif state == 'current' %}
+            <i class="bi bi-play-circle-fill"></i>
+          {% elif state == 'next' %}
+            <i class="bi bi-arrow-right-circle"></i>
+          {% elif state == 'skipped' %}
+            <i class="bi bi-x-circle"></i>
+          {% else %}
+            <i class="bi bi-circle"></i>
+          {% endif %}
+          <span class="timeline-phase-name">{{ p.phase_name }}</span>
+        </div>
+        {% if not loop.last %}<i class="bi bi-chevron-right timeline-phase-arrow" aria-hidden="true"></i>{% endif %}
+        {% endfor %}
+      </div>
+
+      {# 3-tile row — single column on mobile #}
+      <div class="timeline-tiles-grid">
+        <div class="timeline-tile timeline-tile-current">
+          <div class="timeline-tile-label">{{ t('timeline.current_phase') }}</div>
+          {% if current_phase %}
+          <div class="timeline-tile-primary">{{ current_phase.phase_name }}</div>
+          <div class="timeline-tile-meta">
+            <span class="timeline-health-badge timeline-health-{{ command_center_state.health_band }}">
+              {% if command_center_state.health_band == 'on_track' %}{{ t('timeline.health_on_track') }}
+              {% elif command_center_state.health_band == 'at_risk' %}{{ t('timeline.health_at_risk') }}
+              {% elif command_center_state.health_band == 'delayed' %}{{ t('timeline.health_delayed') }}
+              {% else %}{{ t('timeline.health_not_scheduled') }}{% endif %}
+            </span>
+            {% if current_phase.actual_start_date %}
+            <span class="timeline-tile-sub">
+              {{ t('timeline.started') }} {{ current_phase.actual_start_date.strftime('%b %d, %Y') }}
+            </span>
+            {% else %}
+            <span class="timeline-tile-sub timeline-muted">{{ t('timeline.not_started_yet') }}</span>
+            {% endif %}
+          </div>
+          {% else %}
+          <div class="timeline-tile-primary timeline-muted">—</div>
+          {% endif %}
+        </div>
+
+        <div class="timeline-tile timeline-tile-next-action">
+          <div class="timeline-tile-label">{{ t('timeline.next_action') }}</div>
+          {% if current_phase %}
+          <div class="timeline-tile-primary">{{ t('timeline.move_phase_forward', phase=current_phase.phase_name) }}</div>
+          <div class="timeline-tile-meta">
+            <span class="timeline-tile-sub">
+              <i class="bi bi-person me-1"></i>
+              {% if current_phase.owner %}{{ current_phase.owner }}{% else %}<span class="timeline-muted">{{ t('timeline.owner_not_assigned') }}</span>{% endif %}
+            </span>
+          </div>
+          {% else %}
+          <div class="timeline-tile-primary timeline-muted">—</div>
+          {% endif %}
+        </div>
+
+        <div class="timeline-tile timeline-tile-deadline">
+          <div class="timeline-tile-label">{{ t('timeline.deadline') }}</div>
+          {% if current_phase and current_phase.planned_end_date %}
+          <div class="timeline-tile-primary">
+            {{ t('timeline.due') }} {{ current_phase.planned_end_date.strftime('%b %d, %Y') }}
+          </div>
+          <div class="timeline-tile-meta">
+            {% if command_center_state.days_overdue %}
+            <span class="timeline-days-badge timeline-days-overdue">
+              {{ t('timeline.days_overdue', n=command_center_state.days_overdue) }}
+            </span>
+            {% elif command_center_state.days_left is not none %}
+            <span class="timeline-days-badge {% if command_center_state.days_left <= 7 %}timeline-days-amber{% else %}timeline-days-neutral{% endif %}">
+              {{ t('timeline.days_left', n=command_center_state.days_left) }}
+            </span>
+            {% endif %}
+            {% if command_center_state.pressure_dots %}
+            <span class="timeline-pressure-dots" aria-label="pressure: {{ command_center_state.pressure_dots }}">
+              {% for _ in range(command_center_state.pressure_dots) %}<span class="timeline-pressure-dot"></span>{% endfor %}
+            </span>
+            {% endif %}
+          </div>
+          {% else %}
+          <div class="timeline-tile-primary timeline-muted">{{ t('timeline.no_due_date') }}</div>
+          {% endif %}
+        </div>
+      </div>
+
+      {# Main blocker — EXPLICIT placeholder per doc §1.5 #}
+      <div class="timeline-placeholder timeline-placeholder-blocker" data-placeholder="blocker">
+        <div class="timeline-placeholder-head">
+          <i class="bi bi-shield-exclamation me-2"></i>
+          <strong>{{ t('timeline.blocker_placeholder_title') }}</strong>
+          <span class="timeline-placeholder-badge">{{ t('timeline.placeholder_label') }}</span>
+        </div>
+        <p class="timeline-placeholder-body">{{ t('timeline.blocker_placeholder_body') }}</p>
+        {% if can_view_journal %}
+        <a class="timeline-placeholder-link" href="#journal">
+          <i class="bi bi-arrow-right me-1"></i>{{ t('timeline.blocker_open_journal') }}
+        </a>
+        {% endif %}
+      </div>
+
+      {# AI Nudge — EXPLICIT placeholder per doc §1.5 #}
+      <div class="timeline-placeholder timeline-placeholder-nudge" data-placeholder="ai-nudge">
+        <div class="timeline-placeholder-head">
+          <i class="bi bi-stars me-2"></i>
+          <strong>{{ t('timeline.ai_nudge_title') }}</strong>
+          <span class="timeline-placeholder-badge">{{ t('timeline.placeholder_label') }}</span>
+        </div>
+        <p class="timeline-placeholder-body">{{ t('timeline.ai_nudge_body') }}</p>
+        {% if current_user and current_user.role in ('admin', 'pm', 'viewer') %}
+        <a class="timeline-placeholder-link" href="#" onclick="document.body.classList.add('side-panel-open'); var p=document.getElementById('aiSidePanel'); if(p)p.classList.add('open'); return false;">
+          <i class="bi bi-chat-dots me-1"></i>{{ t('timeline.ai_nudge_open_panel') }}
+        </a>
+        {% endif %}
+      </div>
+
+      {# Action buttons — link to existing controls in the Detailed Table.
+         Dedicated Command Center wiring is Build 07. #}
+      <div class="timeline-action-row">
+        {% if can_edit and current_phase and current_phase.status != 'done' %}
+        <a class="btn btn-sm btn-success" href="#phase-row-{{ current_phase.id }}"
+           onclick="var d=document.getElementById('timelineDetailedTable'); if(d){d.open=true;}"
+           data-action="finish">
+          <i class="bi bi-check2-circle me-1"></i>{{ t('timeline.btn_finish_phase') }}
+        </a>
+        {% endif %}
+        {% if can_edit and current_phase %}
+        <a class="btn btn-sm btn-outline-secondary" href="#phase-row-{{ current_phase.id }}"
+           onclick="var d=document.getElementById('timelineDetailedTable'); if(d){d.open=true;}"
+           data-action="adjust-due-date">
+          <i class="bi bi-calendar-event me-1"></i>{{ t('timeline.btn_adjust_due_date') }}
+        </a>
+        {% endif %}
+        {% if can_edit and can_view_journal %}
+        <a class="btn btn-sm btn-outline-secondary" href="#journal" data-action="add-update">
+          <i class="bi bi-pencil me-1"></i>{{ t('timeline.btn_add_update') }}
+        </a>
+        {% endif %}
+        {% if can_edit %}
+        <button type="button" class="btn btn-sm btn-outline-secondary" disabled
+                title="{{ t('timeline.btn_add_blocker_tooltip') }}"
+                data-action="add-blocker-disabled">
+          <i class="bi bi-shield-x me-1"></i>{{ t('timeline.btn_add_blocker_disabled') }}
+        </button>
+        {% endif %}
+        {% if can_use_ai_intake_user %}
+        <button type="button" class="btn btn-sm btn-outline-primary"
+                onclick="document.body.classList.add('side-panel-open'); var p=document.getElementById('aiSidePanel'); if(p)p.classList.add('open');"
+                data-action="open-ai-intake">
+          <i class="bi bi-robot me-1"></i>{{ t('timeline.btn_open_ai_intake') }}
+        </button>
+        {% endif %}
+      </div>
+    </section>
+    {% endif %}
+
+    <!-- 2. Timeline (Build 17 — Plan / Reality split) — now collapsible via Build 06 -->
     <section class="detail-section" id="timeline">
       <div class="section-header">
         <h2 class="section-title"><i class="bi bi-calendar-range me-2"></i>{{ t('section.timeline') }}</h2>
@@ -571,6 +747,13 @@
       {% endif %}
 
       {% if phases %}
+      {# v1.3 Build 06 — Detailed Table is collapsed by default behind a summary.
+         Build 07 will move common actions out of the table and into the Command Center. #}
+      <details class="timeline-detailed-table-details" id="timelineDetailedTable">
+        <summary class="timeline-detailed-table-summary">
+          <i class="bi bi-table me-2"></i>{{ t('timeline.detailed_table') }}
+          <span class="text-muted small ms-2">({{ t('timeline.plan_reality_hint') }})</span>
+        </summary>
       <div class="timeline-table-wrap">
         <table class="timeline-table timeline-table-v2" id="phaseTable">
           <thead>
@@ -594,7 +777,7 @@
             {% set hist = plan_changes_by_phase.get(phase.id, []) %}
             {% set start_changed = hist | selectattr('field_changed', 'equalto', 'planned_start_date') | list | length %}
             {% set end_changed = hist | selectattr('field_changed', 'equalto', 'planned_end_date') | list | length %}
-            <tr class="phase-row phase-{{ phase.status }}{% if current_phase and current_phase.id == phase.id %} phase-row-current{% endif %}">
+            <tr id="phase-row-{{ phase.id }}" class="phase-row phase-{{ phase.status }}{% if current_phase and current_phase.id == phase.id %} phase-row-current{% endif %}">
               <td class="phase-order">{{ phase.phase_order }}</td>
               <td>
                 <span class="phase-name">{{ phase.phase_name }}</span>
@@ -682,6 +865,7 @@
           </tbody>
         </table>
       </div>
+      </details>
       {% else %}
       <div class="placeholder-section">
         <i class="bi bi-calendar3 me-2"></i>{{ t('empty.no_phases') }}
