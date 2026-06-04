@@ -1,7 +1,7 @@
 # CURRENT_TASK.md
 
 ## Task
-Idle — v1.2.1 just shipped. Awaiting next direction.
+v1.3 Build 01 — Workspace Shell implemented and tested. Awaiting review/commit direction.
 
 ## Handoff rule
 Before editing, inspect:
@@ -53,6 +53,12 @@ Plus the v1.2.1 release-hardening commit itself (test_build_v121, docs rollup, v
 ## Next step
 
 Wait for user direction. Suggested directions:
-1. **Admin one-time duplicate cleanup** — 5 minutes of SQL or admin-UI work; closes the loop on the original Build 30A incident.
-2. **v1.3 planning** — start with what's painful in the live app and prioritize from there.
-3. **Push** — confirm v1.2.1 ships to Railway and verify the navbar shows v1.2.1 in prod.
+1. **Review v1.3 Build 01** — Project Detail now has Overview / Timeline tabs; Overview is default and `#timeline` opens Timeline.
+2. **Commit v1.3 Build 01** — changes are docs/templates/CSS/i18n/test only; no schema or route changes.
+3. **Start v1.3 Build 02** — Overview Project Pulse v1 (rules-based), after Build 01 is accepted.
+
+## v1.3 Build 01 verification
+
+- `env BASE_URL=http://localhost:8001 python3 test_v13_build01.py` — 16/16 passed.
+- `python3 test_build_v121.py` — 19/19 passed.
+- Screenshots generated during test under ignored `test_artifacts/`.

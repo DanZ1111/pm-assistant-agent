@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-_(no unreleased patches — v1.2.1 just shipped)_
+- **v1.3 Build 01 — Workspace Shell.** Project Detail now has explicit Overview / Timeline workspaces under the project header. Overview is the default; `#timeline` opens Timeline directly. The old promoted Commercial Snapshot section is removed; created/updated dates plus project-level price estimates now live in a quiet Project Metadata section near Change Log. Existing Timeline table and phase edit modal are preserved without behavior/schema changes.
 
 ## v1.2.1 — Workflow polish + Excel batch intake + draft delete
 _2026-06-03_

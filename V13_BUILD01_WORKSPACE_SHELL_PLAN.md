@@ -46,3 +46,19 @@ This build is information architecture only. No Timeline behavior redesign yet.
 - PM can clearly see Project Detail as two workspaces.
 - No existing timeline route/action is broken.
 - The first content section is no longer Commercial Snapshot.
+
+## Implementation Notes
+
+- Implemented as two `project_detail.html` workspace panels controlled by Overview / Timeline tabs.
+- Overview remains the default; `#timeline` activates Timeline on page load and after phase-route redirects.
+- Removed the rendered `#commercial-snapshot` section.
+- Added low-priority `#project-metadata` near Change Log for created/updated dates and existing project-level price estimates.
+- Kept all routes, services, schemas, timeline forms, and phase behavior unchanged.
+- Added i18n keys for `workspace.project_workspaces`, `workspace.overview`, and `section.project_metadata`.
+
+## Verification
+
+- `env BASE_URL=http://localhost:8001 python3 test_v13_build01.py` — 16/16 passed.
+- `python3 test_build_v121.py` — 19/19 passed.
+- Desktop screenshot generated during test: `test_artifacts/v13_build01_desktop_overview.png`.
+- Mobile screenshot generated during test: `test_artifacts/v13_build01_mobile_overview.png`.

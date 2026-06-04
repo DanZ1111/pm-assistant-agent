@@ -32,6 +32,7 @@
   "section.change_log": "Change Log",
   "section.inspired_by": "Inspired By",
   "section.commercial_snapshot": "Commercial Snapshot",
+  "section.project_metadata": "Project Metadata",
   "section.rendering_history": "Rendering History",
   "section.prototype_photos": "Prototype Photos",
   "section.variants": "Variants",
@@ -50,6 +51,9 @@
   "section.categorize": "Categorize",
   "section.attribution": "Attribution",
   "section.idea_basics": "What's the idea?",
+
+  "workspace.project_workspaces": "Project workspaces",
+  "workspace.overview": "Overview",
 
   "btn.save": "Save",
   "btn.save_changes": "Save Changes",

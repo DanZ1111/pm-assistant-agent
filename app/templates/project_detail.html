@@ -93,40 +93,26 @@
   </div>
 </div>
 
+<div class="project-workspace" id="projectWorkspace">
+  <div class="project-workspace-tabs" role="tablist" aria-label="{{ t('workspace.project_workspaces') }}">
+    <button type="button" class="project-workspace-tab active"
+            id="workspaceTabOverview" data-workspace-tab="overview"
+            role="tab" aria-selected="true" aria-controls="workspacePanelOverview">
+      <i class="bi bi-layout-text-sidebar-reverse me-1"></i>{{ t('workspace.overview') }}
+    </button>
+    <button type="button" class="project-workspace-tab"
+            id="workspaceTabTimeline" data-workspace-tab="timeline"
+            role="tab" aria-selected="false" aria-controls="workspacePanelTimeline">
+      <i class="bi bi-calendar-range me-1"></i>{{ t('section.timeline') }}
+    </button>
+  </div>
+</div>
+
 <div class="detail-layout detail-layout-full">
   <!-- Main Content -->
   <div class="detail-main">
-    <section class="detail-section detail-section-compact" id="commercial-snapshot">
-      <div class="section-header">
-        <h2 class="section-title"><i class="bi bi-cash-coin me-2"></i>{{ t('section.commercial_snapshot') }}</h2>
-      </div>
-      <div class="project-snapshot-grid">
-        {% if can_sensitive %}
-        <div class="project-snapshot-item">
-          <span>{{ t('form.target_factory_cost') }}</span>
-          <strong>{% if project.target_factory_cost_display %}{{ project.target_factory_cost_display }}{% else %}—{% endif %}</strong>
-        </div>
-        {% endif %}
-        <div class="project-snapshot-item">
-          <span>{{ t('form.target_msrp') }}</span>
-          <strong>{% if project.target_msrp_display %}{{ project.target_msrp_display }}{% else %}—{% endif %}</strong>
-        </div>
-        <div class="project-snapshot-item">
-          <span>{{ t('table.created') }}</span>
-          <strong>{{ project.created_at.strftime('%b %d, %Y') }}</strong>
-        </div>
-        <div class="project-snapshot-item">
-          <span>{{ t('table.updated') }}</span>
-          <strong>{{ project.updated_at.strftime('%b %d, %Y') }}</strong>
-        </div>
-      </div>
-      {% if health.recommended_missing %}
-      <div class="snapshot-note">
-        <strong>{{ t('project.recommended_to_add') }}:</strong>
-        {{ health.recommended_missing | join(', ') | replace('_', ' ') }}
-      </div>
-      {% endif %}
-    </section>
+    <div class="workspace-panel workspace-panel-overview" id="workspacePanelOverview"
+         data-workspace-panel="overview" role="tabpanel" aria-labelledby="workspaceTabOverview">
 
     <!-- 1. Product Thesis -->
     <section class="detail-section" id="thesis">
@@ -385,7 +371,10 @@
     {% include "components/packaging_section.html" %}
     {% include "components/quotation_section.html" %}
     {% include "components/profit_model_section.html" %}
+    </div>
 
+    <div class="workspace-panel workspace-panel-timeline" id="workspacePanelTimeline"
+         data-workspace-panel="timeline" role="tabpanel" aria-labelledby="workspaceTabTimeline">
     <!-- 2. Timeline (Build 17 — Plan / Reality split) -->
     <section class="detail-section" id="timeline">
       <div class="section-header">
@@ -642,7 +631,10 @@
         </div>
       </div>
     </div>
+    </div>
 
+    <div class="workspace-panel workspace-panel-overview" data-workspace-panel="overview"
+         role="tabpanel" aria-labelledby="workspaceTabOverview">
     <!-- 3. Files & Renderings -->
     <section class="detail-section" id="files">
       <div class="section-header">
@@ -783,9 +775,41 @@
     {% set media_kind = "prototype_photo" %}
     {% set media_title = t('section.prototype_photos') %}
     {% set media_icon = "bi-camera" %}
-    {% set media_files = prototype_photos %}
-    {% set media_anchor = "prototype-photos" %}
-    {% include "components/media_history_section.html" %}
+	    {% set media_files = prototype_photos %}
+	    {% set media_anchor = "prototype-photos" %}
+	    {% include "components/media_history_section.html" %}
+
+    <section id="project-metadata" class="detail-section detail-section-compact">
+      <div class="section-header">
+        <h2 class="section-title"><i class="bi bi-info-circle me-2"></i>{{ t('section.project_metadata') }}</h2>
+      </div>
+      <div class="project-metadata-grid">
+        {% if can_sensitive %}
+        <div class="project-metadata-item">
+          <span>{{ t('form.target_factory_cost') }}</span>
+          <strong>{% if project.target_factory_cost_display %}{{ project.target_factory_cost_display }}{% else %}—{% endif %}</strong>
+        </div>
+        {% endif %}
+        <div class="project-metadata-item">
+          <span>{{ t('form.target_msrp') }}</span>
+          <strong>{% if project.target_msrp_display %}{{ project.target_msrp_display }}{% else %}—{% endif %}</strong>
+        </div>
+        <div class="project-metadata-item">
+          <span>{{ t('table.created') }}</span>
+          <strong>{{ project.created_at.strftime('%b %d, %Y') }}</strong>
+        </div>
+        <div class="project-metadata-item">
+          <span>{{ t('table.updated') }}</span>
+          <strong>{{ project.updated_at.strftime('%b %d, %Y') }}</strong>
+        </div>
+      </div>
+      {% if health.recommended_missing %}
+      <div class="metadata-note">
+        <strong>{{ t('project.recommended_to_add') }}:</strong>
+        {{ health.recommended_missing | join(', ') | replace('_', ' ') }}
+      </div>
+      {% endif %}
+    </section>
 
     <!-- 4. Change Log -->
     <section id="changes" class="detail-section">
@@ -822,6 +846,7 @@
       <div class="placeholder-section text-muted">{{ t('empty.no_changes') }}</div>
       {% endif %}
     </section>
+    </div>
 
   </div>
 </div>
@@ -839,6 +864,43 @@
 {% block extra_js %}
 <script>
 var projectId = {{ project.id }};
+
+function setProjectWorkspace(workspace, updateHash) {
+  var target = workspace === 'timeline' ? 'timeline' : 'overview';
+  var root = document.getElementById('projectWorkspace');
+  if (root) {
+    root.classList.toggle('timeline-active', target === 'timeline');
+  }
+
+  document.querySelectorAll('[data-workspace-tab]').forEach(function (tab) {
+    var active = tab.getAttribute('data-workspace-tab') === target;
+    tab.classList.toggle('active', active);
+    tab.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+
+  document.querySelectorAll('[data-workspace-panel]').forEach(function (panel) {
+    var active = panel.getAttribute('data-workspace-panel') === target;
+    panel.hidden = !active;
+  });
+
+  if (updateHash) {
+    var nextHash = target === 'timeline' ? '#timeline' : '#overview';
+    history.replaceState(null, '', window.location.pathname + window.location.search + nextHash);
+  }
+}
+
+function syncProjectWorkspaceFromHash() {
+  setProjectWorkspace(window.location.hash === '#timeline' ? 'timeline' : 'overview', false);
+}
+
+document.querySelectorAll('[data-workspace-tab]').forEach(function (tab) {
+  tab.addEventListener('click', function () {
+    setProjectWorkspace(tab.getAttribute('data-workspace-tab'), true);
+  });
+});
+
+window.addEventListener('hashchange', syncProjectWorkspaceFromHash);
+syncProjectWorkspaceFromHash();
 
 // Populate phase edit modal from data-* attributes
 document.getElementById('phaseModal').addEventListener('show.bs.modal', function (event) {

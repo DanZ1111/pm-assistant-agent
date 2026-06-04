@@ -32,6 +32,7 @@
   "section.change_log": "变更记录",
   "section.inspired_by": "灵感来源",
   "section.commercial_snapshot": "商业快照",
+  "section.project_metadata": "项目元信息",
   "section.rendering_history": "渲染图历史",
   "section.prototype_photos": "样品照片",
   "section.variants": "SKU 变体",
@@ -50,6 +51,9 @@
   "section.categorize": "分类",
   "section.attribution": "归属信息",
   "section.idea_basics": "这个灵感是什么？",
+
+  "workspace.project_workspaces": "项目工作区",
+  "workspace.overview": "总览",
 
   "btn.save": "保存",
   "btn.save_changes": "保存修改",
