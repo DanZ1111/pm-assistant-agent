@@ -1752,6 +1752,13 @@ def create_variant(
         size_color_summary=(data.get("size_color_summary") or "").strip() or None,
         packaging_summary=(data.get("packaging_summary") or "").strip() or None,
         notes=(data.get("notes") or "").strip() or None,
+        # v1.3 Build 05B — structured spec fields (all nullable)
+        sales_format=(data.get("sales_format") or "").strip() or None,
+        packaging_cost=_parse_float_safe(data.get("packaging_cost")),
+        blade_summary=(data.get("blade_summary") or "").strip() or None,
+        handle_summary=(data.get("handle_summary") or "").strip() or None,
+        mechanism_summary=(data.get("mechanism_summary") or "").strip() or None,
+        dimensions_summary=(data.get("dimensions_summary") or "").strip() or None,
     )
     db.add(v)
     db.flush()
@@ -1778,14 +1785,19 @@ def update_variant(
     elif "is_primary" in data and not bool(data["is_primary"]):
         v.is_primary = False
     for field in ("variant_name", "sku", "material_summary", "size_color_summary",
-                  "packaging_summary", "notes"):
+                  "packaging_summary", "notes",
+                  # v1.3 Build 05B
+                  "sales_format", "blade_summary", "handle_summary",
+                  "mechanism_summary", "dimensions_summary"):
         if field in data:
             val = (data.get(field) or "").strip()
             setattr(v, field, val or None)
     if "status" in data:
         s = data["status"]
         v.status = s if s in VARIANT_STATUSES else v.status
-    for field in ("target_factory_cost", "actual_factory_cost", "target_msrp"):
+    for field in ("target_factory_cost", "actual_factory_cost", "target_msrp",
+                  # v1.3 Build 05B
+                  "packaging_cost"):
         if field in data:
             setattr(v, field, _parse_float_safe(data.get(field)))
     v.updated_at = datetime.utcnow()

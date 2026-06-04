@@ -602,5 +602,21 @@
   "variant.profit_future_note": "完整的利润模型将在 v1.4 推出，详见下方利润模型区。",
   "variant.not_tracked": "暂未记录",
   "variant.count_summary_full": "共享 {shared} 个 + 本变体 {variant} 个",
-  "variant.count_summary_shared_only": "共享 {shared} 个"
+  "variant.count_summary_shared_only": "共享 {shared} 个",
+  "spec.blade": "刀身",
+  "spec.handle": "手柄",
+  "spec.mechanism": "机构",
+  "spec.dimensions": "尺寸",
+  "variant.sales_format": "销售形态",
+  "variant.sales_format_unset": "— 未设置 —",
+  "variant.packaging_cost": "包装成本",
+  "variant.no_section_specs": "暂未填写",
+  "variant.legacy_notes": "旧版备注（早期版本）",
+  "sales_format.single": "单件",
+  "sales_format.combo": "套装",
+  "sales_format.colorway": "配色款",
+  "sales_format.packaging_variant": "包装款",
+  "sales_format.retail": "零售版",
+  "sales_format.amazon": "亚马逊版",
+  "sales_format.other": "其他"
 }

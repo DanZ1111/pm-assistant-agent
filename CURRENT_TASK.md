@@ -1,7 +1,7 @@
 # CURRENT_TASK.md
 
 ## Task
-v1.3 Build 05 — Variant Command Cards. Implemented + tested. Awaiting push.
+v1.3 Build 05B — Structured Variant Specs. Implemented + tested. Awaiting push.
 
 ## Handoff rule
 Before editing, inspect:
@@ -58,8 +58,8 @@ These are the canonical product vision. Existing `V13_BUILD0N_EXECUTION_PLAN.md`
 | 02 — Project Pulse v1 | shipped | `ea0460c` |
 | 03 — Product Concept | shipped (with 04) | `bc80506` |
 | 04 — Renderings Overview | shipped (with 03) | `bc80506` |
-| **05 — Variant Command Cards** | **shipped this session** | latest |
-| 05B — Structured spec schema | deferred | — |
+| 05 — Variant Command Cards | shipped | `4d8c847` |
+| **05B — Structured spec schema** | **shipped this session** | latest |
 | 06 — Timeline Command Center Shell | planned | — |
 | 07 — Timeline Command Actions Backend | planned | — |
 | 08 — Timeline History | planned | — |

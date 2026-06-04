@@ -136,9 +136,20 @@ TOOL_SCHEMAS: list[dict] = [
                     "is_primary": {"type": "boolean", "description": "If true, this variant becomes the project's primary SKU."},
                     "target_factory_cost": {"type": "number"},
                     "target_msrp": {"type": "number"},
-                    "material_summary": {"type": "string"},
-                    "packaging_summary": {"type": "string"},
+                    "material_summary": {"type": "string", "description": "Legacy free-text material summary; prefer the new blade_summary/handle_summary fields."},
+                    "packaging_summary": {"type": "string", "description": "Legacy free-text packaging summary; prefer packaging_cost + dimensions_summary for new variants."},
                     "notes": {"type": "string"},
+                    # v1.3 Build 05B — structured spec fields
+                    "sales_format": {
+                        "type": "string",
+                        "enum": ["single", "combo", "colorway", "packaging_variant", "retail", "amazon", "other"],
+                        "description": "Sales-format identifier: single product, combo pack, colorway variant, packaging variant, retail edition, Amazon edition, or other.",
+                    },
+                    "packaging_cost": {"type": "number", "description": "Per-unit packaging cost in USD (separate from factory cost)."},
+                    "blade_summary": {"type": "string", "description": "Blade specs narrative, e.g. 'Steel: VG-10; Length: 3.5\"; Finish: stonewash; Edge: drop point'."},
+                    "handle_summary": {"type": "string", "description": "Handle specs narrative, e.g. 'Material: G-10; Color: black; Texture: football leather'."},
+                    "mechanism_summary": {"type": "string", "description": "Mechanism specs narrative, e.g. 'Lock: liner; Opening: flipper; Clip: deep-carry'."},
+                    "dimensions_summary": {"type": "string", "description": "Dimensions narrative, e.g. 'Overall: 7.5\"; Closed: 4.1\"; Weight: 95g'."},
                 },
                 "required": ["project_id", "variant_name"],
             },
@@ -375,6 +386,9 @@ UPDATE_VARIANT_ALLOWED = {
     "variant_name", "sku", "status", "is_primary", "target_factory_cost",
     "actual_factory_cost", "target_msrp", "material_summary",
     "size_color_summary", "packaging_summary", "notes",
+    # v1.3 Build 05B — structured spec fields
+    "sales_format", "packaging_cost", "blade_summary", "handle_summary",
+    "mechanism_summary", "dimensions_summary",
 }
 UPDATE_COMPONENT_ALLOWED = {
     "variant_id", "component_type", "name", "target_cost", "actual_cost", "notes",

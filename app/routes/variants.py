@@ -55,6 +55,13 @@ def variant_create(
     size_color_summary: str = Form(""),
     packaging_summary: str = Form(""),
     notes: str = Form(""),
+    # v1.3 Build 05B — structured spec fields
+    sales_format: str = Form(""),
+    packaging_cost: str = Form(""),
+    blade_summary: str = Form(""),
+    handle_summary: str = Form(""),
+    mechanism_summary: str = Form(""),
+    dimensions_summary: str = Form(""),
     db: Session = Depends(get_db),
 ):
     ctx, redirect = _auth_edit(request, project_id, db)
@@ -71,6 +78,13 @@ def variant_create(
         "size_color_summary": size_color_summary,
         "packaging_summary": packaging_summary,
         "notes": notes,
+        # v1.3 Build 05B
+        "sales_format": sales_format,
+        "packaging_cost": packaging_cost,
+        "blade_summary": blade_summary,
+        "handle_summary": handle_summary,
+        "mechanism_summary": mechanism_summary,
+        "dimensions_summary": dimensions_summary,
     })
     return _back(project_id)
 
@@ -91,6 +105,13 @@ def variant_edit(
     size_color_summary: str = Form(""),
     packaging_summary: str = Form(""),
     notes: str = Form(""),
+    # v1.3 Build 05B — structured spec fields
+    sales_format: str = Form(""),
+    packaging_cost: str = Form(""),
+    blade_summary: str = Form(""),
+    handle_summary: str = Form(""),
+    mechanism_summary: str = Form(""),
+    dimensions_summary: str = Form(""),
     db: Session = Depends(get_db),
 ):
     ctx, redirect = _auth_edit(request, project_id, db)
@@ -108,6 +129,13 @@ def variant_edit(
         "size_color_summary": size_color_summary,
         "packaging_summary": packaging_summary,
         "notes": notes,
+        # v1.3 Build 05B
+        "sales_format": sales_format,
+        "packaging_cost": packaging_cost,
+        "blade_summary": blade_summary,
+        "handle_summary": handle_summary,
+        "mechanism_summary": mechanism_summary,
+        "dimensions_summary": dimensions_summary,
     })
     return _back(project_id)
 

@@ -602,5 +602,21 @@
   "variant.profit_future_note": "Full profit model coming in v1.4 — see Profit Model section below.",
   "variant.not_tracked": "Not tracked",
   "variant.count_summary_full": "{shared} shared + {variant} for this variant",
-  "variant.count_summary_shared_only": "{shared} shared"
+  "variant.count_summary_shared_only": "{shared} shared",
+  "spec.blade": "Blade",
+  "spec.handle": "Handle",
+  "spec.mechanism": "Mechanism",
+  "spec.dimensions": "Dimensions",
+  "variant.sales_format": "Sales format",
+  "variant.sales_format_unset": "— Not set —",
+  "variant.packaging_cost": "Packaging cost",
+  "variant.no_section_specs": "Not specified",
+  "variant.legacy_notes": "Legacy notes (from earlier builds)",
+  "sales_format.single": "Single product",
+  "sales_format.combo": "Combo pack",
+  "sales_format.colorway": "Colorway variant",
+  "sales_format.packaging_variant": "Packaging variant",
+  "sales_format.retail": "Retail edition",
+  "sales_format.amazon": "Amazon edition",
+  "sales_format.other": "Other"
 }

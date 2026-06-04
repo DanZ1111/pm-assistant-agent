@@ -334,6 +334,18 @@ class ProjectVariant(Base):
     size_color_summary = Column(Text, nullable=True)
     packaging_summary = Column(Text, nullable=True)
     notes = Column(Text, nullable=True)
+    # v1.3 Build 05B — structured spec grouping matching the Overview
+    # redesign wireframe §5.4-5.7. All nullable; per-section narrative
+    # text preserves units / mixed languages / qualifiers.
+    sales_format = Column(String, nullable=True)
+    # canonical values: single / combo / colorway / packaging_variant /
+    # retail / amazon / other. Stored as String for forward flexibility;
+    # custom values allowed.
+    packaging_cost = Column(Float, nullable=True)
+    blade_summary = Column(Text, nullable=True)
+    handle_summary = Column(Text, nullable=True)
+    mechanism_summary = Column(Text, nullable=True)
+    dimensions_summary = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
 

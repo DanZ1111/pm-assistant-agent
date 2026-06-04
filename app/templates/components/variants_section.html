@@ -56,17 +56,59 @@
         <label class="form-label small fw-bold">{{ t('form.target_msrp') }}</label>
         <input type="text" name="target_msrp" class="form-control form-control-sm" placeholder="0.00">
       </div>
-      <div class="col-md-4">
-        <label class="form-label small fw-bold">{{ t('variant.material') }}</label>
-        <input type="text" name="material_summary" class="form-control form-control-sm">
+      {# v1.3 Build 05B — sales format + packaging cost #}
+      <div class="col-md-6">
+        <label class="form-label small fw-bold">{{ t('variant.sales_format') }}</label>
+        <select name="sales_format" class="form-select form-select-sm">
+          <option value="">{{ t('variant.sales_format_unset') }}</option>
+          {% for f in ['single','combo','colorway','packaging_variant','retail','amazon','other'] %}
+          <option value="{{ f }}">{{ t('sales_format.' ~ f) }}</option>
+          {% endfor %}
+        </select>
       </div>
-      <div class="col-md-4">
-        <label class="form-label small fw-bold">{{ t('variant.size_color') }}</label>
-        <input type="text" name="size_color_summary" class="form-control form-control-sm">
+      <div class="col-md-6">
+        <label class="form-label small fw-bold">{{ t('variant.packaging_cost') }}</label>
+        <input type="text" name="packaging_cost" class="form-control form-control-sm" placeholder="0.00">
       </div>
-      <div class="col-md-4">
-        <label class="form-label small fw-bold">{{ t('variant.packaging') }}</label>
-        <input type="text" name="packaging_summary" class="form-control form-control-sm">
+      {# v1.3 Build 05B — 4 spec section textareas #}
+      <div class="col-md-6">
+        <label class="form-label small fw-bold">{{ t('spec.blade') }}</label>
+        <textarea name="blade_summary" class="form-control form-control-sm" rows="2"
+                  placeholder="Steel: VG-10; Length: 3.5&quot;; Finish: stonewash; Edge: drop point"></textarea>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-bold">{{ t('spec.handle') }}</label>
+        <textarea name="handle_summary" class="form-control form-control-sm" rows="2"
+                  placeholder="Material: G-10; Color: black; Texture: football leather; Ergonomics: contoured"></textarea>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-bold">{{ t('spec.mechanism') }}</label>
+        <textarea name="mechanism_summary" class="form-control form-control-sm" rows="2"
+                  placeholder="Lock: liner lock; Opening: flipper; Clip: deep-carry; Pivot: caged bearing"></textarea>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-bold">{{ t('spec.dimensions') }}</label>
+        <textarea name="dimensions_summary" class="form-control form-control-sm" rows="2"
+                  placeholder="Overall: 7.5&quot;; Closed: 4.1&quot;; Weight: 95g"></textarea>
+      </div>
+      <div class="col-12">
+        <details class="variant-form-legacy">
+          <summary class="form-label small fw-bold">{{ t('variant.legacy_notes') }}</summary>
+          <div class="row g-2 mt-1">
+            <div class="col-md-4">
+              <label class="form-label small">{{ t('variant.material') }}</label>
+              <input type="text" name="material_summary" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small">{{ t('variant.size_color') }}</label>
+              <input type="text" name="size_color_summary" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small">{{ t('variant.packaging') }}</label>
+              <input type="text" name="packaging_summary" class="form-control form-control-sm">
+            </div>
+          </div>
+        </details>
       </div>
       <div class="col-12">
         <label class="form-label small fw-bold">{{ t('form.notes') }}</label>
@@ -107,6 +149,11 @@
             {% if v.sku %}{{ v.sku }}{% else %}<em>{{ t('common.no_sku') }}</em>{% endif %}
           </span>
           <span class="badge variant-status-badge status-{{ v.status }}">{{ t('variant_status.' ~ v.status) }}</span>
+          {% if v.sales_format %}
+          <span class="variant-command-sales-format" title="{{ t('variant.sales_format') }}">
+            <i class="bi bi-tag me-1"></i>{{ t('sales_format.' ~ v.sales_format, default=v.sales_format) }}
+          </span>
+          {% endif %}
         </div>
         <div class="variant-command-summary-row">
           {% if can_view_costs %}
@@ -138,32 +185,38 @@
 
       <div class="variant-command-body">
         <div class="variant-command-grid">
-          {# Cell 1: Specs #}
+          {# Cell 1: Specs — v1.3 Build 05B four-section grouping #}
           <div class="variant-command-cell variant-command-cell-specs">
             <h3 class="variant-command-cell-title"><i class="bi bi-rulers me-2"></i>{{ t('variant.specs') }}</h3>
-            {% if v.material_summary or v.size_color_summary or v.packaging_summary %}
-            <dl class="variant-command-spec-list">
-              {% if v.material_summary %}
-              <div>
-                <dt>{{ t('variant.material') }}</dt>
-                <dd>{{ v.material_summary }}</dd>
-              </div>
-              {% endif %}
-              {% if v.size_color_summary %}
-              <div>
-                <dt>{{ t('variant.size_color') }}</dt>
-                <dd>{{ v.size_color_summary }}</dd>
-              </div>
-              {% endif %}
-              {% if v.packaging_summary %}
-              <div>
-                <dt>{{ t('variant.packaging') }}</dt>
-                <dd>{{ v.packaging_summary }}</dd>
-              </div>
-              {% endif %}
-            </dl>
-            {% else %}
+            {% set has_new_specs = v.blade_summary or v.handle_summary or v.mechanism_summary or v.dimensions_summary %}
+            {% set has_legacy_specs = v.material_summary or v.size_color_summary or v.packaging_summary %}
+            {% if has_new_specs %}
+            <div class="variant-command-spec-group">
+              <h4>{{ t('spec.blade') }}</h4>
+              <p>{% if v.blade_summary %}{{ v.blade_summary }}{% else %}<span class="variant-command-muted">{{ t('variant.no_section_specs') }}</span>{% endif %}</p>
+            </div>
+            <div class="variant-command-spec-group">
+              <h4>{{ t('spec.handle') }}</h4>
+              <p>{% if v.handle_summary %}{{ v.handle_summary }}{% else %}<span class="variant-command-muted">{{ t('variant.no_section_specs') }}</span>{% endif %}</p>
+            </div>
+            <div class="variant-command-spec-group">
+              <h4>{{ t('spec.mechanism') }}</h4>
+              <p>{% if v.mechanism_summary %}{{ v.mechanism_summary }}{% else %}<span class="variant-command-muted">{{ t('variant.no_section_specs') }}</span>{% endif %}</p>
+            </div>
+            <div class="variant-command-spec-group">
+              <h4>{{ t('spec.dimensions') }}</h4>
+              <p>{% if v.dimensions_summary %}{{ v.dimensions_summary }}{% else %}<span class="variant-command-muted">{{ t('variant.no_section_specs') }}</span>{% endif %}</p>
+            </div>
+            {% elif not has_legacy_specs %}
             <p class="variant-command-empty">{{ t('variant.no_specs') }}</p>
+            {% endif %}
+            {% if has_legacy_specs %}
+            <details class="variant-command-legacy-notes">
+              <summary>{{ t('variant.legacy_notes') }}</summary>
+              {% if v.material_summary %}<p><strong>{{ t('variant.material') }}:</strong> {{ v.material_summary }}</p>{% endif %}
+              {% if v.size_color_summary %}<p><strong>{{ t('variant.size_color') }}:</strong> {{ v.size_color_summary }}</p>{% endif %}
+              {% if v.packaging_summary %}<p><strong>{{ t('variant.packaging') }}:</strong> {{ v.packaging_summary }}</p>{% endif %}
+            </details>
             {% endif %}
           </div>
 
@@ -228,6 +281,11 @@
               <div>
                 <dt>{{ t('form.target_msrp') }}</dt>
                 <dd>{% if v.target_msrp %}${{ "%.2f"|format(v.target_msrp) }}{% else %}<span class="variant-command-muted">{{ t('variant.not_tracked') }}</span>{% endif %}</dd>
+              </div>
+              {# v1.3 Build 05B — packaging cost as a distinct line item #}
+              <div>
+                <dt>{{ t('variant.packaging_cost') }}</dt>
+                <dd>{% if v.packaging_cost %}${{ "%.2f"|format(v.packaging_cost) }}{% else %}<span class="variant-command-muted">{{ t('variant.not_tracked') }}</span>{% endif %}</dd>
               </div>
             </dl>
           </div>
@@ -330,17 +388,59 @@
               <label class="form-label small fw-bold">{{ t('form.target_msrp') }}</label>
               <input type="text" name="target_msrp" class="form-control form-control-sm" value="{{ v.target_msrp or '' }}">
             </div>
-            <div class="col-md-4">
-              <label class="form-label small fw-bold">{{ t('variant.material') }}</label>
-              <input type="text" name="material_summary" class="form-control form-control-sm" value="{{ v.material_summary or '' }}">
+            {# v1.3 Build 05B — sales format + packaging cost (edit form) #}
+            <div class="col-md-6">
+              <label class="form-label small fw-bold">{{ t('variant.sales_format') }}</label>
+              <select name="sales_format" class="form-select form-select-sm">
+                <option value="">{{ t('variant.sales_format_unset') }}</option>
+                {% for f in ['single','combo','colorway','packaging_variant','retail','amazon','other'] %}
+                <option value="{{ f }}" {% if v.sales_format == f %}selected{% endif %}>{{ t('sales_format.' ~ f) }}</option>
+                {% endfor %}
+              </select>
             </div>
-            <div class="col-md-4">
-              <label class="form-label small fw-bold">{{ t('variant.size_color') }}</label>
-              <input type="text" name="size_color_summary" class="form-control form-control-sm" value="{{ v.size_color_summary or '' }}">
+            <div class="col-md-6">
+              <label class="form-label small fw-bold">{{ t('variant.packaging_cost') }}</label>
+              <input type="text" name="packaging_cost" class="form-control form-control-sm" value="{{ v.packaging_cost or '' }}" placeholder="0.00">
             </div>
-            <div class="col-md-4">
-              <label class="form-label small fw-bold">{{ t('variant.packaging') }}</label>
-              <input type="text" name="packaging_summary" class="form-control form-control-sm" value="{{ v.packaging_summary or '' }}">
+            {# v1.3 Build 05B — 4 spec section textareas (edit form) #}
+            <div class="col-md-6">
+              <label class="form-label small fw-bold">{{ t('spec.blade') }}</label>
+              <textarea name="blade_summary" class="form-control form-control-sm" rows="2"
+                        placeholder="Steel: VG-10; Length: 3.5&quot;; Finish: stonewash; Edge: drop point">{{ v.blade_summary or '' }}</textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold">{{ t('spec.handle') }}</label>
+              <textarea name="handle_summary" class="form-control form-control-sm" rows="2"
+                        placeholder="Material: G-10; Color: black; Texture: football leather; Ergonomics: contoured">{{ v.handle_summary or '' }}</textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold">{{ t('spec.mechanism') }}</label>
+              <textarea name="mechanism_summary" class="form-control form-control-sm" rows="2"
+                        placeholder="Lock: liner lock; Opening: flipper; Clip: deep-carry; Pivot: caged bearing">{{ v.mechanism_summary or '' }}</textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold">{{ t('spec.dimensions') }}</label>
+              <textarea name="dimensions_summary" class="form-control form-control-sm" rows="2"
+                        placeholder="Overall: 7.5&quot;; Closed: 4.1&quot;; Weight: 95g">{{ v.dimensions_summary or '' }}</textarea>
+            </div>
+            <div class="col-12">
+              <details class="variant-form-legacy" {% if v.material_summary or v.size_color_summary or v.packaging_summary %}open{% endif %}>
+                <summary class="form-label small fw-bold">{{ t('variant.legacy_notes') }}</summary>
+                <div class="row g-2 mt-1">
+                  <div class="col-md-4">
+                    <label class="form-label small">{{ t('variant.material') }}</label>
+                    <input type="text" name="material_summary" class="form-control form-control-sm" value="{{ v.material_summary or '' }}">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label small">{{ t('variant.size_color') }}</label>
+                    <input type="text" name="size_color_summary" class="form-control form-control-sm" value="{{ v.size_color_summary or '' }}">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label small">{{ t('variant.packaging') }}</label>
+                    <input type="text" name="packaging_summary" class="form-control form-control-sm" value="{{ v.packaging_summary or '' }}">
+                  </div>
+                </div>
+              </details>
             </div>
             <div class="col-12">
               <label class="form-label small fw-bold">{{ t('form.notes') }}</label>

@@ -3026,3 +3026,75 @@ body.has-bottom-chat .main-content { padding-bottom: 104px; }
     gap: 0.3rem;
   }
 }
+
+
+/* ============================================================================
+   v1.3 Build 05B — structured variant specs styling
+============================================================================ */
+
+/* Sales-format chip in the collapsed summary meta row */
+.variant-command-sales-format {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  background: rgba(59, 130, 246, 0.08);
+  color: var(--color-accent, #2563eb);
+  font-weight: 500;
+}
+
+/* Per-spec-section sub-blocks inside the Specs cell */
+.variant-command-spec-group {
+  margin-bottom: 0.6rem;
+}
+.variant-command-spec-group:last-of-type {
+  margin-bottom: 0.4rem;
+}
+.variant-command-spec-group > h4 {
+  margin: 0 0 0.2rem 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted, #6b7280);
+}
+.variant-command-spec-group > p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text, #111827);
+  white-space: pre-wrap;
+  line-height: 1.4;
+}
+
+/* Legacy notes collapsible inside the Specs cell */
+.variant-command-legacy-notes {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--color-border, #e5e7eb);
+  font-size: 0.78rem;
+}
+.variant-command-legacy-notes > summary {
+  cursor: pointer;
+  color: var(--color-text-muted, #6b7280);
+  font-weight: 500;
+  list-style: revert;
+}
+.variant-command-legacy-notes > p {
+  margin: 0.3rem 0 0 0;
+  color: var(--color-text-muted, #6b7280);
+}
+
+/* Legacy notes details inside the edit/add form */
+.variant-form-legacy {
+  margin-top: 0.25rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px dashed var(--color-border, #d1d5db);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.015);
+}
+.variant-form-legacy > summary {
+  cursor: pointer;
+  color: var(--color-text-muted, #6b7280);
+  margin: 0;
+}

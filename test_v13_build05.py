@@ -353,14 +353,22 @@ def main():
     else:
         fail("#packaging anchor", "packaging_section.html missing id='packaging'")
 
-    # ── 14. No schema migration ──
-    print("\n── 14. No schema migration ──")
+    # ── 14. Build 05 itself added no schema migration ──
+    # NOTE: Build 05B (a separate atomic step) added migration 005 with
+    # structured variant spec columns. Build 05's "no schema change" promise
+    # applies to Build 05 alone; we verify here that migrations 001-004
+    # (the v1.0-v1.2 set) are still the baseline Build 05 inherited.
+    print("\n── 14. Build 05's baseline migrations (001-004) untouched ──")
     migrations = open("app/migrations.py").read()
-    if migrations.count('"00') == 4:
-        # Original 4 migrations: 001, 002, 003, 004
-        ok("No new migration added (still 4 entries)")
+    for marker in ("001_v1_1_add_language_to_users",
+                    "002_v1_1_add_conversation_id_to_ai_messages",
+                    "003_v1_2_add_price_text_fields",
+                    "004_v1_2_add_project_creation_tokens"):
+        if marker not in migrations:
+            fail("migrations baseline", f"missing {marker}")
+            break
     else:
-        fail("migration count", f"expected 4, found {migrations.count('\"00')}")
+        ok("Build 05 baseline migrations 001-004 all present")
 
     # Cleanup
     cleanup("b05_test")

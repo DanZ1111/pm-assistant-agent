@@ -130,7 +130,23 @@ MIGRATIONS = [
         "004_v1_2_add_project_creation_tokens",
         lambda eng: _create_project_creation_tokens(eng),
     ),
+    (
+        "005_v1_3_add_variant_structured_specs",
+        lambda eng: _add_variant_structured_specs(eng),
+    ),
 ]
+
+
+def _add_variant_structured_specs(engine):
+    """Build 05B — six new optional columns on project_variants matching the
+    wireframe's structured spec grouping. All nullable; existing rows keep
+    NULL and naturally show the section's empty state until edited."""
+    add_column_if_missing(engine, "project_variants", "sales_format", "VARCHAR")
+    add_column_if_missing(engine, "project_variants", "packaging_cost", "REAL")
+    add_column_if_missing(engine, "project_variants", "blade_summary", "TEXT")
+    add_column_if_missing(engine, "project_variants", "handle_summary", "TEXT")
+    add_column_if_missing(engine, "project_variants", "mechanism_summary", "TEXT")
+    add_column_if_missing(engine, "project_variants", "dimensions_summary", "TEXT")
 
 
 def _create_project_creation_tokens(engine):
