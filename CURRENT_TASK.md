@@ -76,4 +76,5 @@ Starting with v1.3 Build 03, every build gets a short build-specific execution p
 ## v1.3 Build 03 planning
 
 - Added `V13_BUILD03_EXECUTION_PLAN.md`.
+- Revised per Claude review: Inspired By is locked as an internal Product Concept chip-row, Product Concept gets primary `id="product-concept"` plus a hidden `#thesis` compatibility anchor, exact EN/ZH i18n strings are specified, and Build 02 Pulse wording must change from Product Thesis to Product Concept.
 - No Build 03 code has been written yet.

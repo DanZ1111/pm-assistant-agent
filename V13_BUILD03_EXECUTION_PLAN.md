@@ -38,8 +38,9 @@ In `project_detail.html`:
 
 - Replace the visible Thesis section title with `Product Concept`.
 - Preserve the anchor behavior needed by existing links:
-  - keep `id="thesis"` or add a compatibility anchor so old `#thesis` links still land correctly.
-  - add a clearer `id="product-concept"` only if it does not break existing tests/links.
+  - primary section id becomes `id="product-concept"`.
+  - add a compatibility anchor inside the section: `<span id="thesis" class="visually-hidden"></span>`.
+  - old `#thesis` links must still land at the Product Concept area.
 - Keep existing inline thesis edit form unchanged:
   - same route: `/projects/{id}/thesis/inline-edit`
   - same textarea name: `project_thesis`
@@ -47,11 +48,13 @@ In `project_detail.html`:
 - Keep business-plan re-extract behavior unchanged:
   - same form route: `/projects/{id}/thesis/extract-upload`
   - same file input and allowed file types.
-- Move/re-render Inspired By references inside or directly beneath Product Concept:
+- Move/re-render Inspired By references inside Product Concept as an internal chip-row sub-block:
   - use compact concept-reference chips/rows for linked ideas.
   - preserve `Link Idea`, `Create & Link Idea`, unlink, and all modal form behavior.
-  - keep `id="inspired-by"` as a compatibility anchor around the references or as an internal anchor.
-- Remove the old standalone visual weight of Inspired By as a separate peer section, unless keeping a very small internal subheader is clearer.
+  - keep `id="inspired-by"` as a compatibility anchor on the internal references sub-block.
+  - do not keep Inspired By as a standalone peer section with its own large header.
+  - use only a small internal label/header for concept references.
+- Update Build 02 Pulse wording so the missing-thesis action points to `Product Concept`, not `Product Thesis`.
 - Keep Project Journal where it is for now; do not fold Journal into Product Concept.
 
 ## Source Of Truth
@@ -77,13 +80,23 @@ In `project_detail.html`:
 
 ## i18n Labels
 
-Likely new or changed keys:
+Add/change these exact keys and strings:
 
-- `section.product_concept`
-- `concept.thesis_label` or `concept.thesis_guide`
-- `concept.references`
-- `concept.no_references`
-- `concept.add_reference`
+| Key | EN | ZH |
+|---|---|---|
+| `section.product_concept` | Product Concept | 产品理念 |
+| `concept.thesis_label` | What is this product, and why? | 这款产品是什么？为什么存在？ |
+| `concept.references` | Concept references | 灵感来源 |
+| `concept.no_references` | No concept references linked yet. | 暂无关联的灵感记录。 |
+| `concept.add_reference` | Add reference | 添加灵感 |
+
+Also update existing Pulse keys so Build 02 does not contradict Build 03:
+
+| Key | EN | ZH |
+|---|---|---|
+| `pulse.thesis_needed_title` | Product Concept needs work | 产品理念需要完善 |
+| `pulse.thesis_needed_copy` | Complete the Product Concept before deeper product decisions drift. | 在更多产品决策发散前，先补完整产品理念。 |
+| `pulse.complete_thesis` | Complete Product Concept | 完善产品理念 |
 
 Keep existing keys where they still make sense:
 
@@ -91,8 +104,8 @@ Keep existing keys where they still make sense:
 - `btn.reextract`
 - `btn.link_idea`
 - `btn.create_link_idea`
-- `project.thesis_missing`
-- `project.thesis_guide`
+- `project.thesis_missing` may remain for internal health/legacy empty-state logic only if the visible text is no longer contradictory.
+- `project.thesis_guide` may remain if reused as secondary helper text, but the visible primary concept label must use `concept.thesis_label`.
 
 Exact EN/ZH parity is required.
 
@@ -113,10 +126,12 @@ Required assertions:
 
 - Product Concept appears after Project Pulse.
 - Product Concept appears before files/renderings and Timeline.
-- `#thesis` compatibility still works or the test proves the old link target is still present.
+- Product Concept section uses `id="product-concept"`.
+- `#thesis` compatibility anchor still exists inside Product Concept.
+- Build 02 Pulse missing-concept action uses Product Concept language and links to the compatibility anchor or Product Concept area.
 - Existing thesis inline edit still opens and saves through `/thesis/inline-edit`.
 - Business-plan re-extract form still appears for admin/PM and stays hidden for viewer.
-- Linked ideas render as concept references.
+- Linked ideas render as internal concept-reference chips/rows, not as a standalone Inspired By peer section.
 - Create & Link Idea modal still opens and can create/link a fake idea.
 - Viewer sees concept references but no edit/link/create/unlink controls.
 - i18n parity remains exact.
