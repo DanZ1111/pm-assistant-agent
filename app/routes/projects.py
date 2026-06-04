@@ -422,6 +422,9 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
     # Build 17 — Timeline 2.0: plan-change history per phase + error flash
     plan_changes_by_phase = crud.get_plan_changes_by_project(db, project_id)
     timeline_error = request.query_params.get("timeline_error")
+    # Build 07A — Command Center action result banner (PRG result)
+    cc_action = request.query_params.get("cc_action")
+    cc_result = request.query_params.get("cc_result")
     # Find the current "in_progress" phase (for Finish Phase button decoration)
     current_phase = next((p for p in phases if p.status == "in_progress"), None)
     if not current_phase:
@@ -521,6 +524,8 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
         "current_phase": current_phase,
         "command_center_state": command_center_state,
         "can_use_ai_intake_user": can_use_ai_intake(current_user),
+        "cc_action": cc_action,
+        "cc_result": cc_result,
         "renderings": renderings,
         "prototype_photos": prototype_photos,
         "latest_overview_visual": latest_overview_visual,
@@ -795,6 +800,170 @@ def phase_delete(request: Request, project_id: int, phase_id: int, db: Session =
     if project and can_edit_project(current_user, project):
         crud.delete_phase(db, phase_id)
     return RedirectResponse(url=f"/projects/{project_id}#timeline", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# v1.3 Build 07A — Timeline Command Center action routes
+#
+# Dedicated POST routes for the 3 honest Command Center actions. Each
+# re-validates auth + ownership + state, then delegates to the existing
+# crud service (which handles audit + derived-state refresh). PRG; redirects
+# back to #timeline-command-center with ?cc_result=... so the section can
+# render a result banner. Add Blocker is deferred to Build 07B; AI Intake
+# is already wired client-side via Build 06.
+# ---------------------------------------------------------------------------
+
+_CC_REDIRECT_SUFFIX = "#timeline-command-center"
+
+
+def _cc_redirect(project_id: int, action: str, result: str) -> RedirectResponse:
+    return RedirectResponse(
+        url=f"/projects/{project_id}?cc_action={action}&cc_result={result}{_CC_REDIRECT_SUFFIX}",
+        status_code=303,
+    )
+
+
+def _derive_current_phase(phases: list):
+    """Mirrors project_detail's current_phase derivation (Lock 3 race check
+    in Build 07A): prefer status='in_progress'; else first non-(done/skipped)
+    by phase_order."""
+    cur = next((p for p in phases if p.status == "in_progress"), None)
+    if cur:
+        return cur
+    return next(
+        (p for p in sorted(phases, key=lambda x: x.phase_order)
+         if p.status not in ("done", "skipped")),
+        None,
+    )
+
+
+@router.post("/projects/{project_id}/command/finish-phase")
+def cc_finish_phase(
+    request: Request,
+    project_id: int,
+    phase_id: int = Form(...),
+    completion_note: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Build 07A — Finish current phase from the Command Center.
+
+    Lock 3 (stale-form race): the request's phase_id MUST match the project's
+    server-derived current_phase.id. If it doesn't, the form is stale (the
+    phase was already finished by someone else or via the Detailed Table),
+    and we refuse silently and reload — never advance a stale phase.
+    """
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+
+    project = crud.get_project(db, project_id)
+    if not project or not can_edit_project(current_user, project):
+        return _cc_redirect(project_id, "finish", "not_authorized")
+
+    phases = list(project.phases)
+    server_current = _derive_current_phase(phases)
+    if not server_current or server_current.id != phase_id or server_current.status == "done":
+        return _cc_redirect(project_id, "finish", "phase_already_done")
+
+    crud.finish_phase(
+        db, phase_id,
+        changed_by=current_user.role,
+        changed_by_user_id=current_user.id,
+    )
+
+    note = (completion_note or "").strip()
+    if note:
+        crud.write_change(
+            db, project_id, "event_note", changed_by=current_user.role,
+            field_name=server_current.phase_name,
+            summary=f"Completion note: {note}",
+            source_type="manual_edit",
+        )
+        db.commit()
+
+    return _cc_redirect(project_id, "finish", "ok")
+
+
+@router.post("/projects/{project_id}/command/adjust-due-date")
+def cc_adjust_due_date(
+    request: Request,
+    project_id: int,
+    phase_id: int = Form(...),
+    new_planned_end_date: str = Form(""),
+    reason: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """Build 07A — Adjust the current phase's planned_end_date.
+
+    Lock 4 (reason required server-side): empty reason → reject. Mirrors the
+    Detailed Table behavior at phase_edit() above. Delegates to the existing
+    crud.update_phase, which writes phase_plan_changes + project_changes and
+    re-runs recalculate_stage_and_delay automatically.
+    """
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+
+    project = crud.get_project(db, project_id)
+    if not project or not can_edit_project(current_user, project):
+        return _cc_redirect(project_id, "adjust", "not_authorized")
+
+    if not reason.strip():
+        return _cc_redirect(project_id, "adjust", "reason_required")
+
+    phase = crud.get_phase(db, phase_id)
+    if not phase or phase.project_id != project_id:
+        return _cc_redirect(project_id, "adjust", "not_authorized")
+
+    new_date = parse_date(new_planned_end_date)
+    crud.update_phase(
+        db, phase_id, {"planned_end_date": new_date},
+        changed_by=current_user.role,
+        reason=reason,
+        changed_by_user_id=current_user.id,
+    )
+    return _cc_redirect(project_id, "adjust", "ok")
+
+
+@router.post("/projects/{project_id}/command/add-update")
+def cc_add_update(
+    request: Request,
+    project_id: int,
+    entry_text: str = Form(""),
+    entry_type: str = Form("general"),
+    db: Session = Depends(get_db),
+):
+    """Build 07A — Add a journal entry from the Command Center.
+
+    Gated on can_view_journal AND can_edit_project. Empty text → reject.
+    Delegates to crud.create_journal_entry which is the audit record itself.
+    """
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+
+    if not can_view_journal(current_user):
+        return _cc_redirect(project_id, "add-update", "not_authorized")
+
+    project = crud.get_project(db, project_id)
+    if not project or not can_edit_project(current_user, project):
+        return _cc_redirect(project_id, "add-update", "not_authorized")
+
+    text = (entry_text or "").strip()
+    if not text:
+        return _cc_redirect(project_id, "add-update", "empty_update")
+
+    crud.create_journal_entry(
+        db, project_id, text, entry_type or "general",
+        author_user_id=current_user.id,
+    )
+    return _cc_redirect(project_id, "add-update", "ok")
 
 
 # ---------------------------------------------------------------------------

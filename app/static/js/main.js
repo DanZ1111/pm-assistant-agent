@@ -715,3 +715,64 @@ import { createComposerController } from './composer_controller.js';
   }
   window.addEventListener('hashchange', applyVariantHash);
 })();
+
+// ----------------------------------------------------------------------------
+// v1.3 Build 07A — Command Center inline action form toggle
+//   * Buttons with data-cc-form="finish|adjust|add-update" show the matching
+//     inline <form data-cc-panel="...">.
+//   * [data-cc-cancel] inside any form hides the mount.
+//   * Forms with data-cc-disable-on-submit (Add Update) disable the submit
+//     button on first click so accidental double-submits don't create
+//     duplicate journal entries. Server-side is not idempotency-guarded for
+//     these routes (Lock 7) — this is UX belt-and-suspenders only.
+// ----------------------------------------------------------------------------
+(function () {
+  function initCommandCenter() {
+    var mount = document.getElementById('cc-action-form');
+    if (!mount) return;
+    var panels = mount.querySelectorAll('.cc-action-form[data-cc-panel]');
+    var triggers = document.querySelectorAll('[data-cc-form]');
+
+    function showPanel(key) {
+      panels.forEach(function (p) {
+        p.hidden = p.getAttribute('data-cc-panel') !== key;
+      });
+      mount.hidden = false;
+      var visible = mount.querySelector('.cc-action-form:not([hidden])');
+      if (visible) {
+        var firstInput = visible.querySelector('textarea, input:not([type=hidden]), select');
+        if (firstInput) firstInput.focus();
+      }
+    }
+    function hideAll() {
+      panels.forEach(function (p) { p.hidden = true; });
+      mount.hidden = true;
+    }
+
+    triggers.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var key = btn.getAttribute('data-cc-form');
+        if (key) showPanel(key);
+      });
+    });
+    mount.querySelectorAll('[data-cc-cancel]').forEach(function (b) {
+      b.addEventListener('click', hideAll);
+    });
+
+    // Add Update: disable submit on first click (Lock 7 amendment)
+    mount.querySelectorAll('form[data-cc-disable-on-submit]').forEach(function (form) {
+      form.addEventListener('submit', function () {
+        var sub = form.querySelector('button[type="submit"]');
+        if (sub) {
+          sub.disabled = true;
+          sub.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>…';
+        }
+      });
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCommandCenter);
+  } else {
+    initCommandCenter();
+  }
+})();

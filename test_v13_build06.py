@@ -319,17 +319,18 @@ def main():
     else:
         fail("add_blocker disabled", f"button tag: {add_blocker_match.group(0) if add_blocker_match else 'not found'}")
 
-    # [Finish Current Phase] anchors to #phase-row-{id}
-    finish_match = re.search(rf'data-action="finish"[^>]*href="#phase-row-{first_phase_id}"|href="#phase-row-{first_phase_id}"[^>]*data-action="finish"', page)
-    if finish_match:
-        ok(f"[Finish Current Phase] link targets #phase-row-{first_phase_id}")
+    # [Finish Current Phase] — Build 06 shipped this as an <a href="#phase-row-N">
+    # anchor; Build 07A converted it to a <button data-cc-form="finish"> that
+    # triggers the inline finish form whose hidden phase_id input carries the
+    # current phase id. Either shape is acceptable here.
+    finish_btn = re.search(r'<button[^>]*data-action="finish"[^>]*data-cc-form="finish"', page)
+    finish_anchor = re.search(r'<a[^>]*data-action="finish"[^>]*>', page)
+    if finish_btn and f'name="phase_id" value="{first_phase_id}"' in page:
+        ok(f"[Finish Current Phase] triggers inline form with phase_id={first_phase_id} (Build 07A form pattern)")
+    elif finish_anchor and f"#phase-row-{first_phase_id}" in finish_anchor.group(0):
+        ok(f"[Finish Current Phase] link targets #phase-row-{first_phase_id} (legacy Build 06 anchor form)")
     else:
-        # Be more permissive — just look for href + data-action="finish" in same anchor
-        finish_anchor = re.search(r'<a[^>]*data-action="finish"[^>]*>', page)
-        if finish_anchor and f"#phase-row-{first_phase_id}" in finish_anchor.group(0):
-            ok(f"[Finish Current Phase] link targets #phase-row-{first_phase_id} (anchor form)")
-        else:
-            fail("finish anchor", f"anchor: {finish_anchor.group(0) if finish_anchor else 'not found'}")
+        fail("finish action target", "neither Build 06 anchor nor Build 07A form pattern detected")
 
     # ── 12. Action buttons — viewer sees zero (per can_use_ai_intake admin/pm only) ──
     print("\n── 12. Action buttons — viewer permission ──")

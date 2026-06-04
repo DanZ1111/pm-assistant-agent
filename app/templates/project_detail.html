@@ -557,6 +557,21 @@
         </h2>
       </div>
 
+      {# Build 07A — Command Center action result banner (PRG redirect target) #}
+      {% if cc_result %}
+      <div class="cc-result-banner{% if cc_result == 'ok' %} cc-result-ok{% else %} cc-result-error{% endif %}"
+           data-cc-result="{{ cc_result }}" data-cc-action="{{ cc_action or '' }}" role="status">
+        <span class="cc-result-text">
+          {% if cc_result == 'ok' %}{{ t('timeline.cc_result_ok') }}
+          {% elif cc_result == 'reason_required' %}{{ t('timeline.cc_result_reason_required') }}
+          {% elif cc_result == 'empty_update' %}{{ t('timeline.cc_result_empty_update') }}
+          {% elif cc_result == 'phase_already_done' %}{{ t('timeline.cc_result_phase_already_done') }}
+          {% elif cc_result == 'not_authorized' %}{{ t('timeline.cc_result_not_authorized') }}
+          {% else %}{{ cc_result }}{% endif %}
+        </span>
+      </div>
+      {% endif %}
+
       {# Phase strip — horizontal-scroll on narrow widths per Lock 1 #}
       <div class="timeline-phase-strip" aria-label="{{ t('timeline.phase_strip') }}">
         {% for entry in command_center_state.phase_strip %}
@@ -679,27 +694,29 @@
         {% endif %}
       </div>
 
-      {# Action buttons — link to existing controls in the Detailed Table.
-         Dedicated Command Center wiring is Build 07. #}
+      {# Build 07A — Command Center action buttons.
+         Finish / Adjust / Add Update are form triggers (data-cc-form="...");
+         clicking reveals the matching inline form in #cc-action-form below.
+         Add Blocker is still a disabled placeholder (Build 07B).
+         AI Intake opens the existing assistant side panel (Build 06). #}
       <div class="timeline-action-row">
         {% if can_edit and current_phase and current_phase.status != 'done' %}
-        <a class="btn btn-sm btn-success" href="#phase-row-{{ current_phase.id }}"
-           onclick="var d=document.getElementById('timelineDetailedTable'); if(d){d.open=true;}"
-           data-action="finish">
+        <button type="button" class="btn btn-sm btn-success"
+                data-action="finish" data-cc-form="finish">
           <i class="bi bi-check2-circle me-1"></i>{{ t('timeline.btn_finish_phase') }}
-        </a>
+        </button>
         {% endif %}
         {% if can_edit and current_phase %}
-        <a class="btn btn-sm btn-outline-secondary" href="#phase-row-{{ current_phase.id }}"
-           onclick="var d=document.getElementById('timelineDetailedTable'); if(d){d.open=true;}"
-           data-action="adjust-due-date">
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                data-action="adjust-due-date" data-cc-form="adjust">
           <i class="bi bi-calendar-event me-1"></i>{{ t('timeline.btn_adjust_due_date') }}
-        </a>
+        </button>
         {% endif %}
         {% if can_edit and can_view_journal %}
-        <a class="btn btn-sm btn-outline-secondary" href="#journal" data-action="add-update">
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                data-action="add-update" data-cc-form="add-update">
           <i class="bi bi-pencil me-1"></i>{{ t('timeline.btn_add_update') }}
-        </a>
+        </button>
         {% endif %}
         {% if can_edit %}
         <button type="button" class="btn btn-sm btn-outline-secondary" disabled
@@ -716,6 +733,95 @@
         </button>
         {% endif %}
       </div>
+
+      {# Build 07A — shared inline form mount. Initially hidden; the buttons
+         above toggle which inner <form> is visible. PRG: each form submits
+         to its dedicated /command/* route and redirects back here. #}
+      {% if can_edit and current_phase %}
+      <div class="cc-action-form-mount" id="cc-action-form" hidden>
+
+        {# Finish Current Phase — confirmation card #}
+        {% if current_phase.status != 'done' %}
+        <form class="cc-action-form" data-cc-panel="finish" hidden
+              method="post" action="/projects/{{ project.id }}/command/finish-phase">
+          <input type="hidden" name="phase_id" value="{{ current_phase.id }}">
+          <div class="cc-action-form-title">
+            <i class="bi bi-check2-circle me-2"></i>{{ t('timeline.cc_finish_confirm_title') }}
+          </div>
+          <p class="cc-action-form-help">{{ t('timeline.cc_finish_checklist') }}</p>
+          <ul class="cc-finish-preflight">
+            <li>{{ current_phase.phase_name }} → done</li>
+            {% if current_phase.actual_start_date %}
+            <li>{{ t('timeline.started') }} {{ current_phase.actual_start_date.strftime('%b %d, %Y') }}</li>
+            {% else %}
+            <li class="cc-preflight-warn">{{ t('timeline.not_started_yet') }} — actual_start_date will be backfilled</li>
+            {% endif %}
+            {% if current_phase.owner %}
+            <li>Owner: {{ current_phase.owner }}</li>
+            {% else %}
+            <li class="cc-preflight-warn">{{ t('timeline.owner_not_assigned') }}</li>
+            {% endif %}
+          </ul>
+          <label class="cc-action-form-label" for="cc-finish-note">{{ t('timeline.cc_finish_note_label') }}</label>
+          <textarea id="cc-finish-note" name="completion_note" rows="2" class="cc-action-form-input"></textarea>
+          <div class="cc-action-form-buttons">
+            <button type="submit" class="btn btn-sm btn-success">{{ t('timeline.cc_btn_confirm') }}</button>
+            <button type="button" class="btn btn-sm btn-link" data-cc-cancel>{{ t('timeline.cc_btn_cancel') }}</button>
+          </div>
+        </form>
+        {% endif %}
+
+        {# Adjust Due Date — inline form #}
+        <form class="cc-action-form" data-cc-panel="adjust" hidden
+              method="post" action="/projects/{{ project.id }}/command/adjust-due-date">
+          <input type="hidden" name="phase_id" value="{{ current_phase.id }}">
+          <div class="cc-action-form-title">
+            <i class="bi bi-calendar-event me-2"></i>{{ t('timeline.btn_adjust_due_date') }}
+          </div>
+          <label class="cc-action-form-label" for="cc-adjust-date">{{ t('timeline.cc_adjust_new_date') }}</label>
+          <input id="cc-adjust-date" type="date" name="new_planned_end_date" class="cc-action-form-input"
+                 {% if current_phase.planned_end_date %}value="{{ current_phase.planned_end_date.isoformat() }}"{% endif %}>
+          <label class="cc-action-form-label" for="cc-adjust-reason">{{ t('timeline.cc_adjust_reason_label') }}</label>
+          <textarea id="cc-adjust-reason" name="reason" rows="2" required
+                    class="cc-action-form-input"
+                    placeholder="{{ t('timeline.cc_adjust_reason_placeholder') }}"></textarea>
+          <div class="cc-action-form-buttons">
+            <button type="submit" class="btn btn-sm btn-primary">{{ t('timeline.cc_btn_confirm') }}</button>
+            <button type="button" class="btn btn-sm btn-link" data-cc-cancel>{{ t('timeline.cc_btn_cancel') }}</button>
+          </div>
+        </form>
+
+        {# Add Update — inline journal-entry form #}
+        {% if can_view_journal %}
+        <form class="cc-action-form" data-cc-panel="add-update" hidden data-cc-disable-on-submit
+              method="post" action="/projects/{{ project.id }}/command/add-update">
+          <div class="cc-action-form-title">
+            <i class="bi bi-pencil me-2"></i>{{ t('timeline.btn_add_update') }}
+          </div>
+          <label class="cc-action-form-label" for="cc-update-text">{{ t('timeline.cc_update_text_label') }}</label>
+          <textarea id="cc-update-text" name="entry_text" rows="3" required
+                    class="cc-action-form-input"></textarea>
+          <label class="cc-action-form-label" for="cc-update-type">{{ t('timeline.cc_update_type_label') }}</label>
+          <select id="cc-update-type" name="entry_type" class="cc-action-form-input">
+            <option value="general">general</option>
+            <option value="factory_discussion">factory_discussion</option>
+            <option value="cost_discovery">cost_discovery</option>
+            <option value="design_feedback">design_feedback</option>
+            <option value="decision">decision</option>
+            <option value="risk">risk</option>
+            <option value="packaging">packaging</option>
+            <option value="variant">variant</option>
+            <option value="other">other</option>
+          </select>
+          <div class="cc-action-form-buttons">
+            <button type="submit" class="btn btn-sm btn-primary">{{ t('timeline.cc_btn_confirm') }}</button>
+            <button type="button" class="btn btn-sm btn-link" data-cc-cancel>{{ t('timeline.cc_btn_cancel') }}</button>
+          </div>
+        </form>
+        {% endif %}
+
+      </div>
+      {% endif %}
     </section>
     {% endif %}
 

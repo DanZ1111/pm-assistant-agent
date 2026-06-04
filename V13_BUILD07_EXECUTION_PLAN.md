@@ -107,8 +107,10 @@ Reuse Build 14's existing vocabulary: `general / factory_discussion / cost_disco
 ### Lock 6 — Permission re-validation (defense in depth)
 Each new route independently re-runs `require_auth` + `can_edit_project` (and `can_view_journal` for Add Update). Form rendering hides buttons the user can't use, but server-side checks are the load-bearing protection. Mirrors the Build 14 / Build 17 pattern.
 
-### Lock 7 — No idempotency tokens for these routes
-Build 30A's `project_creation_tokens` covers project creation. For Finish/Adjust/Add Update, idempotency comes from server-side state: Finish re-checks `current_phase.id` (Lock 3); Adjust is idempotent because the same date set twice is a no-op (`update_phase` only writes a `phase_plan_changes` row when the date actually changed); Add Update is per-journal-entry so double-submit creates two rows — accepted risk since journal entries are cheap and PMs can edit/delete in Build 14. If duplicate-journal becomes a real problem, Build 07B can add the same token pattern (small scope).
+### Lock 7 — No idempotency tokens for these routes; Add Update gets client-side submit-disable
+Build 30A's `project_creation_tokens` covers project creation. For Finish/Adjust/Add Update, idempotency comes from server-side state: Finish re-checks `current_phase.id` (Lock 3); Adjust is idempotent because the same date set twice is a no-op (`update_phase` only writes a `phase_plan_changes` row when the date actually changed); Add Update is per-journal-entry so double-submit creates two rows — accepted risk since journal entries are cheap and PMs can edit/delete in Build 14.
+
+**Amendment (user-approved 2026-06-04):** the Add Update form's submit button additionally disables on first click and swaps the label to a spinner (mirrors the Build 30A form pattern). Belt-and-suspenders: not load-bearing, just reduces accidental double-submit. If duplicate-journal becomes a real problem in practice, Build 07B can add the full server-side token pattern.
 
 ## UI Scope
 
