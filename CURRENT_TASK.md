@@ -1,7 +1,7 @@
 # CURRENT_TASK.md
 
 ## Task
-v1.3 Build 08 — Timeline Updates / History (derived view). Implemented + tested. Awaiting push.
+v1.3 Build 09 — Planning Sandbox Design (design-only). Shipped. Awaiting Build 10 (release hardening).
 
 ## Handoff rule
 Before editing, inspect:
@@ -13,44 +13,41 @@ Git/code is the source of truth.
 
 ## What just shipped in this session
 
-- **Plan** committed at `3e9a373` (initial draft) + `4796778` (folded ChatGPT amendments — Locks 2/7/10 + source_id + 3 empty states + expanded tests).
-- **Build 08 implementation** committed as one atomic commit (see latest `git log`). Locks 1–11 approved 2026-06-06 with ChatGPT amendments; implementation followed plan verbatim.
-  - `app/crud.py` — new `get_timeline_events(db, project_id, limit, viewer)` helper + 5 sub-helpers + 2 constants (COST_FIELDS, SENSITIVE_FILE_CATEGORIES, _SAMPLE_PHASE_TYPES, _classify_project_change, _is_pc_sensitive, _journal_bucket_and_subtype) + 5 bucket constants. Pure derivation over `project_changes` + `phase_plan_changes` + `project_journal_entries`. Returns `{events, total_unfiltered_visible, viewer_hidden_count, total}`. Deterministic tiebreaker on `occurred_at` ties: `(source_priority, source_id DESC)`. Viewer filter removes restricted events entirely (cost field_updates, sensitive file_category uploads, journal-mirror event_note rows whose summary begins with "Journal entry added:", and all journal-sourced rows).
-  - `app/routes/projects.py` — `project_detail` view passes `timeline_history` + `is_viewer` into template context.
-  - `app/templates/project_detail.html` — new `<section id="timeline-history">` inside `workspacePanelTimeline`, AFTER existing `#timeline` Detailed Table section. 6 filter chips (data-filter attrs); event list with bucket badge + optional subtype + optional AI badge + actor + optional View anchor; 3 distinct empty state blocks; Show More button only when total > 50.
-  - `app/static/css/styles.css` — `.timeline-history-*` styles: chips, bucket-colored badges (delays red / decisions blue / blockers red / phase_changes green / files purple), subtype + AI badges, row layout, mobile breakpoint at 768px. Filter behavior via attribute selectors on the section's `data-active-filter`.
-  - `app/static/js/main.js` — `initTimelineHistory()` IIFE: chip click toggles active state + section's `data-active-filter`; computes filter empty-state across the FULL loaded array (not just visible 50, per Lock 5); Show More reveals rows 51-200 and re-evaluates the active filter.
-  - `app/i18n/en.json` + `zh.json` — 26 new `timeline.history_*` keys; parity **714/714**.
-  - `test_v13_build08.py` — **55/55 PASS** (helper shape + 3 sources merged + bucket coverage + 6 classification cases + viewer hidden_count + viewer-no-journal + viewer-no-cost + source_id traceability + deterministic ordering + Lock 10 anchor fallback + 14 template markers + 3 empty states + Show More gate + Lock 5 full-array filter + Build 06/07A/07B invariants).
+- **Build 09 — Planning Sandbox Design (design-only)**, committed as one atomic commit (see latest `git log`).
+  - `V13_BUILD09_PLANNING_SANDBOX_DESIGN.md` (~24 KB) — comprehensive design lock covering all 8 user-specified sections: purpose, 6 template types, module model, dependency/overlap, estimated launch math, save-as-template flow, 6 open schema decisions (with recommendations), and the recommended v1.4 4-sub-build implementation sequence.
+  - `test_v13_build09.py` — **31/31 PASS**. Regression-guard: asserts design doc exists, all 8 locked sections present, all 6 template types named, all 6 schema decisions present, 4 v1.4 sub-builds present, AND zero scope drift (no migration drift, no i18n drift, no new tables, no can_overlap/overlap_group columns, no new AI tools).
+  - No app code changed. No schema. No migration. No i18n. No AI tools. No routes.
 
-## Build 08 — Confirmed locks (1-11)
+## Build 09 — design lock highlights (for v1.4 reference)
 
-1. **Pure derivation**; no `timeline_events` table.
-2. **6 filter chips** exactly (All / Delays / Decisions / Blockers / Phase Changes / Files+Renderings); every event has one primary bucket (no orphans).
-3. **Viewer permission filtering** removes restricted events entirely — no hidden placeholders.
-4. **50 default · 200 ceiling** with Show More; no cursor pagination.
-5. **Client-side filter chips** against full 200-event array.
-6. **AI overlay badge** (`bi-robot`), not a separate bucket.
-7. **Newest first** + deterministic tiebreaker on ties.
-8. **Anchor links** where original record is reachable.
-9. (skip — was renumbered to 11)
-10. **Anchor links best-effort** with graceful fallback (link_anchor=None when target permission-hidden or DOM-missing).
-11. **Scope discipline** — out of scope: AI summaries, semantic re-classification, edit-from-history, unread markers, per-event mute/star/pin, CSV export, cross-project feed, date-range picker, cursor pagination beyond 200, email digest.
+### Schema decisions locked (Q1–Q6)
+1. **Templates as DB rows**, not static config (`timeline_templates` + `timeline_template_modules`).
+2. **Dependencies in a join table**, not a JSON column (cycle detection + topological sort need queryable edges).
+3. **Copy-down module → phase** when applying a template (historical project phases must not mutate when source template evolves).
+4. **Persisted sandbox state** on the project itself (no separate `sandbox_drafts` table; every edit flows through `crud.update_phase` and writes a normal `phase_plan_changes` audit row).
+5. **AI tool surface**: read + apply tools (confirmation-required), no `create_timeline_template` AI tool (matches `delete_variant` UI-only pattern).
+6. **Python DAG, not SQL CTE** for the dependency engine (project scale 8–14 phases doesn't warrant DB-side recursion).
 
-## Discovered + deferred (per Lock 11)
+### v1.4 sub-build sequence (locked)
+| Sub-build | Scope | Risk |
+|---|---|---|
+| v1.4 Build 01 | Template tables + seed 6 system templates + admin-only template list page | Low |
+| v1.4 Build 02 | "Apply template" flow on New Project form + AI intake confirm | Medium |
+| v1.4 Build 03 | Sandbox UI: edit durations + dependencies + overlap + live estimated launch | **High** |
+| v1.4 Build 04 | "Save current as template" | Low |
 
-- **Legacy Change Log (`#changes`) viewer leak**: the Build 13 Change Log section renders journal-mirror `event_note` rows to viewers without filtering. Pre-existing behavior; out of Build 08 scope. Build 08 hides those rows specifically in its new History feed via `_is_pc_sensitive`. If we want to fix the Change Log too, that's its own small build (likely ~10 LOC + 1 assertion).
+### Out of scope for v1.3 entirely (per Build 09 doc)
+Any DB table for templates, any migration, any UI for templates, any route changes, any AI tool addition, any seed data, any change to `PHASE_TEMPLATES`, any cycle-detection / topological-sort code.
 
 ## Verification at ship time
 
-- `python3 test_v13_build08.py` — **55/55 PASS**.
+- `python3 test_v13_build09.py` — **31/31 PASS**.
 - Regression sweep all green:
-  - `test_v13_build01..07b` — 325 assertions total, all PASS.
+  - `test_v13_build01..08` — 380 assertions total, all PASS.
   - `test_build_v121` — 19/19.
-  - `test_build30` — 23/23.
-  - `test_ai_e2e` — 15P/2S/0F (SKIPs are OPENAI key issues, not regressions).
-- i18n parity: **714/714**.
-- Migration count: **6** (unchanged — no schema change in Build 08).
+- i18n parity: **714/714** (unchanged).
+- Migration count: **6** (unchanged).
+- Code changes outside the new doc + new test file: **zero** (verified by test invariants).
 
 ## v1.3 Build series status
 
@@ -65,34 +62,42 @@ Git/code is the source of truth.
 | 06 — Timeline Command Center Shell | shipped | `4a800d6` |
 | 07A — Timeline Command Actions (3 routes) | shipped | `57b48c3` |
 | 07B — Project Blockers | shipped | `5dfff4e` |
-| **08 — Timeline Updates / History** | **shipped this session** | latest |
-| 09 — Planning Sandbox (design doc only) | planned | — |
-| 10 — v1.3.0 Release Hardening | planned | — |
+| 08 — Timeline Updates / History | shipped | `3ab1dc8` |
+| **09 — Planning Sandbox Design (design-only)** | **shipped this session** | latest |
+| 10 — v1.3.0 Release Hardening | next | — |
 
-## Next step
+## Next step — Build 10 (v1.3.0 Release Hardening)
 
-Wait for user direction. Suggested next moves:
-1. **Push** to origin (currently 8+ commits ahead of `origin/main`).
-2. **Browser walkthrough** of Build 08 — create a project, run through 3 phase finishes + 2 plan adjusts + 1 blocker + resolve + 2 journal entries + 1 file upload + 1 cost change. Verify all show up in History, correctly typed + bucketed, newest first. Click each filter chip; verify viewer's hidden-event count.
-3. **Build 09** — Planning Sandbox **design doc only** per masterplan §"Non-Negotiable Product Decisions" → "Planning Sandbox is design-only in initial v1.3." Single markdown deliverable, ~1 commit, no code.
-4. **Build 10** — v1.3.0 release hardening: bump `app/version.py` from `1.2.1` to `1.3.0`, update visible version strings, write `test_v13_build10.py` as the release-proof regression that re-runs v1.3 Builds 01-09 + v1.2.1 baseline.
-5. **Optional cleanup** — fix the legacy Change Log viewer leak discovered during Build 08 (small standalone build; ~10 LOC + 1 assertion in `test_build14.py` or wherever).
+Final v1.3 build. Suggested scope (per masterplan §"Testing Standard"):
+1. **Version bump**: `app/version.py` `v1.2.0-build30` → `v1.3.0`. Update build name + LAST_UPDATED. Update visible version strings if any exist outside `app/version.py`.
+2. **Roll up CHANGELOG**: collapse the Unreleased section's v1.3 Builds 01-09 entries into a single `## v1.3.0` heading with a release narrative + dated.
+3. **Update MASTERPLAN.md**: mark all 10 v1.3 builds as ✓ SHIPPED with their commit hashes; add v1.3.0 to the version history table if one exists.
+4. **Write `test_v13_build10.py`** as the release-proof regression: re-runs all v1.3 Builds 01-09 + v1.2.1 baseline, asserts the version string, asserts the CHANGELOG has a v1.3.0 entry. Mirrors `test_build29.py`'s shape (which served the same role for v1.2.0).
+5. **Address the legacy Change Log viewer leak** discovered during Build 08:
+   - **Risk assessment**: low. The leak surfaces `event_note` audit rows whose summary mirrors journal-entry text to viewer in the `#changes` section (line 1497 in `project_detail.html`). Viewer permissions are otherwise correct everywhere else (Build 08's `#timeline-history` already hides these). Severity: information disclosure to a role that already has read access to projects; not a privilege escalation.
+   - **Recommendation**: include the fix in Build 10 — it's small (~10 LOC in the template's `change-log` for-loop to also skip `event_note` rows whose summary starts with "Journal entry added:" when `not can_view_journal`). Add a single assertion in `test_v13_build10.py` to lock the fix. Avoids shipping v1.3.0 with a known viewer-visibility bug.
+   - **Alternative**: ship v1.3.0 first, fix as v1.3.1 patch. Defensible if the rest of the release is critical and we want the change set to be exactly Builds 01-09. **My vote: include in Build 10** because the fix is trivial and shipping a known leak in a release flagged as "release-hardening" reads poorly.
 
 ## Deferred to future builds (carried forward)
 
-- Native-speaker Chinese review of strings added in Builds 26-30C + v1.3 Builds 01-08.
+- Native-speaker Chinese review of strings added in Builds 26-30C + v1.3 Builds 01-09.
 - AI prompt translation, Help modal body translation, `/admin/*` page translation.
-- Full Profit Model implementation (variant cell shows naive margin; full model is v1.4).
+- Full Profit Model implementation (v1.4).
 - Row-level multi-tenancy.
 - Bulk delete from the projects list / soft-delete with undo window.
 - Auto-provisioning script for Railway.
 - One-time admin cleanup of the original 6 admin-linked duplicates from the Build 30A incident.
-- Cursor pagination beyond 200 events (per Lock 11).
-- Semantic AI classification of legacy entries (per Lock 11).
-- Timeline templates / sandbox implementation (Build 09 is design-doc only).
-- CSV / PDF export of Timeline History (per Lock 11).
+- **Planning Sandbox implementation** — design locked in Build 09; implementation is v1.4 Builds 01-04 per the sequence in `V13_BUILD09_PLANNING_SANDBOX_DESIGN.md` §8.
+- Cursor pagination beyond 200 Timeline History events (per Build 08 Lock 11).
 - Recently-resolved blockers section in Command Center (per Build 07B Lock 10).
 
-## v1.3 process pattern (continues)
+## v1.3 process pattern (closing the series)
 
-Every build gets a build-specific execution plan before coding. Plan files are committed/reviewed first; ChatGPT + Claude both review; the plan gets amended before code lands. Builds touching schema additionally write an Architecture Review section answering CLAUDE.md's 6 schema questions; Build 08 wrote an Architecture Review **in reverse** (proving existing tables can honestly support the requirement, so no schema change is needed). Locks are resolved in-plan before implementation starts. Build 08 added another reusable lock type: **graceful anchor fallback** (Lock 10) — links omitted when target permission-hidden or DOM-missing rather than rendered as broken. Carries forward to any future build that links across permission-gated sections.
+Every build in this series:
+- Started with a per-build execution plan (`V13_BUILD0X_EXECUTION_PLAN.md`), committed and reviewed before code.
+- Got a Backend Honesty Mapping when display surfaces were introduced.
+- Got an Architecture Review when schema changed (Build 07B, Build 05B) OR in reverse when schema was deliberately NOT changed (Build 08 — proved existing tables sufficient; Build 09 — locked the design for v1.4).
+- Got a "Scope discipline" lock (introduced in Build 07B Lock 10, carried through Builds 08 and 09) — an explicit out-of-scope list to prevent feature creep mid-build.
+- Got a regression sweep + commit before moving to the next build.
+
+This pattern scales. v1.4 Sandbox builds should reuse it verbatim.
