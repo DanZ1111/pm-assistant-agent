@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -23,6 +23,17 @@ engine = create_engine(
     connect_args=_connect_args,
     pool_pre_ping=True,
 )
+
+# Enforce foreign-key constraints on SQLite to mirror PostgreSQL (Railway prod)
+# behavior. Default SQLite has PRAGMA foreign_keys = OFF, which silently allows
+# FK violations in dev that later 500 on Railway. This event listener flips it
+# ON for every new SQLite connection. PostgreSQL ignores the PRAGMA.
+if SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
+    @event.listens_for(engine, "connect")
+    def _sqlite_fk_on(dbapi_connection, _connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys = ON")
+        cursor.close()
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

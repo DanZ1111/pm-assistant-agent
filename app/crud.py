@@ -565,9 +565,47 @@ def archive_project(db: Session, project_id: int) -> Project | None:
     return project
 
 def delete_project(db: Session, project_id: int) -> bool:
+    """Delete a project + all related rows.
+
+    Most child tables cascade via the SQLAlchemy `Project` relationships
+    (phases, files, changes, ai_messages, idea_links, journal_entries,
+    variants, variant_components, blockers — all cascade="all, delete-orphan").
+
+    Two child tables have a `project_id` FK but NO corresponding `Project`
+    relationship, so cascade does not fire. We delete them explicitly before
+    the ORM delete to avoid a FOREIGN KEY constraint violation. This bug
+    was silent on SQLite (dev) because the default `PRAGMA foreign_keys`
+    is OFF, but always raised a 500 on PostgreSQL (Railway prod) where
+    FK enforcement is always on.
+
+      - `ai_conversations`: every AI-intake project gets one. The
+        cascade also has to handle `ai_messages.conversation_id`, which
+        is referenced via a separate FK chain through AIConversation.
+      - `project_creation_tokens`: the Build 30A idempotency token row.
+        Cleanup is opportunistic in normal operation but stragglers
+        block project delete.
+    """
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         return False
+
+    # Late imports to mirror the pattern used elsewhere in this file.
+    from app.models import AIConversation, AIMessage, ProjectCreationToken
+
+    # Sever ai_messages.conversation_id BEFORE the AIConversation rows go,
+    # since the Project.ai_messages relationship already cascades via
+    # project_id but those messages may also reference conversations being
+    # deleted in the same transaction.
+    db.query(AIMessage).filter(
+        AIMessage.project_id == project_id
+    ).update({"conversation_id": None}, synchronize_session=False)
+    db.query(AIConversation).filter(
+        AIConversation.project_id == project_id
+    ).delete(synchronize_session=False)
+    db.query(ProjectCreationToken).filter(
+        ProjectCreationToken.project_id == project_id
+    ).delete(synchronize_session=False)
+
     db.delete(project)
     db.commit()
     return True
