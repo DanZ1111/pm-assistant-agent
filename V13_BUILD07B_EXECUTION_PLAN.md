@@ -2,11 +2,18 @@
 
 ## Status
 
-Plan-only execution gate. No code until this plan is reviewed and approved.
+Plan-only execution gate. **Locks 1–10 approved (user, 2026-06-05).** Implementation runs in the next session.
 
 Predecessor: Build 07A shipped at `57b48c3` (Finish / Adjust / Add Update wired to dedicated Command Center routes; Add Blocker stayed disabled with tooltip "Coming Build 07B — needs Architecture Review for blocker model").
 
-This plan starts with the **Architecture Review** the user's `V13_BUILD07_TIMELINE_COMMAND_ACTIONS_PLAN.md` and `CLAUDE.md` both require before any blocker-model schema change. The plan resolves the 7 open Architecture Review questions sketched at the end of `V13_BUILD07_EXECUTION_PLAN.md`. Each answer is presented as the **proposed** default; the user can override any item before implementation starts.
+This plan starts with the **Architecture Review** the user's `V13_BUILD07_TIMELINE_COMMAND_ACTIONS_PLAN.md` and `CLAUDE.md` both require before any blocker-model schema change. The plan resolves the 7 open Architecture Review questions sketched at the end of `V13_BUILD07_EXECUTION_PLAN.md`.
+
+### Approved lock summary (per 2026-06-05 review)
+
+The 10 locks below were reviewed and approved. Three deltas vs. the initial plan draft:
+- **Lock 4** — `+N more` collapsed details list is **deferred**; tile shows only the active-count badge. Full list lands in Build 08 with Timeline History.
+- **Lock 6** — resolve audit requirement (`status='resolved'`, `resolved_at`, `resolved_by_user_id`, `write_change('blocker_resolved')`) is now **mandatory and explicit** in the lock, not just implied by the Backend Honesty Mapping.
+- **Lock 10** — NEW. Scope discipline: 07B is "blocker model + honest display + basic actions + tests". Explicitly forbids project health engine, SLA timers, severity weighting math, proactive AI proposal, recently-resolved section, or any of the other near-adjacent features that could grow scope.
 
 ## User Problem (from the canonical doc)
 
@@ -153,7 +160,7 @@ Touch:
 - `app/static/js/main.js` — extend `initCommandCenter()` so the new add/edit/resolve buttons populate the form mount the same way Build 07A's Finish/Adjust/Add Update do. Likely <10 lines additional.
 - `app/ai/tools.py` — add 3 new tool schemas (`create_blocker`, `update_blocker`, `resolve_blocker`) + handlers; add them to `CONFIRMATION_TOOLS`; add `UPDATE_BLOCKER_ALLOWED` whitelist.
 - `app/ai/prompts.py` — add 1-2 sentences guiding the assistant on when to propose a blocker (mirrors the create_idea guidance pattern at app/ai/prompts.py:157).
-- `app/i18n/en.json` + `zh.json` — ~22 new keys (tile labels, severity chips, form fields, banner messages, Pulse branch, phase-strip aria). Parity target 688/688.
+- `app/i18n/en.json` + `zh.json` — 24 new keys − 2 removed (Build 06 disabled-button strings) = **net +22**. Parity target **688/688**.
 - `AI_TOOLS_REGISTRY.md` — add a row for the 3 new tools (per CLAUDE.md: "For any feature that creates structured data, add a corresponding tool entry").
 - `test_v13_build07b.py` — new file (target ~40 assertions).
 - `CURRENT_TASK.md`, `CHANGELOG.md`.
@@ -172,17 +179,27 @@ Do not touch:
 ### Lock 2 — Severity is `low | medium | high`, not numeric
 Three values cover the visual difference (gray / amber / red). Numeric severity invites scope creep (sort priority math, weighted aging). Default `medium` so omitted-severity creates don't fail.
 
-### Lock 3 — `phase_id` is OPTIONAL
-A blocker can attach to any phase OR none. Validation: if `phase_id` provided, it must belong to the same `project_id` (mirrors the existing `_relationship_error` pattern in `app/ai/tools.py:455`). Routes reject mismatched phase_id with `cc_result=not_authorized`.
+### Lock 3 — `phase_id` is OPTIONAL; phase-strip dot is the only display that distinguishes
+A blocker can attach to any phase OR none (project-level). Validation: if `phase_id` provided, it must belong to the same `project_id` (mirrors the existing `_relationship_error` pattern in `app/ai/tools.py:455`). Routes reject mismatched phase_id with `cc_result=not_authorized`.
 
-### Lock 4 — "Main blocker" tile shows ONE blocker at a time (newest active)
-Multiple active blockers are summarized as "+ {N-1} more" link that scrolls to a full list rendered below the tile (collapsed by default behind a `<details>` summary, mirroring the Detailed Table pattern from Build 06). Avoids tile sprawl while keeping all blockers reachable.
+**Phase-strip red dot fires ONLY for blockers with non-NULL `phase_id`.** Project-level blockers (phase_id = NULL) are never randomly attached to a phase block — they appear in the Command Center main tile and Pulse cascade but contribute zero dots on the strip. This is intentional: a project-level blocker without a phase is "this project as a whole is blocked", not "this specific phase is blocked".
+
+### Lock 4 — "Main blocker" tile shows ONE blocker (newest active) + a count
+Tile renders the single newest active blocker (by `created_at desc`). When `count_active > 1`, a small badge next to the tile title reads `(+{N-1} more active)` — text only, no link, no list, no `<details>` collapse. Users access the rest by clicking through to Build 08's Timeline History (when shipped) or by resolving the current one and seeing the next.
+
+**Per ChatGPT-approved locks: a full list of other active blockers is deferred** to keep 07B small and to avoid duplicating what Timeline History will render in Build 08. The active count is exposed on the model side (`get_active_blockers_for_project` returns the full list, count is `len(...)`), so the badge is honest.
 
 ### Lock 5 — Pulse branch inserted FIRST in the cascade
-Active blocker beats delay beats thesis beats missing-field beats inspiration. Rationale: a known active blocker is more actionable than a calculated delay (the blocker may be the *reason* for the delay). Doc-aligned: "what should the PM do next?" — resolve the blocker first.
+Active blocker beats delay beats thesis beats missing-field beats inspiration. Rationale: a known active blocker is more actionable than a calculated delay (the blocker may be the *reason* for the delay). Doc-aligned: "what should the PM do next?" — resolve the blocker first. **Behavior change for Build 02 Pulse**: when ≥1 active blocker exists, the existing delay/thesis/missing-field branches are suppressed for this render. `test_v13_build02.py` will need a one-line assertion update.
 
-### Lock 6 — Resolve is a one-click action, NOT a form
-[Resolve] button on an active blocker posts directly to `/command/resolve-blocker` with `blocker_id`. No reason field, no confirmation modal — the blocker title + description IS the context. Bulk-resolve and resolution notes are deferred. If PMs want to capture *how* a blocker was resolved, they use Add Update (Build 07A) immediately after.
+### Lock 6 — Resolve is one-click; audit is mandatory
+[Resolve] button on an active blocker posts directly to `/command/resolve-blocker` with `blocker_id`. No reason field, no confirmation modal — the blocker title + description IS the context.
+
+**Audit requirement (made explicit per ChatGPT-approved locks):** `crud.resolve_blocker` MUST:
+1. Set `status='resolved'`, `resolved_at=datetime.utcnow()`, `resolved_by_user_id=current_user.id`.
+2. Call `write_change()` with `change_type='blocker_resolved'`, summary = `"Blocker resolved: {title}"`, `changed_by=user.role`, `source_type='manual_edit'`.
+
+The change-log row IS the auditable history record. No additional table needed (Timeline History in Build 08 reads from `project_changes`). Bulk-resolve and resolution notes remain deferred.
 
 ### Lock 7 — Defense-in-depth permission re-validation per route
 Same pattern as Build 07A: each new route independently re-runs `require_auth` + `can_edit_project`. Phase ownership cross-check on Add/Edit. Admin-bypasses do NOT short-circuit phase-belongs-to-project validation.
@@ -192,6 +209,33 @@ Build 07A's `data-cc-disable-on-submit` JS hook applies to the new Add Blocker f
 
 ### Lock 9 — AI proposes; user confirms (Build 27 pattern, no exceptions)
 `create_blocker`, `update_blocker`, `resolve_blocker` all go through Build 27 confirmation. No silent AI write. `delete_blocker` is NOT exposed as an AI tool (admin-only UI action; matches `delete_variant`).
+
+### Lock 10 — Scope discipline: blocker model + honest display + basic actions + tests, nothing more
+07B ships exactly:
+- 1 new table (`project_blockers`)
+- 6 crud helpers (create / update / resolve / get_active / get_by_phase / get_active_by_phase_set)
+- 3 new routes (`/command/add-blocker`, `/command/edit-blocker`, `/command/resolve-blocker`)
+- 1 Command Center tile (replaces Build 06 placeholder)
+- 1 Pulse cascade branch
+- 1 phase-strip red dot
+- 3 AI tools + handlers
+- 1 test file (~40 assertions)
+- 1 migration
+
+**Out of scope for 07B (do not implement; do not "while we're here"):**
+- A "project health" scoring / engine.
+- Severity weighting / sort logic beyond display color.
+- Blocker → Pulse text richness (we surface title only, not blast-radius reasoning).
+- Cross-project blocker dashboard.
+- Proactive AI blocker detection from chat (manual-only this build).
+- Recently-resolved section in Command Center.
+- "+N more" expanded list / details accordion.
+- Blocker comments / discussion thread.
+- File attachments on blockers.
+- SLA timers / auto-escalation / overdue blocker pressure.
+- Auto-migrating existing `journal.entry_type='risk'` rows into blockers.
+
+If any of these surface during implementation, they stop the work and become a separate plan. This lock exists because the wireframe shows ONE tile and Pulse shows ONE branch — the surrounding system (health scoring, SLAs, etc.) is genuinely a future feature.
 
 ## Permissions
 
@@ -217,8 +261,7 @@ Viewer sees the tile + Pulse branch + phase-strip dot. Viewer cannot create / ed
 | `timeline.blocker_more_affordance` | more | 更多 |
 | `timeline.blocker_opened_meta` | Opened {n} days ago by {author} | 由 {author} 提出 {n} 天 |
 | `timeline.blocker_opened_today` | Opened today by {author} | 今天由 {author} 提出 |
-| `timeline.blocker_more_count` | + {n} more | 还有 {n} 条 |
-| `timeline.blocker_others_summary` | Other active blockers | 其他进行中的阻碍 |
+| `timeline.blocker_more_count` | +{n} more active | 另有 {n} 条进行中 |
 | `timeline.blocker_severity_low` | Low | 低 |
 | `timeline.blocker_severity_medium` | Medium | 中 |
 | `timeline.blocker_severity_high` | High | 高 |
@@ -238,7 +281,7 @@ Viewer sees the tile + Pulse branch + phase-strip dot. Viewer cannot create / ed
 | `pulse.blocker_action_copy` | "{title}" is open. Resolve it before continuing. | 「{title}」尚未解决，请先处理。 |
 | `pulse.open_command_center` | Open Command Center | 打开指挥中心 |
 
-Total: **25 new keys** (one above the rough ~22 estimate). Parity target 691/691 (= 666 from Build 07A + 25). The Build 07A `timeline.btn_add_blocker_disabled` and `timeline.btn_add_blocker_tooltip` keys are **removed** in 07B since the button is no longer disabled (net = +25, -2 = +23 → 689/689). **Locked target: 689/689.** Plan re-counts during implementation if any key is reworded.
+Total: **24 new keys** (one removed vs prior plan revision since `timeline.blocker_others_summary` is no longer needed under Lock 4). The Build 07A `timeline.btn_add_blocker_disabled` and `timeline.btn_add_blocker_tooltip` keys are **removed** in 07B since the button is no longer disabled (net = +24, -2 = +22 → 688/688). **Locked target: 688/688.** Plan re-counts during implementation if any key is reworded.
 
 ## Tests — test_v13_build07b.py
 
@@ -275,7 +318,7 @@ Target ~40 assertions. Mirrors v1.3 test pattern (requests.Session + sqlite3).
 18. Active blocker present → Command Center tile renders title + description + severity badge + opened-meta line.
 19. Severity badge has class `.timeline-blocker-severity-high` (etc).
 20. No active blocker → tile renders empty state with `[+ Add blocker]` button.
-21. Multiple active blockers → tile shows newest + "+ {N-1} more" + collapsed `<details>` list of others.
+21. Multiple active blockers → tile shows newest + "+{N-1} more active" text badge (count only — no list, no `<details>` per Lock 4 / Lock 10).
 22. PM owner sees Edit + Resolve buttons; viewer does NOT see Edit or Resolve.
 
 ### Pulse next-action cascade
@@ -297,7 +340,7 @@ Target ~40 assertions. Mirrors v1.3 test pattern (requests.Session + sqlite3).
 34. AI call with `confirmed=True` from PM-owner runs the handler.
 
 ### Cross-cutting + regression
-35. i18n parity at 689/689.
+35. i18n parity at 688/688.
 36. Migrations count = 6.
 37. test_v13_build07.py (07A) re-runs green — Add Blocker button is no longer the disabled placeholder; the 07A assertion that checks for the `disabled` attribute on the Add Blocker button is updated to verify the button now exists, is enabled, and has `data-cc-form="add-blocker"`.
 38. test_v13_build06.py re-runs green — the placeholder assertion check (`data-placeholder="blocker"`) is updated to verify the honest tile now renders instead. AI Nudge placeholder still present.
@@ -343,16 +386,18 @@ If migration 006 ran in production before rollback, `DROP TABLE` is the only des
 ## Acceptance Criteria
 
 - Migration 006 creates `project_blockers` idempotently on SQLite + PostgreSQL.
-- `crud.create_blocker / update_blocker / resolve_blocker` each write a `project_changes` audit row.
+- `crud.create_blocker / update_blocker / resolve_blocker` each write a `project_changes` audit row (Lock 6 explicit).
 - Command Center "Main blocker" tile is honest: shows newest active blocker OR "No active blockers" empty state.
-- Pulse "Resolve blocker" branch fires first in the cascade when active blockers exist.
-- Phase strip shows red dot only on phases with ≥1 active blocker.
-- All 3 routes enforce permissions server-side; viewer + non-owner PM cannot mutate.
-- All 3 AI tools require Build 27 confirmation before write.
+- When multiple active blockers exist, tile shows newest + a `+{N-1} more active` text badge (Lock 4 — no expanded list).
+- Pulse "Resolve blocker" branch fires first in the cascade when active blockers exist (Lock 5).
+- Phase strip shows red dot ONLY on phases with ≥1 active phase-linked blocker; project-level blockers do not light up any phase (Lock 3).
+- All 3 routes enforce permissions server-side; viewer + non-owner PM cannot mutate (Lock 7).
+- All 3 AI tools require Build 27 confirmation before write (Lock 9).
 - `delete_blocker` is not exposed as an AI tool.
-- i18n parity at 689/689.
+- i18n parity at 688/688.
 - Build 06 + 07A + 02 (Pulse) regressions all pass after their assertions are updated for the new honest blocker tile.
-- Manual browser walkthrough passes (create / edit / resolve / "+ N more" / viewer view / AI propose+confirm).
+- Manual browser walkthrough passes (create / edit / resolve / count badge with 2+ active / viewer view / AI propose+confirm).
+- **No scope creep**: nothing from Lock 10's "out of scope" list landed in this PR.
 
 ## What Build 07B Solves From the User's Doc
 
@@ -375,4 +420,4 @@ These are all "default = NO/conservative" choices; user can override before impl
 
 ---
 
-End of Build 07B execution plan. Implementation begins only after this is reviewed and approved.
+End of Build 07B execution plan. Locks 1–10 approved 2026-06-05; implementation runs next session.
