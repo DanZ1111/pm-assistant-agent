@@ -2,7 +2,16 @@
 
 ## Status
 
-Plan-only execution gate. No code until this plan is reviewed and approved.
+Plan reviewed and **approved 2026-06-06** with ChatGPT-amended locks. Implementation runs this session.
+
+### Approved amendment summary (2026-06-06)
+
+- **Lock 2 tightened:** every event MUST have one primary filter bucket (one of the 6 chips). Subtypes (Sample / Rendering / Packaging / Cost) are overlay labels, not buckets. The "Manual Note" pure-orphan bucket is removed; orphan event_note rows fold into Decisions as project-level recorded changes.
+- **Lock 7 tightened:** deterministic tiebreaker when `occurred_at` ties — source priority (project_changes > phase_plan_changes > project_journal_entries) then `source_id DESC`.
+- **NEW Lock 10:** anchor links are best-effort. If the target DOM section is missing OR hidden by the viewer's permissions, omit the link rather than render a broken/dishonest one.
+- **TimelineEvent shape adds `source_id`** so every event traces to exactly one source row.
+- **Three explicit empty states** required: (a) no timeline events at all, (b) no events matching the active filter, (c) viewer's filter is non-empty in the full set but empty after permission filtering.
+- **Test coverage expanded** to cover merged ordering, viewer hiding, subtype badge rendering, Show more behavior, filter chips against the full 200 array (NOT just the visible 50), deterministic fallback for unclassifiable events.
 
 Predecessor: Build 07B shipped at `5dfff4e` (Project Blockers — first-class lifecycle model + Command Center wiring + Pulse cascade integration).
 
@@ -38,8 +47,8 @@ A new `timeline_events` table would let us pre-classify every event (Sample Upda
 ## Scope (strict)
 
 In:
-1. New service `crud.get_timeline_events(db, project_id, limit, sensitive_visible) -> list[dict]` that unions and normalizes events from 3 source tables.
-2. New `TimelineEvent` shape (Python dict / dataclass) — `occurred_at`, `event_type`, `event_subtype`, `actor`, `title`, `body`, `link_anchor`, `is_sensitive`, `is_ai`, `source_table`.
+1. New service `crud.get_timeline_events(db, project_id, limit, viewer) -> list[dict]` that unions and normalizes events from 3 source tables.
+2. New `TimelineEvent` shape (Python dict) — `occurred_at`, `bucket` (primary filter), `subtype` (display badge or None), `actor`, `title`, `body`, `link_anchor` (may be None per Lock 10), `is_ai`, **`source_table`, `source_id`** (per ChatGPT amendment — every event traces to exactly one source row).
 3. New section `#timeline-history` rendered inside `workspacePanelTimeline`, AFTER the existing `#timeline` Detailed Table section.
 4. Filter chips: All / Delays / Decisions / Blockers / Phase Changes / Files+Renderings (6 chips per the doc).
 5. Sensitive-event filter for viewer (cost field_updates, factory/engineer field_updates hidden from viewer).
@@ -122,25 +131,31 @@ Every event type traces to a real row in one of the 3 source tables. No fabricat
 
 | Doc event type | Source table | Filter rule | event_subtype | Permission rule | Test coverage |
 |---|---|---|---|---|---|
-| **Phase Change** | `project_changes` | `change_type='phase_update'` AND summary does NOT match Sample/Packaging rules | (none) | all authenticated | Build 17 covers writes; Build 08 adds rendering test |
-| **Decision** | `project_journal_entries` | `entry_type='decision'` | (none) | `can_view_journal` (viewer cannot see Journal entries — same in History) | Build 14 + new |
-| **Delay** | `phase_plan_changes` | `new_date > old_date` (forward shift); `old_date` non-null | (none) | all authenticated | Build 17 + new |
-| **Blocker** | `project_changes` | `change_type IN ('blocker_opened','blocker_updated','blocker_resolved')` | the change_type itself | all authenticated | Build 07B + new |
-| **File Uploaded** | `project_changes` | `change_type='file_upload'` AND linked file's `file_category != 'rendering'` | (none) | all authenticated; sensitive file categories hidden from viewer (factory_feedback, quotation) | Build 13 + new |
-| **Rendering Update** | `project_changes` | `change_type='file_upload'` AND linked file's `file_category='rendering'` | (none) | all authenticated | Build 04 + new |
-| **Cost Update** | `project_changes` | `change_type='field_update'` AND `field_name IN COST_FIELDS` | the field_name | **viewer HIDDEN** (cost data) | Build 13 + new |
-| **Sample Update** | `project_changes` | `change_type='phase_update'` AND phase.phase_type IN ('prototype','review') | (none) | all authenticated | Build 17 + new |
-| **Packaging Update** | `project_journal_entries` | `entry_type='packaging'` | (none) | `can_view_journal` (viewer cannot see) | Build 14 + new |
-| **AI Intake** | (overlay, not bucket) | `source_type='ai_chat'` OR `changed_by='ai'` | n/a | inherits the underlying event's permission | new |
-| **Manual Note** | catch-all | `project_journal_entries.entry_type NOT IN (decision, packaging)` AND `project_changes.change_type='event_note'` | (none) | journal half: `can_view_journal`; event_note half: all authenticated | Build 14 + new |
+| Doc display label | Source rule | **Primary bucket** (filter chip) | **Subtype badge** (display-only) | Permission rule | Test coverage |
+|---|---|---|---|---|---|
+| **Phase Change** (generic) | `project_changes.change_type='phase_update'` AND phase.phase_type NOT IN sample-types | Phase Changes | — | all authenticated | Build 17 + new |
+| **Sample Update** | `project_changes.change_type='phase_update'` AND phase.phase_type IN ('prototype','review','production') | Phase Changes | Sample | all authenticated | Build 17 + new |
+| **Decision** | `project_journal_entries.entry_type='decision'` | Decisions | — | `can_view_journal` (viewer hidden) | Build 14 + new |
+| **Delay** | `phase_plan_changes` with `new_date > old_date` (forward shift); `old_date` non-null | Delays | — | all authenticated | Build 17 + new |
+| **Blocker** | `project_changes.change_type IN ('blocker_opened','blocker_updated','blocker_resolved')` | Blockers | (opened / updated / resolved as label) | all authenticated | Build 07B + new |
+| **File Uploaded** (generic) | `project_changes.change_type='file_upload'` AND file_category NOT IN (rendering, packaging) | Files+Renderings | — | all authenticated; sensitive file_categories (factory_feedback, quotation) hidden from viewer | Build 13 + new |
+| **Rendering Update** | `project_changes.change_type='file_upload'` AND file_category='rendering' | Files+Renderings | Rendering | all authenticated | Build 04 + new |
+| **Cost Update** | `project_changes.change_type='field_update'` AND `field_name IN COST_FIELDS` | Decisions | Cost | **viewer HIDDEN** (cost data) | Build 13 + new |
+| **Packaging Update** (journal) | `project_journal_entries.entry_type='packaging'` | Decisions | Packaging | `can_view_journal` (viewer hidden) | Build 14 + new |
+| **Packaging Update** (file) | `project_changes.change_type='file_upload'` AND file_category='packaging' | Files+Renderings | Packaging | all authenticated | Build 13 + new |
+| **AI Intake** | (overlay, not bucket) `source_type='ai_chat'` OR `changed_by='ai'` | inherits underlying bucket | AI | inherits underlying event's permission | new |
+| **Manual Note** (display label) | `project_journal_entries.entry_type IN (general, factory_discussion, design_feedback, question, other)` | Decisions | — | `can_view_journal` (viewer hidden) | Build 14 + new |
+| **Recorded change** (display label) | `project_changes.change_type='event_note'` (catch-all from create_variant, create_journal_entry's audit, etc.) | Decisions | — | all authenticated (no role-protected fields) | Build 13 + new |
 
 `COST_FIELDS = {"target_factory_cost", "actual_factory_cost", "target_msrp", "actual_msrp", "packaging_cost"}` (closed allowlist).
 
 ### Reading the mapping
 
-- **6 source-driven buckets** + **3 contextual subtypes** (Sample = phase_type-driven, Rendering = file_category-driven, Packaging = entry_type-driven) + **1 overlay badge** (AI Intake) = exactly the doc's 11 event types displayed honestly.
-- **No type is fabricated.** Every label has a deterministic filter rule with no fall-through to "I'll guess."
-- **Manual Note** is the catch-all for everything that doesn't match the above rules (e.g., `event_note` change-log rows from `create_journal_entry`, `create_variant`, etc.). Keeps the feed honest about its catch-all rather than mis-labeling.
+- **Every event has exactly one primary bucket** (one of the 6 filter chips: All / Delays / Decisions / Blockers / Phase Changes / Files+Renderings). No event is orphaned to "All only" — per ChatGPT amendment 2026-06-06.
+- **Subtype badges** (Sample, Rendering, Packaging, Cost) are display-only context. They do NOT add a second filter chip; they just decorate the row inside its primary bucket.
+- **AI overlay badge** is independent of bucket — it tells the PM *who* did the change, not *what* changed.
+- **Manual Note + Recorded change** are display labels for journal-other + event_note rows; both fold into the Decisions bucket because they describe project-level recorded changes/decisions.
+- **No type is fabricated.** Every label has a deterministic source rule.
 
 ## UI Scope
 
@@ -196,19 +211,36 @@ Server returns the full set; chips are pure CSS show/hide via `[data-event-type]
 ### Lock 6 — AI Intake is an overlay badge, NOT a separate bucket
 Events where `source_type='ai_chat'` OR `changed_by='ai'` get a small `bi-robot` icon next to the event type badge. They still classify into the appropriate bucket (e.g., an AI-confirmed journal entry is a Decision/Note, not an "AI Intake"). The badge tells the PM *who* did it, the bucket tells them *what* happened.
 
-### Lock 7 — Newest first; merge by `occurred_at`
+### Lock 7 — Newest first; merge by `occurred_at`, deterministic tiebreaker
 Single SQL query per source table (3 queries total — none expensive at typical project size). In-memory merge by `occurred_at DESC`. No SQL UNION (avoids fighting SQLite's lack of typed columns across the 3 tables).
+
+**Deterministic tiebreaker (per ChatGPT amendment 2026-06-06):** when two events share `occurred_at` to the second, sort by `(source_priority, source_id DESC)` where:
+- `source_priority` = 1 for `project_changes`, 2 for `phase_plan_changes`, 3 for `project_journal_entries`
+- `source_id DESC` puts the higher-numbered row first (matches "newer was inserted later" for autoincrement PKs)
+
+This makes the feed render order pure-functional: two PMs viewing the same project at the same moment see the same row order. Important for screenshots, support reproduction, and the regression test.
 
 ### Lock 8 — Anchor links where the original record is reachable
 - Phase Change / Delay / Sample Update → `#phase-row-{phase_id}` (auto-expands Detailed Table per Build 06 anchor handler).
 - Blocker → `#timeline-command-center` (Command Center tile shows the blocker).
-- File Uploaded / Rendering Update → `#files` (Files section).
-- Decision / Packaging Update / Manual Note (journal) → `#journal`.
-- Cost Update / Manual Note (event_note) → no anchor (the source field has no detail page).
+- File Uploaded / Rendering Update / Packaging Update (file) → `#files` (Files section).
+- Decision / Packaging Update (journal) / Manual Note (journal) → `#journal`.
+- Cost Update / Recorded change (event_note) → no anchor (the source field has no detail page).
 
 Anchors are honest — clicking them lands on existing UI that already shows the record. No new detail-page route.
 
-### Lock 9 — Scope discipline (carrying Build 07B's Lock 10 pattern)
+### Lock 10 — Anchor links are best-effort with graceful fallback
+**Per ChatGPT amendment 2026-06-06:** if a Lock 8 anchor's target would be hidden by the viewer's permissions OR the target DOM section doesn't exist on this render, the helper must omit the link rather than render a broken or dishonest one.
+
+Concrete rules:
+- `#journal` link → omitted when `can_view_journal=False` (viewer never sees journal anchors).
+- `#timeline-command-center` link → always renders (every authenticated user sees the Command Center per Build 06).
+- `#phase-row-N` link → omitted when the phase has been deleted (no row exists with that id).
+- `#files` link → omitted when project has no files section (defensive; the section always renders today, this is future-proofing).
+
+Implementation: `link_anchor` field in the TimelineEvent dict is set to `None` by the helper when permission gates fail. Template uses `{% if event.link_anchor %}...{% endif %}` to conditionally render.
+
+### Lock 11 — Scope discipline (carrying Build 07B's Lock 10 pattern)
 07B introduced "scope discipline" as a lock type. Carrying forward:
 
 **Out of scope for Build 08, do NOT slip in:**
@@ -248,6 +280,8 @@ Viewer sees a deduplicated, filtered subset — all non-sensitive events. The fi
 | `timeline.history_show_more` | Show more ({n}) | 查看更多（{n}） |
 | `timeline.history_empty` | No events yet for this project. | 此项目暂无更新记录。 |
 | `timeline.history_empty_filter` | No events match this filter. | 没有符合此筛选条件的更新。 |
+| `timeline.history_empty_viewer` | Some recent updates are not visible to your role. | 部分更新对您的角色不可见。 |
+| `timeline.history_back_to_all` | ← Back to All | ← 返回全部 |
 | `timeline.history_filter_all` | All | 全部 |
 | `timeline.history_filter_delays` | Delays | 延期 |
 | `timeline.history_filter_decisions` | Decisions | 决策 |
@@ -268,7 +302,22 @@ Viewer sees a deduplicated, filtered subset — all non-sensitive events. The fi
 | `timeline.history_by_actor` | by {actor} | 由 {actor} |
 | `timeline.history_anchor_view` | View | 查看 |
 
-24 new keys. Parity target **712/712** (= 688 + 24). Recount confirmed in implementation.
+26 new keys (24 original + 2 added in ChatGPT amendment for empty case 3 + back-to-all). Parity target **714/714** (= 688 + 26). Recount confirmed in implementation.
+
+## Empty states (per ChatGPT amendment 2026-06-06)
+
+Three distinct empty states; each renders different copy + different next-action affordance:
+
+| Condition | Copy | Affordance |
+|---|---|---|
+| **No timeline events at all** (project just created; helper returns []) | `timeline.history_empty` — "No events yet for this project." | None — emit a small muted line under the filter chips. |
+| **Filter chips applied; full set has rows but the active filter has none** | `timeline.history_empty_filter` — "No events match this filter." | "← Back to All" button that re-activates the All chip. |
+| **Viewer-only: full set has 0 visible rows after permission filtering, even though the project has activity** | `timeline.history_empty_viewer` — "Some recent updates are not visible to your role." | None (no escalation path; admin/PM see them). |
+
+Detection logic (server-side, before render):
+- `total_loaded == 0` → empty case 1.
+- `total_loaded > 0` AND active filter rule excludes all rows → empty case 2 (client-side, rendered by JS when chip click yields zero visible).
+- For viewer specifically, helper returns the count of permission-hidden events as `viewer_hidden_count`; if `viewer_hidden_count > 0` AND `total_loaded == 0`, render empty case 3 instead of case 1.
 
 ## Tests — test_v13_build08.py
 
@@ -311,11 +360,23 @@ Target ~30 assertions. Mirrors v1.3 test pattern (`requests.Session` + `sqlite3`
 28. Each chip has the right i18n label.
 29. "All" chip is active by default.
 
+### Filter chips against the FULL loaded array (per ChatGPT amendment)
+30. Filter chip JS applies its show/hide to all events in the wrapper, not only the first 50 rendered as visible. Verify by loading a project with > 50 events, applying a filter that matches only events 51-100, then asserting the count of `[data-event-type=...]:not([data-pagination=hidden])` after the filter is correctly non-zero even before "Show more" is clicked.
+
+### Deterministic ordering + fallback
+31. Two events with identical `occurred_at` sort by `(source_priority, source_id DESC)` deterministically across multiple GET requests.
+32. Unclassifiable `event_note` rows fall back to Decisions bucket (NOT silently dropped, NOT mis-labeled as Phase Change).
+
+### Empty states
+33. New project (zero activity) renders `timeline.history_empty` copy + no filter chips needed.
+34. Filter applied with zero matches renders `timeline.history_empty_filter` + "← Back to All" button.
+35. Viewer on a project where the full event set is admin/PM-only renders `timeline.history_empty_viewer` copy.
+
 ### Regression
-30. i18n parity at 712/712 (or recomputed target if any key was reworded).
-31. Migration count still 6 (no schema change).
-32. test_v13_build07b 66/66 (Pulse + blocker tile invariants).
-33. test_v13_build_v121 19/19 (release-proof baseline).
+36. i18n parity at 714/714 (or recomputed target if any key was reworded).
+37. Migration count still 6 (no schema change).
+38. test_v13_build07b 66/66 (Pulse + blocker tile invariants).
+39. test_v13_build_v121 19/19 (release-proof baseline).
 
 ### Manual browser walkthrough
 - Create a project, run through 3 phase finishes + 2 plan adjusts + 1 blocker + resolve + 2 journal entries + 1 file upload. Verify all show up in History, correctly typed, newest first.
@@ -359,10 +420,17 @@ Zero data risk. Source tables unchanged. All existing surfaces (Command Center, 
 - AI-created events carry a visible badge.
 - Each event with a reachable source links back (anchor or Files/Journal section).
 - Default 50 visible; "Show more" reveals up to 200.
-- i18n parity at 712/712.
+- i18n parity at 714/714.
 - No new schema, no migration, no new AI tool, no service mutation.
 - test_v13_build08.py passes; all v1.3 Builds 01-07B + v1.2.1 regression remain green.
-- No scope creep per Lock 9.
+- Every TimelineEvent includes `source_table` + `source_id` so it traces to exactly one source row (per amendment).
+- `viewer=True` removes restricted events entirely from the returned list — no hidden placeholders, no leaked sensitive metadata (per amendment).
+- Filter chips apply to the full 200-event array, not just the first 50 visible (per amendment).
+- Sort order is deterministic on `occurred_at` ties: `(source_priority, source_id DESC)` (per amendment).
+- Every event has exactly one primary bucket from the 6 chips; subtypes are overlay labels only (per amendment).
+- Anchor links omitted when target is unreachable (permission-hidden or DOM-missing) — no broken anchors rendered (per amendment).
+- All three empty states render correct copy + correct affordance (per amendment).
+- No scope creep per Lock 11.
 
 ## What Build 08 Solves From the User's Doc
 
@@ -389,4 +457,4 @@ Zero data risk. Source tables unchanged. All existing surfaces (Command Center, 
 
 ---
 
-End of Build 08 execution plan. Implementation begins only after this is reviewed and approved.
+End of Build 08 execution plan. Locks 1–11 approved 2026-06-06 with ChatGPT amendments; implementation runs this session.
