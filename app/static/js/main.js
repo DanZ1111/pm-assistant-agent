@@ -795,3 +795,83 @@ import { createComposerController } from './composer_controller.js';
     initCommandCenter();
   }
 })();
+
+// ----------------------------------------------------------------------------
+// v1.3 Build 08 — Timeline History filter chips + Show more reveal
+//
+// Filter chips apply to the FULL loaded event array (per ChatGPT amendment
+// Lock 5), not just the first 50 visible rows. The CSS hide rules use
+// :not([data-event-type=ACTIVE]) so they target every row regardless of
+// pagination state. The "Show more" button removes the data-pagination=hidden
+// attribute from rows 51-200.
+//
+// Empty-state 2 ("No events match this filter") is rendered server-side as
+// a hidden <p> and toggled by this script after each filter click.
+// ----------------------------------------------------------------------------
+(function () {
+  function initTimelineHistory() {
+    var section = document.querySelector('[data-timeline-history]');
+    if (!section) return;
+
+    var chips = section.querySelectorAll('.timeline-history-chip, [data-filter]');
+    var emptyFilter = section.querySelector('[data-empty-state="filter"]');
+
+    function applyFilter(name) {
+      section.setAttribute('data-active-filter', name);
+      // Update chip active state
+      section.querySelectorAll('.timeline-history-chip').forEach(function (c) {
+        c.classList.toggle(
+          'timeline-history-chip-active',
+          c.getAttribute('data-filter') === name
+        );
+      });
+      // Compute filter empty state — count visible rows (not hidden by
+      // pagination AND not hidden by the active filter).
+      var visible = 0;
+      section.querySelectorAll('.timeline-history-row').forEach(function (row) {
+        if (row.hasAttribute('data-pagination') &&
+            row.getAttribute('data-pagination') === 'hidden') return;
+        if (name !== 'all' && row.getAttribute('data-event-type') !== name) return;
+        visible++;
+      });
+      // Also consider hidden-pagination rows that match (so "no match" only
+      // fires when truly no row matches the filter, full set considered).
+      if (name !== 'all') {
+        var matchingAnywhere = section.querySelectorAll(
+          '.timeline-history-row[data-event-type="' + name + '"]'
+        ).length;
+        if (matchingAnywhere === 0 && emptyFilter) {
+          emptyFilter.hidden = false;
+          return;
+        }
+      }
+      if (emptyFilter) emptyFilter.hidden = (visible > 0 || name === 'all');
+    }
+
+    chips.forEach(function (chip) {
+      chip.addEventListener('click', function () {
+        var name = chip.getAttribute('data-filter');
+        if (name) applyFilter(name);
+      });
+    });
+
+    var showMore = section.querySelector('[data-history-show-more]');
+    if (showMore) {
+      showMore.addEventListener('click', function () {
+        section.querySelectorAll('.timeline-history-row[data-pagination="hidden"]').forEach(function (r) {
+          r.removeAttribute('data-pagination');
+        });
+        showMore.parentElement.hidden = true;
+        // Re-evaluate the current filter so any newly visible rows update
+        // the empty-state correctly.
+        applyFilter(section.getAttribute('data-active-filter') || 'all');
+      });
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initTimelineHistory);
+  } else {
+    initTimelineHistory();
+  }
+})();

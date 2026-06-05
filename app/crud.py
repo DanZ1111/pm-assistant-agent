@@ -2197,3 +2197,300 @@ def get_active_phase_blocker_ids(db: Session, project_id: int) -> set:
         .all()
     )
     return {r[0] for r in rows}
+
+
+# ---------------------------------------------------------------------------
+# v1.3 Build 08 — Timeline Updates / History (derived view)
+#
+# Pure derivation over project_changes + phase_plan_changes +
+# project_journal_entries. No new schema. Returns up to `limit` normalized
+# TimelineEvent dicts, newest first. Deterministic tiebreaker on equal
+# timestamps via (source_priority, source_id DESC).
+# ---------------------------------------------------------------------------
+
+COST_FIELDS = {
+    "target_factory_cost", "actual_factory_cost",
+    "target_msrp", "actual_msrp",
+    "packaging_cost",
+}
+SENSITIVE_FILE_CATEGORIES = {"factory_feedback", "quotation"}
+_SAMPLE_PHASE_TYPES = {"prototype", "review", "production"}
+
+# Bucket constants — must match the 6 filter chips per Lock 2
+BUCKET_DELAYS = "delays"
+BUCKET_DECISIONS = "decisions"
+BUCKET_BLOCKERS = "blockers"
+BUCKET_PHASE_CHANGES = "phase_changes"
+BUCKET_FILES = "files"  # files + renderings
+
+
+def _is_ai_change(changed_by: str | None, source_type: str | None) -> bool:
+    return (changed_by or "") == "ai" or (source_type or "") == "ai_chat"
+
+
+def _classify_project_change(pc, phase_lookup: dict, file_lookup: dict) -> tuple[str, str | None, str | None] | None:
+    """Return (bucket, subtype, link_anchor) for a project_changes row, or None
+    if the row is unclassifiable (e.g., unknown change_type) — caller decides
+    whether to drop or fall back."""
+    ct = pc.change_type
+    if ct == "phase_update":
+        # Try to derive subtype from the affected phase's phase_type if we
+        # can resolve it. field_name on phase_update events stores phase_name
+        # — look up by name within this project's phases.
+        subtype = None
+        if pc.field_name:
+            phase = phase_lookup.get(pc.field_name)
+            if phase and (phase.phase_type or "") in _SAMPLE_PHASE_TYPES:
+                subtype = "sample"
+            link = f"#phase-row-{phase.id}" if phase else None
+        else:
+            link = None
+        return (BUCKET_PHASE_CHANGES, subtype, link)
+    if ct in ("blocker_opened", "blocker_updated", "blocker_resolved"):
+        # subtype = the action verb (opened / updated / resolved) for badge
+        verb = ct.split("_", 1)[1]
+        return (BUCKET_BLOCKERS, verb, "#timeline-command-center")
+    if ct == "file_upload":
+        # field_name on file_upload events stores original_filename. Look up
+        # the file by that filename within this project's files for category.
+        pf = file_lookup.get(pc.field_name) if pc.field_name else None
+        cat = (pf.file_category if pf else "") or ""
+        if cat == "rendering":
+            return (BUCKET_FILES, "rendering", "#files")
+        if cat == "packaging":
+            return (BUCKET_FILES, "packaging", "#files")
+        return (BUCKET_FILES, None, "#files")
+    if ct == "field_update":
+        if (pc.field_name or "") in COST_FIELDS:
+            return (BUCKET_DECISIONS, "cost", None)
+        # Generic field updates fall through to Decisions (project-level
+        # recorded changes) per Lock 2 — every event has a bucket.
+        return (BUCKET_DECISIONS, None, None)
+    if ct == "event_note":
+        # event_note rows from create_journal_entry / create_variant / etc.
+        # Fold into Decisions per Lock 2 (no orphan "All only" bucket).
+        return (BUCKET_DECISIONS, None, None)
+    return None
+
+
+def _is_pc_sensitive(pc, file_lookup: dict) -> bool:
+    """Lock 3: cost field_updates + sensitive-category file uploads + journal-
+    mirror event_notes are hidden from viewers. Journal-mirror rows have
+    summaries beginning with 'Journal entry added:' — they leak the journal
+    body text via the audit log even though the source journal entry itself
+    is can_view_journal-gated. Filter them out for parity with the journal-
+    source row hiding."""
+    if pc.change_type == "field_update" and (pc.field_name or "") in COST_FIELDS:
+        return True
+    if pc.change_type == "file_upload":
+        pf = file_lookup.get(pc.field_name) if pc.field_name else None
+        if pf and (pf.file_category or "") in SENSITIVE_FILE_CATEGORIES:
+            return True
+    if pc.change_type == "event_note":
+        summary = pc.summary or ""
+        if summary.startswith("Journal entry added:"):
+            return True
+    return False
+
+
+def _journal_bucket_and_subtype(entry) -> tuple[str, str | None]:
+    et = (entry.entry_type or "general").strip()
+    if et == "decision":
+        return (BUCKET_DECISIONS, None)
+    if et == "packaging":
+        return (BUCKET_DECISIONS, "packaging")
+    # general / factory_discussion / cost_discovery / design_feedback /
+    # question / risk / variant / other — all fold into Decisions with
+    # the entry_type as a subtle subtype label for context.
+    return (BUCKET_DECISIONS, et if et != "general" else None)
+
+
+def get_timeline_events(
+    db: Session,
+    project_id: int,
+    limit: int = 200,
+    viewer: bool = False,
+    user_lookup: dict | None = None,
+) -> dict:
+    """Return up to `limit` TimelineEvent dicts merged from 3 source tables.
+
+    Output: {
+        'events': [TimelineEvent...],     # already filtered for viewer
+        'total_unfiltered_visible': int,  # before viewer hiding
+        'viewer_hidden_count': int,       # rows hidden because viewer=True
+        'total': int,                      # len(events) — what the UI shows
+    }
+
+    TimelineEvent shape (dict):
+        occurred_at: datetime
+        bucket: str           # one of the 6 filter chips
+        subtype: str | None   # display badge (sample/rendering/packaging/cost/etc.)
+        actor: str            # display_name OR username OR 'ai' OR 'system'
+        title: str            # short summary headline
+        body: str | None      # optional detail
+        link_anchor: str | None  # #phase-row-N etc. (Lock 10 — may be None)
+        is_ai: bool
+        source_table: str     # 'project_changes' | 'phase_plan_changes' | 'project_journal_entries'
+        source_id: int        # row id in source_table (Lock 7 tiebreaker)
+    """
+    from app.models import (
+        Project, ProjectPhase, ProjectFile, ProjectChange,
+        ProjectJournalEntry, PhasePlanChange, User,
+    )
+
+    # Resolve phase + file lookups once (cheap; typical project < 20 phases / 100 files)
+    phases = db.query(ProjectPhase).filter(ProjectPhase.project_id == project_id).all()
+    phase_by_name = {p.phase_name: p for p in phases}
+    phase_ids = [p.id for p in phases]
+    files = db.query(ProjectFile).filter(ProjectFile.project_id == project_id).all()
+    file_by_name = {f.original_filename: f for f in files}
+
+    if user_lookup is None:
+        # Resolve referenced user ids in a single query at the end. For now
+        # build an inline lookup for the actor strings.
+        user_lookup = {}
+
+    def _actor(changed_by: str | None, user_id: int | None = None) -> str:
+        if user_id and user_id in user_lookup:
+            return user_lookup[user_id]
+        if user_id:
+            u = db.query(User).filter(User.id == user_id).first()
+            if u:
+                name = u.display_name or u.username
+                user_lookup[user_id] = name
+                return name
+        if (changed_by or "") == "ai":
+            return "AI"
+        return changed_by or "system"
+
+    events: list[dict] = []
+    viewer_hidden = 0
+
+    # ── Source 1: project_changes ──
+    pc_rows = (
+        db.query(ProjectChange)
+        .filter(ProjectChange.project_id == project_id)
+        .order_by(ProjectChange.changed_at.desc())
+        .limit(limit * 2)  # over-fetch; we may filter some
+        .all()
+    )
+    for pc in pc_rows:
+        classification = _classify_project_change(pc, phase_by_name, file_by_name)
+        if classification is None:
+            continue
+        bucket, subtype, link = classification
+        if viewer and _is_pc_sensitive(pc, file_by_name):
+            viewer_hidden += 1
+            continue
+        is_ai = _is_ai_change(pc.changed_by, pc.source_type)
+        events.append({
+            "occurred_at": pc.changed_at,
+            "bucket": bucket,
+            "subtype": subtype,
+            "actor": _actor(pc.changed_by),
+            "title": pc.summary or pc.field_name or "(no summary)",
+            "body": None,
+            "link_anchor": link,
+            "is_ai": is_ai,
+            "source_table": "project_changes",
+            "source_id": pc.id,
+        })
+
+    # ── Source 2: phase_plan_changes (delays + plan adjustments) ──
+    if phase_ids:
+        ppc_rows = (
+            db.query(PhasePlanChange)
+            .filter(PhasePlanChange.phase_id.in_(phase_ids))
+            .order_by(PhasePlanChange.changed_at.desc())
+            .limit(limit * 2)
+            .all()
+        )
+        phase_by_id = {p.id: p for p in phases}
+        for ppc in ppc_rows:
+            phase = phase_by_id.get(ppc.phase_id)
+            # A plan-date forward shift IS a delay; backward shifts (or new
+            # date with no old) are plan adjustments.
+            is_delay = bool(
+                ppc.old_date and ppc.new_date and ppc.new_date > ppc.old_date
+            )
+            bucket = BUCKET_DELAYS if is_delay else BUCKET_PHASE_CHANGES
+            subtype = None
+            old_str = ppc.old_date.isoformat() if ppc.old_date else "—"
+            new_str = ppc.new_date.isoformat() if ppc.new_date else "—"
+            title = (
+                f"{phase.phase_name if phase else 'Phase'} "
+                f"{ppc.field_changed.replace('_', ' ')}: {old_str} → {new_str}"
+            )
+            body = ppc.reason if ppc.reason and ppc.reason != "(no reason given)" else None
+            link = f"#phase-row-{ppc.phase_id}" if phase else None
+            events.append({
+                "occurred_at": ppc.changed_at,
+                "bucket": bucket,
+                "subtype": subtype,
+                "actor": _actor(None, ppc.changed_by_user_id),
+                "title": title,
+                "body": body,
+                "link_anchor": link,
+                "is_ai": False,  # plan changes are always user-driven
+                "source_table": "phase_plan_changes",
+                "source_id": ppc.id,
+            })
+
+    # ── Source 3: project_journal_entries ──
+    if not viewer:  # Lock 3: viewer cannot see journal entries at all
+        je_rows = (
+            db.query(ProjectJournalEntry)
+            .filter(ProjectJournalEntry.project_id == project_id)
+            .order_by(ProjectJournalEntry.created_at.desc())
+            .limit(limit * 2)
+            .all()
+        )
+        for je in je_rows:
+            bucket, subtype = _journal_bucket_and_subtype(je)
+            actor = _actor(None, je.author_user_id)
+            snippet = (je.entry_text or "").strip()
+            title = je.title or (snippet[:80] + "…" if len(snippet) > 80 else snippet)
+            events.append({
+                "occurred_at": je.created_at,
+                "bucket": bucket,
+                "subtype": subtype,
+                "actor": actor,
+                "title": title or "(empty entry)",
+                "body": snippet if (snippet and snippet != title) else None,
+                "link_anchor": "#journal",  # Lock 10: only renders for can_view_journal users (viewer already excluded above)
+                "is_ai": False,
+                "source_table": "project_journal_entries",
+                "source_id": je.id,
+            })
+    else:
+        # Count would-be-visible journal entries that we're hiding from viewer
+        viewer_hidden += (
+            db.query(ProjectJournalEntry)
+            .filter(ProjectJournalEntry.project_id == project_id)
+            .count()
+        )
+
+    # ── Lock 7: merge + deterministic sort ──
+    # Primary: occurred_at DESC.
+    # Tiebreaker: source_priority ASC (project_changes=1, ppc=2, journal=3),
+    # then source_id DESC.
+    _priority = {
+        "project_changes": 1,
+        "phase_plan_changes": 2,
+        "project_journal_entries": 3,
+    }
+    events.sort(
+        key=lambda e: (
+            -(e["occurred_at"].timestamp() if e["occurred_at"] else 0),
+            _priority.get(e["source_table"], 99),
+            -e["source_id"],
+        )
+    )
+
+    truncated = events[:limit]
+    return {
+        "events": truncated,
+        "total_unfiltered_visible": len(events),
+        "viewer_hidden_count": viewer_hidden,
+        "total": len(truncated),
+    }

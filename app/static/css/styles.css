@@ -3582,3 +3582,170 @@ body.has-bottom-chat .main-content { padding-bottom: 104px; }
   /* Subtle highlight on the block itself when a blocker is attached */
   position: relative;
 }
+
+/* ============================================================
+   v1.3 Build 08 — Timeline Updates / History (derived view)
+   ============================================================ */
+
+.timeline-history-section {
+  margin-top: 1.5rem;
+}
+
+/* Filter chips */
+.timeline-history-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.5rem 0 1rem;
+}
+.timeline-history-chip {
+  font-size: 0.82rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  border: 1px solid #d5dae0;
+  background: #fff;
+  color: #3d4148;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.timeline-history-chip:hover {
+  background: #eef0f3;
+}
+.timeline-history-chip.timeline-history-chip-active {
+  background: #2b2f36;
+  color: #fff;
+  border-color: #2b2f36;
+}
+
+/* Event list */
+.timeline-history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.timeline-history-row {
+  padding: 0.7rem 0.9rem;
+  border: 1px solid #e5e9ef;
+  border-radius: 0.4rem;
+  background: #fff;
+}
+.timeline-history-row[data-pagination="hidden"] {
+  display: none;
+}
+.timeline-history-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+  font-size: 0.82rem;
+  color: #6a6f76;
+}
+.timeline-history-time {
+  white-space: nowrap;
+}
+.timeline-history-badges {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.timeline-history-bucket-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.12rem 0.45rem;
+  border-radius: 0.45rem;
+  text-transform: uppercase;
+}
+.timeline-history-bucket-delays         { background: #fdd5d1; color: #8a1f15; }
+.timeline-history-bucket-decisions      { background: #d8e3fa; color: #1c3f87; }
+.timeline-history-bucket-blockers       { background: #fde8e6; color: #8a1f15; }
+.timeline-history-bucket-phase_changes  { background: #d6f0df; color: #1f6b3a; }
+.timeline-history-bucket-files          { background: #f0e5fa; color: #4a2774; }
+
+.timeline-history-subtype-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 0.4rem;
+  background: #f0f2f5;
+  color: #4a4f56;
+  font-weight: 500;
+}
+.timeline-history-ai-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  background: #6c8cff;
+  color: #fff;
+  font-size: 0.78rem;
+}
+
+.timeline-history-title {
+  font-size: 0.95rem;
+  color: #2b2f36;
+  font-weight: 500;
+  line-height: 1.35;
+}
+.timeline-history-body {
+  margin: 0.35rem 0 0;
+  color: #4a4f56;
+  font-size: 0.88rem;
+}
+.timeline-history-meta {
+  margin-top: 0.4rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  color: #6a6f76;
+}
+.timeline-history-anchor {
+  color: #1c3f87;
+  text-decoration: none;
+}
+.timeline-history-anchor:hover {
+  text-decoration: underline;
+}
+
+/* Filter behavior — show only rows matching the active filter (per chip).
+   "all" leaves data-active-filter unset; section without an active-filter
+   value shows everything. */
+.timeline-history-section[data-active-filter="delays"] .timeline-history-row:not([data-event-type="delays"]),
+.timeline-history-section[data-active-filter="decisions"] .timeline-history-row:not([data-event-type="decisions"]),
+.timeline-history-section[data-active-filter="blockers"] .timeline-history-row:not([data-event-type="blockers"]),
+.timeline-history-section[data-active-filter="phase_changes"] .timeline-history-row:not([data-event-type="phase_changes"]),
+.timeline-history-section[data-active-filter="files"] .timeline-history-row:not([data-event-type="files"]) {
+  display: none;
+}
+
+.timeline-history-empty {
+  color: #6a6f76;
+  font-style: italic;
+  font-size: 0.9rem;
+  margin: 0.4rem 0 0;
+}
+
+.timeline-history-more-row {
+  margin-top: 1rem;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .timeline-history-row-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .timeline-history-meta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

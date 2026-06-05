@@ -503,6 +503,16 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
         "blocker_phase_ids": blocker_phase_ids,
     }
 
+    # v1.3 Build 08 — Timeline Updates / History (derived view).
+    # Pure derivation over project_changes + phase_plan_changes +
+    # project_journal_entries. Viewer flag enforces Lock 3 sensitive-event
+    # hiding server-side. Helper returns up to 200 events; template paginates
+    # the first 50 visible with Show More.
+    is_viewer = current_user.role == "viewer"
+    timeline_history = crud.get_timeline_events(
+        db, project_id, limit=200, viewer=is_viewer,
+    )
+
     return templates.TemplateResponse(request, "project_detail.html", {
         "project": project,
         "phases": phases,
@@ -536,6 +546,8 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
         "can_use_ai_intake_user": can_use_ai_intake(current_user),
         "cc_action": cc_action,
         "cc_result": cc_result,
+        "timeline_history": timeline_history,
+        "is_viewer": is_viewer,
         "renderings": renderings,
         "prototype_photos": prototype_photos,
         "latest_overview_visual": latest_overview_visual,

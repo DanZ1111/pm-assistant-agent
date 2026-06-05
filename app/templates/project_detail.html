@@ -1126,6 +1126,105 @@
       </div>
     </section>
 
+    {# v1.3 Build 08 — Timeline Updates / History (derived view).
+       Pure derivation over project_changes + phase_plan_changes +
+       project_journal_entries. Filter chips client-side; default 50
+       visible + Show More reveals up to 200 (Locks 4/5). #}
+    <section class="detail-section timeline-history-section" id="timeline-history"
+             data-timeline-history
+             data-event-count="{{ timeline_history.total }}"
+             data-active-filter="all">
+      <div class="section-header">
+        <h2 class="section-title">
+          <i class="bi bi-clock-history me-2"></i>{{ t('timeline.history_title') }}
+        </h2>
+        {% if timeline_history.total > 0 %}
+        <span class="text-muted small">{{ t('timeline.history_hint', n=timeline_history.total) }}</span>
+        {% endif %}
+      </div>
+
+      {# Filter chips (Lock 2 — 6 chips exactly). Hidden when no events. #}
+      {% if timeline_history.total > 0 %}
+      <div class="timeline-history-filters" role="tablist">
+        {% for chip in [('all','history_filter_all'),('delays','history_filter_delays'),('decisions','history_filter_decisions'),('blockers','history_filter_blockers'),('phase_changes','history_filter_phase_changes'),('files','history_filter_files')] %}
+        <button type="button" class="timeline-history-chip{% if chip[0] == 'all' %} timeline-history-chip-active{% endif %}"
+                data-filter="{{ chip[0] }}">{{ t('timeline.' ~ chip[1]) }}</button>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {# Empty state 1: no events at all. #}
+      {% if timeline_history.total == 0 and timeline_history.viewer_hidden_count == 0 %}
+      <p class="timeline-history-empty" data-empty-state="none">{{ t('timeline.history_empty') }}</p>
+      {% endif %}
+
+      {# Empty state 3: viewer can't see any of the events that exist. #}
+      {% if timeline_history.total == 0 and timeline_history.viewer_hidden_count > 0 %}
+      <p class="timeline-history-empty" data-empty-state="viewer">{{ t('timeline.history_empty_viewer') }}</p>
+      {% endif %}
+
+      {# Event list. #}
+      {% if timeline_history.total > 0 %}
+      <ol class="timeline-history-list">
+        {% for event in timeline_history.events %}
+        <li class="timeline-history-row"
+            data-event-type="{{ event.bucket }}"
+            data-event-source="{{ event.source_table }}"
+            data-event-source-id="{{ event.source_id }}"
+            {% if loop.index > 50 %}data-pagination="hidden"{% endif %}>
+          <div class="timeline-history-row-head">
+            <span class="timeline-history-time">
+              <i class="bi bi-clock me-1"></i>{{ event.occurred_at.strftime('%b %d, %Y · %H:%M') }}
+            </span>
+            <span class="timeline-history-badges">
+              <span class="timeline-history-bucket-badge timeline-history-bucket-{{ event.bucket }}">
+                {% if event.bucket == 'delays' %}{{ t('timeline.history_event_delay') }}
+                {% elif event.bucket == 'decisions' %}{{ t('timeline.history_event_decision') }}
+                {% elif event.bucket == 'blockers' %}{{ t('timeline.history_event_blocker') }}
+                {% elif event.bucket == 'phase_changes' %}{{ t('timeline.history_event_phase_change') }}
+                {% elif event.bucket == 'files' %}{{ t('timeline.history_event_file_uploaded') }}
+                {% else %}{{ event.bucket }}{% endif %}
+              </span>
+              {% if event.subtype == 'sample' %}<span class="timeline-history-subtype-badge">{{ t('timeline.history_event_sample_update') }}</span>
+              {% elif event.subtype == 'rendering' %}<span class="timeline-history-subtype-badge">{{ t('timeline.history_event_rendering_update') }}</span>
+              {% elif event.subtype == 'packaging' %}<span class="timeline-history-subtype-badge">{{ t('timeline.history_event_packaging_update') }}</span>
+              {% elif event.subtype == 'cost' %}<span class="timeline-history-subtype-badge">{{ t('timeline.history_event_cost_update') }}</span>
+              {% elif event.subtype %}<span class="timeline-history-subtype-badge">{{ event.subtype }}</span>
+              {% endif %}
+              {% if event.is_ai %}<span class="timeline-history-ai-badge" title="{{ t('timeline.history_ai_badge') }}"><i class="bi bi-robot"></i></span>{% endif %}
+            </span>
+          </div>
+          <div class="timeline-history-title">{{ event.title }}</div>
+          {% if event.body %}<p class="timeline-history-body">{{ event.body }}</p>{% endif %}
+          <div class="timeline-history-meta">
+            <span class="timeline-history-actor">{{ t('timeline.history_by_actor', actor=event.actor) }}</span>
+            {% if event.link_anchor %}
+            <a class="timeline-history-anchor" href="{{ event.link_anchor }}">{{ t('timeline.history_anchor_view') }} →</a>
+            {% endif %}
+          </div>
+        </li>
+        {% endfor %}
+      </ol>
+
+      {# Empty state 2 — rendered client-side when a filter chip click yields zero matches. #}
+      <p class="timeline-history-empty" data-empty-state="filter" hidden>
+        {{ t('timeline.history_empty_filter') }}
+        <button type="button" class="btn btn-sm btn-link timeline-history-back-to-all" data-filter="all">
+          {{ t('timeline.history_back_to_all') }}
+        </button>
+      </p>
+
+      {% if timeline_history.total > 50 %}
+      <div class="timeline-history-more-row">
+        <button type="button" class="btn btn-sm btn-outline-secondary timeline-history-show-more"
+                data-history-show-more>
+          {{ t('timeline.history_show_more', n=timeline_history.total - 50) }}
+        </button>
+      </div>
+      {% endif %}
+      {% endif %}
+    </section>
+
     <!-- Phase Edit Modal -->
     <div class="modal fade" id="phaseModal" tabindex="-1" aria-labelledby="phaseModalLabel" aria-hidden="true">
       <div class="modal-dialog modal-lg">
