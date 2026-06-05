@@ -367,6 +367,61 @@ TOOL_SCHEMAS: list[dict] = [
             },
         },
     },
+    # v1.3 Build 07B — Project Blockers (active/resolved lifecycle)
+    {
+        "type": "function",
+        "function": {
+            "name": "create_blocker",
+            "description": "Propose a new Project Blocker. Blockers are first-class active state that drive Project Pulse and the Timeline Command Center. phase_id is optional; project-level blockers are allowed.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "project_id": {"type": "integer", "description": "ID of the project"},
+                    "title": {"type": "string", "description": "Short blocker title (≤ 200 chars)"},
+                    "description": {"type": "string", "description": "Optional details"},
+                    "severity": {
+                        "type": "string",
+                        "enum": ["low", "medium", "high"],
+                        "description": "Defaults to 'medium' if omitted",
+                    },
+                    "phase_id": {"type": "integer", "description": "Optional — phase this blocker attaches to. Must belong to the same project."},
+                },
+                "required": ["project_id", "title"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "update_blocker",
+            "description": "Propose an edit to an existing active blocker. Only allowlisted fields (title, description, severity, phase_id) can be changed.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "blocker_id": {"type": "integer"},
+                    "fields": {
+                        "type": "object",
+                        "description": "Editable fields only: title, description, severity, phase_id.",
+                    },
+                },
+                "required": ["blocker_id", "fields"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "resolve_blocker",
+            "description": "Propose marking a blocker as resolved. One-click — no reason required. Writes audit trail.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "blocker_id": {"type": "integer"},
+                },
+                "required": ["blocker_id"],
+            },
+        },
+    },
 ]
 
 
@@ -390,6 +445,9 @@ UPDATE_VARIANT_ALLOWED = {
     "sales_format", "packaging_cost", "blade_summary", "handle_summary",
     "mechanism_summary", "dimensions_summary",
 }
+# v1.3 Build 07B — Project Blockers
+UPDATE_BLOCKER_ALLOWED = {"title", "description", "severity", "phase_id"}
+
 UPDATE_COMPONENT_ALLOWED = {
     "variant_id", "component_type", "name", "target_cost", "actual_cost", "notes",
 }
@@ -419,6 +477,10 @@ TOOL_PERMISSIONS: dict[str, dict[str, Any]] = {
     "link_idea_to_project":            {"require_role": ("admin", "pm"), "needs_project": True},
     "create_idea":                     {"require_role": ("admin", "pm"), "optional_project": True},
     "update_idea":                     {"require_role": ("admin", "pm")},
+    # v1.3 Build 07B — Project Blockers
+    "create_blocker":                  {"require_role": ("admin", "pm"), "needs_project": True},
+    "update_blocker":                  {"require_role": ("admin", "pm")},
+    "resolve_blocker":                 {"require_role": ("admin", "pm")},
 }
 
 CONFIRMATION_TOOLS = {
@@ -429,6 +491,8 @@ CONFIRMATION_TOOLS = {
     "update_project_field",
     "save_pending_attachment",
     "create_idea", "link_idea_to_project", "update_idea",
+    # v1.3 Build 07B — Project Blockers
+    "create_blocker", "update_blocker", "resolve_blocker",
 }
 UPDATE_IDEA_ALLOWED = {
     "idea_type", "source", "source_detail", "contributor", "notes", "description",
@@ -495,6 +559,28 @@ def _relationship_error(tool_name: str, args: dict, db, user) -> dict | None:
             get_pending_attachment(attachment_id, user.id)
         except AttachmentError as exc:
             return _err(exc.code, message=exc.message)
+    elif tool_name == "create_blocker":
+        # Lock 3: if phase_id is supplied, it must belong to project_id.
+        phase_id = _int_arg(args, "phase_id")
+        if phase_id:
+            phase = crud.get_phase(db, phase_id)
+            if not phase or phase.project_id != project_id:
+                return _err("phase_not_found")
+    elif tool_name in ("update_blocker", "resolve_blocker"):
+        from app.models import ProjectBlocker  # late import
+        blocker = db.query(ProjectBlocker).filter(
+            ProjectBlocker.id == (_int_arg(args, "blocker_id") or 0)
+        ).first()
+        if not blocker:
+            return _err("blocker_not_found")
+        if not can_edit_project(user, blocker.project):
+            return _err("forbidden", reason="cannot_edit_project")
+        if tool_name == "update_blocker":
+            fields = args.get("fields") or {}
+            if isinstance(fields, dict) and fields.get("phase_id") not in (None, "", 0, "0"):
+                phase = crud.get_phase(db, _int_arg(fields, "phase_id") or 0)
+                if not phase or phase.project_id != blocker.project_id:
+                    return _err("phase_not_found")
     return None
 
 
@@ -942,6 +1028,56 @@ def _handle_update_idea(args: dict, db, user) -> dict:
     }
 
 
+# v1.3 Build 07B — Project Blocker handlers
+
+def _handle_create_blocker(args: dict, db, user) -> dict:
+    blocker = crud.create_blocker(
+        db,
+        project_id=int(args["project_id"]),
+        title=str(args.get("title") or ""),
+        description=args.get("description"),
+        severity=str(args.get("severity") or "medium"),
+        phase_id=_int_arg(args, "phase_id"),
+        created_by_user_id=user.id,
+        changed_by="ai",
+        source_type="ai_chat",
+    )
+    if blocker is None:
+        return _err("blocker_create_failed")
+    return {
+        "ok": True, "blocker_id": blocker.id,
+        "message": f"Blocker opened: '{blocker.title}'.",
+    }
+
+
+def _handle_update_blocker(args: dict, db, user) -> dict:
+    fields = args.get("fields") or {}
+    if not isinstance(fields, dict):
+        return _err("invalid_fields")
+    unexpected = sorted(set(fields) - UPDATE_BLOCKER_ALLOWED)
+    if unexpected:
+        return _err("field_not_allowlisted", fields=unexpected)
+    blocker = crud.update_blocker(
+        db, int(args["blocker_id"]), fields,
+        changed_by="ai", changed_by_user_id=user.id,
+        source_type="ai_chat",
+    )
+    if blocker is None:
+        return _err("blocker_not_found")
+    return {"ok": True, "blocker_id": blocker.id, "message": "Blocker updated."}
+
+
+def _handle_resolve_blocker(args: dict, db, user) -> dict:
+    blocker = crud.resolve_blocker(
+        db, int(args["blocker_id"]),
+        resolved_by_user_id=user.id,
+        changed_by="ai", source_type="ai_chat",
+    )
+    if blocker is None:
+        return _err("blocker_not_found")
+    return {"ok": True, "blocker_id": blocker.id, "message": f"Blocker resolved: '{blocker.title}'."}
+
+
 _HANDLERS: dict[str, Any] = {
     "search_projects": _handle_search_projects,
     "get_project_context": _handle_get_project_context,
@@ -959,6 +1095,10 @@ _HANDLERS: dict[str, Any] = {
     "create_idea": _handle_create_idea,
     "link_idea_to_project": _handle_link_idea_to_project,
     "update_idea": _handle_update_idea,
+    # v1.3 Build 07B — Project Blockers
+    "create_blocker": _handle_create_blocker,
+    "update_blocker": _handle_update_blocker,
+    "resolve_blocker": _handle_resolve_blocker,
     # Delete, thesis-extraction, and journal-summary tools intentionally remain
     # absent until their dedicated follow-up slices.
 }

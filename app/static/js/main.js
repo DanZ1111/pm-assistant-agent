@@ -749,10 +749,29 @@ import { createComposerController } from './composer_controller.js';
       mount.hidden = true;
     }
 
+    // v1.3 Build 07B — when the Edit Blocker button is clicked, pre-populate
+    // the edit form from its data-blocker-* attrs before showing the panel.
+    function populateEditBlocker(btn) {
+      var form = mount.querySelector('form[data-cc-panel="edit-blocker"]');
+      if (!form) return;
+      var idInput = form.querySelector('[data-cc-edit-blocker-id]');
+      var titleInput = form.querySelector('[data-cc-edit-blocker-title]');
+      var descInput = form.querySelector('[data-cc-edit-blocker-description]');
+      var sevSelect = form.querySelector('[data-cc-edit-blocker-severity]');
+      var phaseSelect = form.querySelector('[data-cc-edit-blocker-phase]');
+      if (idInput) idInput.value = btn.getAttribute('data-blocker-id') || '';
+      if (titleInput) titleInput.value = btn.getAttribute('data-blocker-title') || '';
+      if (descInput) descInput.value = btn.getAttribute('data-blocker-description') || '';
+      if (sevSelect) sevSelect.value = btn.getAttribute('data-blocker-severity') || 'medium';
+      if (phaseSelect) phaseSelect.value = btn.getAttribute('data-blocker-phase-id') || '';
+    }
+
     triggers.forEach(function (btn) {
       btn.addEventListener('click', function () {
         var key = btn.getAttribute('data-cc-form');
-        if (key) showPanel(key);
+        if (!key) return;
+        if (key === 'edit-blocker') populateEditBlocker(btn);
+        showPanel(key);
       });
     });
     mount.querySelectorAll('[data-cc-cancel]').forEach(function (b) {

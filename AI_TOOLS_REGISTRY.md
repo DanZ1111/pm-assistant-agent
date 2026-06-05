@@ -53,6 +53,10 @@ The original 16 schemas landed in Build 20. Build 26 added `update_idea`; Build 
 | `link_idea_to_project` | project_id, idea_id, note | admin/PM + `can_edit_project` | YES — Idea-specific review card | **implemented (Build 26)** |
 | `create_idea` | project_id (optional), name, description, idea_type, source, source_detail, contributor, notes | admin/PM; `can_edit_project` when linking | YES — Idea-specific review card | **implemented (Build 26)** |
 | `update_idea` | idea_id, editable fields | admin/PM | YES — Idea-specific review card | **implemented (Build 26)** |
+| `create_blocker` | project_id, title, description (optional), severity, phase_id (optional) | admin/PM + `can_edit_project` + phase same-project check | YES | **implemented (v1.3 Build 07B)** |
+| `update_blocker` | blocker_id, fields (UPDATE_BLOCKER_ALLOWED whitelist) | admin/PM + owning-project edit access | YES | **implemented (v1.3 Build 07B)** |
+| `resolve_blocker` | blocker_id | admin/PM + owning-project edit access | YES | **implemented (v1.3 Build 07B)** |
+| `delete_blocker` | — | not exposed to AI (admin-only UI path; matches `delete_variant`) | n/a | **not registered — by design** |
 
 ## How the dispatcher works
 

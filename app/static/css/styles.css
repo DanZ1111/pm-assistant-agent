@@ -3477,3 +3477,108 @@ body.has-bottom-chat .main-content { padding-bottom: 104px; }
     padding: 0.8rem;
   }
 }
+
+/* ============================================================
+   v1.3 Build 07B — Blocker tile + severity chips + phase-strip dot
+   ============================================================ */
+
+.timeline-blocker-tile {
+  margin: 1rem 0;
+  padding: 0.9rem 1.05rem;
+  border-radius: 0.45rem;
+  border: 1px solid #e5e9ef;
+  background: #fff;
+}
+.timeline-blocker-tile.timeline-blocker-active {
+  border-left: 4px solid #c0392b;
+  background: #fff8f7;
+}
+.timeline-blocker-tile.timeline-blocker-empty {
+  border-left: 4px solid #d5dae0;
+  background: #fafbfc;
+}
+.timeline-blocker-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  margin-bottom: 0.4rem;
+}
+.timeline-blocker-more-badge {
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 0.6rem;
+  background: #fde8e6;
+  color: #8a1f15;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+.timeline-blocker-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.2rem 0;
+}
+.timeline-blocker-title-text {
+  font-weight: 600;
+  font-size: 1.0rem;
+  color: #2b2f36;
+}
+.timeline-blocker-description {
+  color: #4a4f56;
+  font-size: 0.92rem;
+  margin: 0.35rem 0 0.5rem;
+}
+.timeline-blocker-meta {
+  font-size: 0.82rem;
+  color: #6a6f76;
+  margin-bottom: 0.55rem;
+}
+.timeline-blocker-actions {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+.timeline-blocker-empty-text {
+  color: #6a6f76;
+  font-size: 0.9rem;
+  margin: 0.1rem 0 0;
+}
+
+/* Severity chips */
+.timeline-blocker-severity {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.12rem 0.45rem;
+  border-radius: 0.45rem;
+  text-transform: uppercase;
+}
+.timeline-blocker-severity-low {
+  background: #eef0f3;
+  color: #5b6068;
+}
+.timeline-blocker-severity-medium {
+  background: #fcecbd;
+  color: #7a5c00;
+}
+.timeline-blocker-severity-high {
+  background: #fdd5d1;
+  color: #8a1f15;
+}
+
+/* Phase-strip red dot for phases with active blockers (Lock 3) */
+.timeline-phase-blocker-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 0.35rem;
+  border-radius: 50%;
+  background: #c0392b;
+  box-shadow: 0 0 0 2px #fff;
+}
+.timeline-phase-block.timeline-phase-has-blocker {
+  /* Subtle highlight on the block itself when a blocker is attached */
+  position: relative;
+}

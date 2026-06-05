@@ -158,6 +158,7 @@ Guidance for tool use:
 - If a user wants to link an existing Good Idea, call `link_idea_to_project`.
 - After creating an Idea with missing type or source, ask one concise follow-up. Use `update_idea` after the user answers.
 - For project decisions, questions, risks, and general updates, use `create_journal_entry`. Prefer human-facing types such as `general`, `decision`, `question`, or `risk`; never present internal labels to the user.
+- When the user explicitly asks to track an active blocker on a project (something blocking forward progress that needs to be resolved), call `create_blocker`. Use `update_blocker` for edits and `resolve_blocker` when the user says the issue is fixed. Do NOT proactively propose blockers without a clear ask — a journal entry of type `risk` is the right surface for narrative observations.
 - Use the relevant confirmed tool for variants, package/accessory components, file comments, allowlisted project fields, plan-date adjustments, and Finish Phase.
 - If a tool call returns `{"ok": False, ...}`, tell the user what went wrong in plain language — don't expose the raw error key.
 

@@ -46,6 +46,10 @@ class Project(Base):
                             order_by="ProjectVariant.created_at")
     variant_components = relationship("ProjectVariantComponent", back_populates="project",
                                       cascade="all, delete-orphan")
+    # v1.3 Build 07B — first-class blockers with active/resolved lifecycle
+    blockers = relationship("ProjectBlocker", back_populates="project",
+                            cascade="all, delete-orphan",
+                            order_by="ProjectBlocker.created_at.desc()")
 
     @property
     def target_factory_cost_display(self) -> str | None:
@@ -87,6 +91,9 @@ class ProjectPhase(Base):
     plan_changes = relationship("PhasePlanChange", back_populates="phase",
                                 cascade="all, delete-orphan",
                                 order_by="PhasePlanChange.changed_at")
+    # v1.3 Build 07B — optional phase-level blocker association
+    blockers = relationship("ProjectBlocker", back_populates="phase",
+                            order_by="ProjectBlocker.created_at.desc()")
 
 
 class ProjectFile(Base):
@@ -308,6 +315,41 @@ class ProjectJournalEntry(Base):
     project = relationship("Project", back_populates="journal_entries")
     author = relationship("User", foreign_keys=[author_user_id])
     linked_file = relationship("ProjectFile", foreign_keys=[linked_file_id])
+
+
+class ProjectBlocker(Base):
+    """v1.3 Build 07B — first-class project blockers.
+
+    Lifecycle: active → resolved (Lock 1, 2 states only). No 'archived' state;
+    admin-only hard delete is the escape hatch.
+
+    phase_id is OPTIONAL (Lock 3): blockers can be project-level (phase_id=NULL)
+    or phase-level. Phase-strip red dot fires only for phase-level blockers.
+
+    Severity is a String enum (low / medium / high) — same shape as
+    ProjectPhase.status to avoid SQL ENUM type migration risk.
+
+    Audit trail: every create / update / resolve writes a project_changes row
+    via write_change(). No separate audit table.
+    """
+    __tablename__ = "project_blockers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    phase_id = Column(Integer, ForeignKey("project_phases.id"), nullable=True)
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    severity = Column(String, nullable=False, default="medium")  # low / medium / high
+    status = Column(String, nullable=False, default="active")    # active / resolved
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    resolved_at = Column(DateTime, nullable=True)
+    resolved_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    project = relationship("Project", back_populates="blockers")
+    phase = relationship("ProjectPhase", back_populates="blockers", foreign_keys=[phase_id])
+    created_by = relationship("User", foreign_keys=[created_by_user_id])
+    resolved_by = relationship("User", foreign_keys=[resolved_by_user_id])
 
 
 class ProjectVariant(Base):

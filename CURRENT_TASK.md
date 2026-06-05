@@ -1,7 +1,7 @@
 # CURRENT_TASK.md
 
 ## Task
-v1.3 Build 07A — Timeline Command Center Actions Backend (Finish / Adjust / Add Update). Implemented + tested. Awaiting push.
+v1.3 Build 07B — Project Blockers (first-class lifecycle model + Command Center wiring). Implemented + tested. Awaiting push.
 
 ## Handoff rule
 Before editing, inspect:
@@ -13,43 +13,41 @@ Git/code is the source of truth.
 
 ## What just shipped in this session
 
-- **Plan** committed at `0616af5` (V13_BUILD07_EXECUTION_PLAN.md) — proposed 07A/07B split, Backend Honesty Mapping per button, 7 locks. User approved 07A-only and confirmed locks 1/3/4/7 (with Lock 7 amendment: Add Update gets a client-side submit-disable since no idempotency token).
-- **Build 07A implementation** committed as one atomic commit (see latest `git log`):
-  - `app/routes/projects.py` — 3 new POST routes (`/command/finish-phase`, `/command/adjust-due-date`, `/command/add-update`) + `_cc_redirect()` helper + `_derive_current_phase()` race-check helper. project_detail view passes `cc_action` + `cc_result` query params into the template.
-  - `app/templates/project_detail.html` — action buttons swapped from `<a href="#phase-row-N">` to `<button data-cc-form="...">` form triggers; new `<div id="cc-action-form">` shared mount with 3 inline `<form>` panels (Finish confirmation card with 3-line preflight, Adjust with required reason, Add Update with 9-option entry_type select). Result banner renders above action row when `?cc_result` is present.
-  - `app/static/css/styles.css` — `.cc-result-banner`, `.cc-action-form-mount`, `.cc-action-form-*` (~100 lines). Mount has light grey background to visually attach the form to the action that opened it. Mobile collapses padding.
-  - `app/static/js/main.js` — `initCommandCenter()` IIFE: button click shows matching panel, focuses first field, Cancel hides mount, Add Update submit click disables button + shows spinner (Lock 7 amendment).
-  - `app/i18n/en.json` + `zh.json` — 15 new `timeline.cc_*` keys + updated `timeline.btn_add_blocker_tooltip` to point at Build 07B. Parity 666/666.
-  - `test_v13_build07.py` — **57/57 PASS** (15 i18n + migration count + project setup + 13 template markup + 3 viewer-leak + 9 Finish [happy/stale-race/viewer/non-owner] + 4 Adjust [happy/empty-reason/viewer] + 4 Add Update [happy/empty/viewer/PM-non-owner] + 2 banner render + 1 AI Intake invariant + 3 Detailed Table regression + 8 Build 06 invariants).
-  - `test_v13_build06.py` — updated assertion: accepts either Build 06 anchor pattern or Build 07A form-trigger pattern for the Finish button (planned behavior change, not regression).
+- **Build 07B implementation** committed as one atomic commit (see latest `git log`). Locks 1–10 approved 2026-06-05; implementation followed plan verbatim.
+  - `app/models.py` — `ProjectBlocker` model (11 columns), `Project.blockers` + `ProjectPhase.blockers` relationships.
+  - `app/migrations.py` — Migration 006 `_create_project_blockers(engine)`, idempotent `CREATE TABLE IF NOT EXISTS` + `ix_pb_project_status` + `ix_pb_phase` indexes (mirrors Build 30A's migration 004 pattern).
+  - `app/crud.py` — 6 helpers: `create_blocker / update_blocker / resolve_blocker / get_active_blockers_for_project / get_blockers_by_phase / get_active_phase_blocker_ids` + `UPDATE_BLOCKER_ALLOWED` whitelist. Each mutating helper writes a `project_changes` audit row.
+  - `app/routes/projects.py` — 3 new POST routes (`/command/add-blocker`, `/command/edit-blocker`, `/command/resolve-blocker`); `command_center_state` now includes `active_blockers`, `active_blocker_count`, `newest_active_blocker`, `blocker_phase_ids`.
+  - `app/templates/project_detail.html` — Build 06 `data-placeholder="blocker"` block replaced with honest `timeline-blocker-tile`; phase-strip blocks gain `timeline-phase-blocker-dot` for phase-linked blockers; Pulse cascade gets a new FIRST branch (Lock 5) — active blocker beats delay/thesis/missing-field; `[Add Blocker]` button promoted from disabled placeholder to enabled `data-cc-form="add-blocker"`; two new inline form panels (Add Blocker + Edit Blocker) inside `#cc-action-form`; new `cc_result` codes (`blocker_empty_title` error, `blocker_resolved` success).
+  - `app/static/css/styles.css` — `.timeline-blocker-*` styles (tile, severity chips low/medium/high, count badge, phase-strip dot).
+  - `app/static/js/main.js` — `initCommandCenter()` extended with `populateEditBlocker()` that pre-fills the Edit form from the [Edit] button's `data-blocker-*` attrs.
+  - `app/ai/tools.py` — 3 new schemas (`create_blocker`, `update_blocker`, `resolve_blocker`), `UPDATE_BLOCKER_ALLOWED`, all 3 added to `CONFIRMATION_TOOLS` (Lock 9). Relationship checks reject wrong-project blocker_id (forbidden) + wrong-project phase_id (phase_not_found). 3 handler functions registered in `_HANDLERS`. `delete_blocker` NOT in `TOOL_SCHEMAS` (matches `delete_variant` admin-only pattern).
+  - `app/ai/prompts.py` — 1-sentence guidance: create_blocker only when user explicitly asks; do NOT proactively propose.
+  - `AI_TOOLS_REGISTRY.md` — 4 new rows (3 implemented + 1 "not registered — by design").
+  - `app/i18n/en.json` + `zh.json` — 24 new keys − 2 removed = net +22; parity 688/688.
+  - `test_v13_build07b.py` — **66/66 PASS** (migration + model + i18n parity + crud helpers + audit + Lock 3 phase mismatch + query helpers + template active state + empty state + phase-strip dot + project-level blocker doesn't light up phase + routes happy/empty/cross-project/viewer/wrong-project rejections + Pulse cascade Lock 5 + resolved blockers don't trigger phase dots + AI tool schemas + confirmation gating + no delete_blocker + Build 06/07A invariants).
+  - `test_v13_build06.py` + `test_v13_build07.py` — updated for honest tile + enabled Add Blocker button + key churn (planned regression test updates).
+  - `test_ai_e2e.py` — TOOL_SCHEMAS count loosened from `== 20` to `>= 20` (Build 07B adds 3 → 23).
 
-## Build 07A — Confirmed locks
+## Build 07B — Confirmed locks (1-10)
 
-1. **Lock 1**: Inline forms inside shared mount, not modals — phase strip + tiles stay visible.
-2. **Lock 2**: PRG redirect to `#timeline-command-center` with `?cc_action=...&cc_result=...` query params; banner renders ok-green or error-red.
-3. **Lock 3**: Server-side stale-form race protection on Finish — re-derives `current_phase` and rejects if `request.phase_id != server.current_phase.id` OR phase is already `done`.
-4. **Lock 4**: Reason required server-side for Adjust Due Date (whitespace-only also rejected).
-5. **Lock 5**: Reused Build 14 entry_type vocabulary unchanged (9 options).
-6. **Lock 6**: Defense-in-depth — every new route re-runs `require_auth` + `can_edit_project` + (Add Update) `can_view_journal`.
-7. **Lock 7**: No server-side idempotency tokens for these 3 routes (race protection / service-layer no-op / journal cheapness handle it). **Amendment**: Add Update form has `data-cc-disable-on-submit` → JS disables submit on first click with spinner. UX only, not load-bearing.
-
-## What stays placeholder
-
-- **Add Blocker** — disabled button, tooltip now says "Coming Build 07B — needs Architecture Review for blocker model". Architecture Review for the blocker model will be its own plan file before Build 07B implementation.
+1. **Real `project_blockers` table** — not journal extension.
+2. **2-state lifecycle** (active / resolved); admin-only hard delete is the escape hatch (no UI surface yet).
+3. **`phase_id` OPTIONAL + same-project validation**; phase-strip red dot fires ONLY for phase-linked blockers (project-level blockers do not light up any phase block).
+4. **Tile shows newest active + active-count badge** (`+N more active` text); `+N more` expanded list DEFERRED to Build 08 Timeline History.
+5. **Pulse blocker branch goes FIRST**; beats delay/thesis/missing-field. Behavior change for Build 02 cascade; test_v13_build02 still 11/11 (existing branches still fire when count == 0).
+6. **Resolve is one-click** + audit explicit: `crud.resolve_blocker` sets `status`, `resolved_at`, `resolved_by_user_id` AND writes `blocker_resolved` change-log row.
+7. **Defense-in-depth permission re-validation** per route + phase-belongs-to-project check on every blocker write.
+8. **Add Blocker form** carries `data-cc-disable-on-submit` (Lock 7 amendment from Build 07A carried over).
+9. **AI tools confirmation-gated** (all 3 in `CONFIRMATION_TOOLS`); no `delete_blocker` AI tool.
+10. **Scope discipline**: NO project health engine, NO SLA timers, NO proactive AI blocker proposal, NO recently-resolved section, NO `+N more` expanded list, NO blocker comments, NO file attachments, NO journal `risk` auto-migration.
 
 ## Verification at ship time
 
-- `python3 test_v13_build07.py` — **57/57 PASS**.
-- Regression: `test_v13_build01..06` all green (Build 06 updated for Build 07A button pattern); `test_build_v121` 19/19; `test_build30` 23/23; `test_ai_e2e.py` 15P/2S/0F.
-- i18n parity: 666/666.
-- No new migration (still 5); no schema change; no service change; no AI tool change.
-
-## Reference: uploaded v1.3 product spec docs
-
-User-provided canonical references for v1.3:
-- `project_overview_redesign_plan.md` (Overview tab; covers Builds 01-05)
-- `timeline_command_center_redesign_plan.md` (Timeline tab; covers Builds 06-09)
-- `V13_BUILD07_TIMELINE_COMMAND_ACTIONS_PLAN.md` — user's high-level Build 07 doc with the Required Action Mapping checklist that Build 07A's Backend Honesty Mapping satisfies for 3 of 5 actions.
+- `python3 test_v13_build07b.py` — **66/66 PASS**.
+- Regression: `test_v13_build01..07` all green (Build 06 + 07 had planned assertion updates for the new honest tile + enabled button + tooltip key removal); `test_build_v121` 19/19; `test_build30` 23/23; `test_ai_e2e` 15P/2S/0F.
+- i18n parity: **688/688**.
+- Migration 006 applied successfully on dev sqlite; idempotent on both SQLite + PostgreSQL.
 
 ## v1.3 Build series status
 
@@ -62,29 +60,34 @@ User-provided canonical references for v1.3:
 | 05 — Variant Command Cards | shipped | `4d8c847` |
 | 05B — Structured spec schema | shipped | `dd96cf2` |
 | 06 — Timeline Command Center Shell | shipped | `4a800d6` |
-| **07A — Timeline Command Actions (3 routes)** | **shipped this session** | latest |
-| 07B — Blocker model + Add Blocker wiring | planned (needs Architecture Review) | — |
-| 08 — Timeline History | planned | — |
-| 09 — Planning Sandbox (design-only) | planned | — |
+| 07A — Timeline Command Actions (3 routes) | shipped | `57b48c3` |
+| **07B — Project Blockers (model + Command Center wiring)** | **shipped this session** | latest |
+| 08 — Timeline History (derived from change-log + journal + plan_changes + files) | planned | — |
+| 09 — Planning Sandbox (design-only doc) | planned | — |
+| 10 — v1.3.0 Release Hardening (version bump + release-proof regression) | planned | — |
 
 ## Next step
 
 Wait for user direction. Suggested next moves:
-1. **Push** to origin (currently several commits ahead of `origin/main` after this build).
-2. **Build 07B Architecture Review** — write the Architecture Review document for the blocker model first (per user's V13_BUILD07_TIMELINE_COMMAND_ACTIONS_PLAN.md gate). Resolve the 7 open questions sketched at the end of V13_BUILD07_EXECUTION_PLAN.md. Then write V13_BUILD07B_EXECUTION_PLAN.md before any 07B coding.
-3. **Build 08** — Timeline History view, derived from `project_changes` + `phase_plan_changes` + `project_journal_entries` + file uploads. No new table per the doc.
-4. **Browser walkthrough** of Build 07A: click each of the 3 buttons, verify forms appear inline below the action row, fill and submit each, verify banner appears and state updates correctly.
+1. **Push** to origin (currently several commits ahead of `origin/main`).
+2. **Browser walkthrough** of Build 07B — add a project-level blocker; verify Pulse branch fires + tile renders + no phase dots; add a phase-linked blocker on phase 3; verify phase 3 gets a red dot + count badge says "+1 more active"; edit one; resolve one; verify tile flips to empty state + Pulse falls through to delay/thesis branch.
+3. **Build 08 plan** — Timeline History view derived from `project_changes` + `phase_plan_changes` + `project_journal_entries` + uploaded files + (new) `blocker_opened` / `blocker_resolved` change-log rows. No new table per the doc; "the data already exists." Per the user's V13_MASTERPLAN.md.
+4. **Native-speaker Chinese review** of strings added in v1.3 Builds 01-07B (carried-forward deferral).
 
-## Deferred to future builds (carried forward from v1.2.1)
+## Deferred to future builds (carried forward)
 
-- Native-speaker Chinese review of strings added in Builds 26-30C + v1.3 Builds 01-07A.
+- Native-speaker Chinese review of strings added in Builds 26-30C + v1.3 Builds 01-07B.
 - AI prompt translation, Help modal body translation, `/admin/*` page translation.
 - Full Profit Model implementation (variant cell shows naive margin; full model is v1.4).
 - Row-level multi-tenancy (`Organization` table + `org_id` everywhere). Deployment-level isolation (Build 25) remains the answer for ≤3 departments.
 - Bulk delete from the projects list / soft-delete with undo window.
 - Auto-provisioning script for Railway (the DEPLOYMENT.md runbook is still manual).
 - One-time admin cleanup of the original 6 admin-linked duplicates from the Build 30A incident.
+- Recently-resolved blockers section in Command Center (per Lock 10 — out of scope for 07B; Build 08 Timeline History will surface them in history view).
+- `+N more` expanded blocker list (per Lock 4 — Build 08 will provide the list).
+- Proactive AI blocker proposal from chat heuristics (per Lock 10 — manual-only this build).
+- Blocker comments / discussion thread, file attachments, SLA timers (per Lock 10 — out of scope).
 
 ## v1.3 process pattern (continues)
 
-Every build gets a build-specific execution plan before coding. Plan files are committed/reviewed first. Locks (route choices, anchor strategies, i18n keys, schema/service constraints) are resolved in-plan before implementation starts. Builds 06 + 07A both added a **Backend Honesty Mapping** per visible field — every field is either honestly sourced (with source-of-truth path + write-path + permission rule + test coverage) or marked as an EXPLICIT placeholder. Build 07A also added **Locked Decisions** (7 locks) — explicit named choices the user confirmed before coding started. This discipline scales to higher-risk builds (07B, blocker model; 09, planning sandbox).
+Every build gets a build-specific execution plan before coding. Plan files are committed/reviewed first. Builds touching schema additionally write an Architecture Review section answering CLAUDE.md's 6 schema questions + any build-specific gates (Build 07B answered both the 6 schema questions and the 7 Add Blocker open questions sketched at the end of V13_BUILD07_EXECUTION_PLAN.md). Locks are resolved in-plan before implementation starts; ChatGPT + Claude both review and the plan gets amended before code lands. Build 07B added Lock 10 (scope discipline) as a new lock type — explicitly forbids "while we're here" feature creep when a build's surface area could naturally expand.

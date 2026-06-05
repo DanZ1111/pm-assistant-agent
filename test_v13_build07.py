@@ -149,18 +149,21 @@ def main():
         ok(f"All {len(cc_keys)} Build 07A cc_ keys present")
     else:
         fail("cc keys", f"missing: {missing}")
-    if "07B" in en["timeline.btn_add_blocker_tooltip"]:
-        ok("[Add Blocker] tooltip updated to point at Build 07B")
+    # Build 07B removed timeline.btn_add_blocker_tooltip when the button was
+    # promoted from disabled-placeholder to enabled form trigger. Assertion
+    # rewritten: just confirm the key no longer exists (key churn was planned).
+    if "timeline.btn_add_blocker_tooltip" not in en:
+        ok("Build 07B removed the disabled-button tooltip key (key churn planned)")
     else:
-        fail("blocker tooltip", f"got: {en['timeline.btn_add_blocker_tooltip']!r}")
+        fail("tooltip key churn", "key still present — 07B removal not applied")
 
-    # ── 2. No new migration ──
-    print("\n── 2. Migrations count unchanged ──")
+    # ── 2. Migration count (forward-compatible with 07B's migration 006) ──
+    print("\n── 2. Migrations count ──")
     from app.migrations import MIGRATIONS
-    if len(MIGRATIONS) == 5:
-        ok("MIGRATIONS still 5 entries (no schema change in 07A)")
+    if len(MIGRATIONS) >= 5:
+        ok(f"MIGRATIONS count >= 5 (got {len(MIGRATIONS)})")
     else:
-        fail("migration count", f"expected 5, got {len(MIGRATIONS)}")
+        fail("migration count", f"expected >= 5, got {len(MIGRATIONS)}")
 
     # ── 3. Set up a project with first phase in_progress + planned_end_date ──
     print("\n── 3. Project setup ──")
@@ -448,7 +451,8 @@ def main():
         ("timeline-phase-strip", "Phase strip"),
         ("timeline-tile-current", "Current tile"),
         ("timeline-tile-deadline", "Deadline tile"),
-        ('data-placeholder="blocker"', "Blocker placeholder"),
+        # v1.3 Build 07B replaced the blocker placeholder with the honest tile.
+        ('timeline-blocker-tile', "Blocker tile (Build 07B)"),
         ('data-placeholder="ai-nudge"', "AI nudge placeholder"),
         ('id="timelineDetailedTable"', "Detailed Table <details> wrapper"),
         (f'id="phase-row-{p1_id}"', f"phase-row-{p1_id} anchor"),

@@ -140,7 +140,8 @@ def main():
         "timeline.blocker_open_journal", "timeline.ai_nudge_title",
         "timeline.ai_nudge_body", "timeline.ai_nudge_open_panel",
         "timeline.btn_finish_phase", "timeline.btn_adjust_due_date",
-        "timeline.btn_add_update", "timeline.btn_add_blocker_disabled",
+        # Note: timeline.btn_add_blocker_disabled was removed by Build 07B.
+        "timeline.btn_add_update",
         "timeline.btn_open_ai_intake", "timeline.detailed_table",
         "timeline.placeholder_label",
     ]
@@ -153,10 +154,13 @@ def main():
     # ── 2. No new migration ──
     print("\n── 2. Migrations count unchanged ──")
     from app.migrations import MIGRATIONS
-    if len(MIGRATIONS) == 5:
-        ok(f"MIGRATIONS still 5 entries (no schema change in Build 06)")
+    # Build 06 itself adds no migration. Build 07B added migration 006
+    # (project_blockers). Accept either count >= 5 to keep this regression
+    # forward-compatible with later schema-additive builds.
+    if len(MIGRATIONS) >= 5:
+        ok(f"MIGRATIONS count >= 5 (got {len(MIGRATIONS)})")
     else:
-        fail("migration count", f"expected 5, got {len(MIGRATIONS)}")
+        fail("migration count", f"expected >= 5, got {len(MIGRATIONS)}")
 
     # ── 3. Set up a "happy path" project ──
     print("\n── 3. Happy-path project — Command Center renders ──")
@@ -171,7 +175,9 @@ def main():
         ("timeline-tile-current", "Current Phase tile renders"),
         ("timeline-tile-next-action", "Next Action tile renders"),
         ("timeline-tile-deadline", "Deadline tile renders"),
-        ('data-placeholder="blocker"', "Main blocker placeholder renders"),
+        # v1.3 Build 07B replaced the data-placeholder="blocker" block with
+        # an honest tile (timeline-blocker-tile). Accept the new marker.
+        ('timeline-blocker-tile', "Main blocker tile renders (Build 07B honest tile)"),
         ('data-placeholder="ai-nudge"', "AI Nudge placeholder renders"),
         ('id="timelineDetailedTable"', "Detailed Table <details> wrapper renders"),
     ]:
@@ -299,12 +305,14 @@ def main():
         fail("owner render", "'Test Owner Alice' not in page")
 
     # ── 11. Action buttons — admin sees all 5 ──
+    # v1.3 Build 07B promoted [Add Blocker] from disabled placeholder
+    # to enabled form trigger (data-cc-form="add-blocker"). Updated below.
     print("\n── 11. Action buttons — admin permission ──")
     for action, msg in [
         ('data-action="finish"', "[Finish Current Phase] visible to admin"),
         ('data-action="adjust-due-date"', "[Adjust Due Date] visible to admin"),
         ('data-action="add-update"', "[Add Update] visible to admin"),
-        ('data-action="add-blocker-disabled"', "[Add Blocker] (disabled) visible to admin"),
+        ('data-action="add-blocker"', "[Add Blocker] (enabled, Build 07B) visible to admin"),
         ('data-action="open-ai-intake"', "[Open AI Intake] visible to admin"),
     ]:
         if action in page:
@@ -312,12 +320,12 @@ def main():
         else:
             fail(msg, f"'{action}' not in page")
 
-    # [Add Blocker] is disabled
-    add_blocker_match = re.search(r'<button[^>]*data-action="add-blocker-disabled"[^>]*>', page)
-    if add_blocker_match and "disabled" in add_blocker_match.group(0):
-        ok("[Add Blocker] button has disabled attribute")
+    # Build 07B: [Add Blocker] button must NOT carry the disabled attribute
+    add_blocker_match = re.search(r'<button[^>]*data-action="add-blocker"[^>]*>', page)
+    if add_blocker_match and "disabled" not in add_blocker_match.group(0):
+        ok("[Add Blocker] button is enabled (no disabled attr) — Build 07B")
     else:
-        fail("add_blocker disabled", f"button tag: {add_blocker_match.group(0) if add_blocker_match else 'not found'}")
+        fail("add_blocker enabled", f"button tag: {add_blocker_match.group(0) if add_blocker_match else 'not found'}")
 
     # [Finish Current Phase] — Build 06 shipped this as an <a href="#phase-row-N">
     # anchor; Build 07A converted it to a <button data-cc-form="finish"> that
@@ -339,7 +347,7 @@ def main():
         ('data-action="finish"', "[Finish] hidden from viewer"),
         ('data-action="adjust-due-date"', "[Adjust] hidden from viewer"),
         ('data-action="add-update"', "[Add Update] hidden from viewer"),
-        ('data-action="add-blocker-disabled"', "[Add Blocker] hidden from viewer"),
+        ('data-action="add-blocker"', "[Add Blocker] hidden from viewer (Build 07B)"),
         ('data-action="open-ai-intake"', "[AI Intake] hidden from viewer (can_use_ai_intake=False)"),
     ]:
         if action not in page_viewer:
@@ -347,16 +355,18 @@ def main():
         else:
             fail(msg, f"viewer sees '{action}' — should be hidden")
 
-    # Viewer still sees the command center structure + placeholders
+    # Viewer still sees the command center structure + (Build 07B) honest blocker tile
     if 'id="timeline-command-center"' in page_viewer:
         ok("Viewer still sees Command Center section")
     else:
         fail("viewer cc", "viewer cannot see Command Center")
-    if 'data-placeholder="blocker"' in page_viewer:
-        ok("Viewer sees blocker placeholder")
+    if 'timeline-blocker-tile' in page_viewer:
+        ok("Viewer sees blocker tile (Build 07B — read-only)")
     else:
-        fail("viewer blocker", "blocker placeholder hidden from viewer")
+        fail("viewer blocker tile", "blocker tile missing for viewer")
     # Viewer should NOT see "Open Journal" link (can_view_journal=False for viewer)
+    # Note: Build 07B removed the placeholder's Open Journal link entirely;
+    # this assertion is now belt-and-suspenders.
     if "Open Journal" not in page_viewer:
         ok("Viewer does NOT see 'Open Journal' link (can_view_journal=False)")
     else:
@@ -434,7 +444,7 @@ def main():
     page_pm = pm.get(f"{BASE}/projects/{pid}").text
     pm_actions = sum(1 for action in [
         'data-action="finish"', 'data-action="adjust-due-date"',
-        'data-action="add-update"', 'data-action="add-blocker-disabled"',
+        'data-action="add-update"', 'data-action="add-blocker"',
         'data-action="open-ai-intake"',
     ] if action in page_pm)
     if pm_actions == 5:

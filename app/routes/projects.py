@@ -484,6 +484,12 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
     else:
         health_band = "delayed"
 
+    # v1.3 Build 07B — active blockers + phase-strip dot data
+    active_blockers = crud.get_active_blockers_for_project(db, project_id)
+    active_blocker_count = len(active_blockers)
+    newest_active_blocker = active_blockers[0] if active_blockers else None
+    blocker_phase_ids = crud.get_active_phase_blocker_ids(db, project_id)
+
     command_center_state = {
         "phase_strip": phase_strip,
         "days_left": days_left,
@@ -491,6 +497,10 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
         "pressure_dots": pressure_dots,
         "health_band": health_band,
         "today": today_date,
+        "active_blockers": active_blockers,
+        "active_blocker_count": active_blocker_count,
+        "newest_active_blocker": newest_active_blocker,
+        "blocker_phase_ids": blocker_phase_ids,
     }
 
     return templates.TemplateResponse(request, "project_detail.html", {
@@ -964,6 +974,149 @@ def cc_add_update(
         author_user_id=current_user.id,
     )
     return _cc_redirect(project_id, "add-update", "ok")
+
+
+# ---------------------------------------------------------------------------
+# v1.3 Build 07B — Project Blockers (Add / Edit / Resolve)
+#
+# Same shape as Build 07A's CC routes: re-auth, ownership re-check,
+# delegate to crud.*, PRG redirect with cc_result. Lock 6: Resolve is
+# one-click + audit. Lock 3: phase_id optional + same-project check
+# enforced in the crud layer.
+# ---------------------------------------------------------------------------
+
+
+def _parse_optional_phase_id(raw: str) -> int | None:
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
+
+
+@router.post("/projects/{project_id}/command/add-blocker")
+def cc_add_blocker(
+    request: Request,
+    project_id: int,
+    title: str = Form(""),
+    description: str = Form(""),
+    severity: str = Form("medium"),
+    phase_id: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+
+    project = crud.get_project(db, project_id)
+    if not project or not can_edit_project(current_user, project):
+        return _cc_redirect(project_id, "add-blocker", "not_authorized")
+
+    clean_title = (title or "").strip()
+    if not clean_title:
+        return _cc_redirect(project_id, "add-blocker", "blocker_empty_title")
+
+    parsed_phase_id = _parse_optional_phase_id(phase_id)
+    blocker = crud.create_blocker(
+        db, project_id,
+        title=clean_title,
+        description=description,
+        severity=severity,
+        phase_id=parsed_phase_id,
+        created_by_user_id=current_user.id,
+        changed_by=current_user.role,
+    )
+    if blocker is None:
+        # phase_id belonged to a different project (Lock 3) — treat as auth fail
+        return _cc_redirect(project_id, "add-blocker", "not_authorized")
+    return _cc_redirect(project_id, "add-blocker", "ok")
+
+
+@router.post("/projects/{project_id}/command/edit-blocker")
+def cc_edit_blocker(
+    request: Request,
+    project_id: int,
+    blocker_id: int = Form(...),
+    title: str = Form(""),
+    description: str = Form(""),
+    severity: str = Form("medium"),
+    phase_id: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+
+    project = crud.get_project(db, project_id)
+    if not project or not can_edit_project(current_user, project):
+        return _cc_redirect(project_id, "edit-blocker", "not_authorized")
+
+    from app.models import ProjectBlocker  # late import
+    existing = db.query(ProjectBlocker).filter(
+        ProjectBlocker.id == blocker_id,
+        ProjectBlocker.project_id == project_id,
+    ).first()
+    if not existing:
+        return _cc_redirect(project_id, "edit-blocker", "not_authorized")
+
+    clean_title = (title or "").strip()
+    if not clean_title:
+        return _cc_redirect(project_id, "edit-blocker", "blocker_empty_title")
+
+    crud.update_blocker(
+        db, blocker_id,
+        {
+            "title": clean_title,
+            "description": description,
+            "severity": severity,
+            "phase_id": _parse_optional_phase_id(phase_id),
+        },
+        changed_by=current_user.role,
+        changed_by_user_id=current_user.id,
+    )
+    return _cc_redirect(project_id, "edit-blocker", "ok")
+
+
+@router.post("/projects/{project_id}/command/resolve-blocker")
+def cc_resolve_blocker(
+    request: Request,
+    project_id: int,
+    blocker_id: int = Form(...),
+    db: Session = Depends(get_db),
+):
+    """Lock 6: one-click resolve. No reason field; the blocker title +
+    description IS the context. crud.resolve_blocker writes
+    blocker_resolved change-log row + sets resolved_at + resolved_by."""
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+
+    project = crud.get_project(db, project_id)
+    if not project or not can_edit_project(current_user, project):
+        return _cc_redirect(project_id, "resolve-blocker", "not_authorized")
+
+    from app.models import ProjectBlocker
+    existing = db.query(ProjectBlocker).filter(
+        ProjectBlocker.id == blocker_id,
+        ProjectBlocker.project_id == project_id,
+    ).first()
+    if not existing:
+        return _cc_redirect(project_id, "resolve-blocker", "not_authorized")
+
+    crud.resolve_blocker(
+        db, blocker_id,
+        resolved_by_user_id=current_user.id,
+        changed_by=current_user.role,
+    )
+    return _cc_redirect(project_id, "resolve-blocker", "ok")
 
 
 # ---------------------------------------------------------------------------

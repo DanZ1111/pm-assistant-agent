@@ -2021,3 +2021,179 @@ def update_file_comment(
     db.commit()
     db.refresh(pf)
     return pf
+
+
+# ---------------------------------------------------------------------------
+# v1.3 Build 07B — Project Blockers (first-class lifecycle model)
+#
+# All mutating functions write a project_changes audit row via write_change().
+# Per V13_BUILD07B_EXECUTION_PLAN.md Lock 1/3/6: 2-state lifecycle, optional
+# phase_id with same-project validation, resolve sets resolved_at/by + audit.
+# ---------------------------------------------------------------------------
+
+UPDATE_BLOCKER_ALLOWED = {"title", "description", "severity", "phase_id"}
+_BLOCKER_SEVERITIES = {"low", "medium", "high"}
+
+
+def _import_blocker():
+    from app.models import ProjectBlocker  # late import to mirror journal pattern
+    return ProjectBlocker
+
+
+def create_blocker(
+    db: Session,
+    project_id: int,
+    title: str,
+    description: str | None = None,
+    severity: str = "medium",
+    phase_id: int | None = None,
+    created_by_user_id: int | None = None,
+    changed_by: str = "user",
+    source_type: str = "manual_edit",
+):
+    """Lock 3: phase_id is optional; if provided it must belong to project_id.
+    Returns the created ProjectBlocker, or None if phase_id mismatch / blank title.
+    """
+    ProjectBlocker = _import_blocker()
+    clean_title = (title or "").strip()
+    if not clean_title:
+        return None
+    sev = severity if severity in _BLOCKER_SEVERITIES else "medium"
+    if phase_id is not None:
+        phase = db.query(ProjectPhase).filter(ProjectPhase.id == phase_id).first()
+        if not phase or phase.project_id != project_id:
+            return None
+    blocker = ProjectBlocker(
+        project_id=project_id,
+        phase_id=phase_id,
+        title=clean_title,
+        description=(description or "").strip() or None,
+        severity=sev,
+        status="active",
+        created_by_user_id=created_by_user_id,
+    )
+    db.add(blocker)
+    write_change(
+        db, project_id, "blocker_opened", changed_by=changed_by,
+        field_name=clean_title,
+        summary=f"Blocker opened: '{clean_title}' (severity {sev})",
+        source_type=source_type,
+    )
+    db.commit()
+    db.refresh(blocker)
+    return blocker
+
+
+def update_blocker(
+    db: Session,
+    blocker_id: int,
+    data: dict,
+    changed_by: str = "user",
+    changed_by_user_id: int | None = None,
+    source_type: str = "manual_edit",
+):
+    """UPDATE_BLOCKER_ALLOWED whitelist enforced. Non-allowlisted keys are
+    silently ignored (Lock 7 defense-in-depth)."""
+    ProjectBlocker = _import_blocker()
+    blocker = db.query(ProjectBlocker).filter(ProjectBlocker.id == blocker_id).first()
+    if not blocker:
+        return None
+    changes = []
+    for field in UPDATE_BLOCKER_ALLOWED:
+        if field not in data:
+            continue
+        new_val = data[field]
+        if field == "severity":
+            if new_val not in _BLOCKER_SEVERITIES:
+                continue
+        if field == "phase_id":
+            if new_val is not None:
+                phase = db.query(ProjectPhase).filter(ProjectPhase.id == new_val).first()
+                if not phase or phase.project_id != blocker.project_id:
+                    continue
+        if field == "title":
+            new_val = (new_val or "").strip()
+            if not new_val:
+                continue
+        if field == "description":
+            new_val = ((new_val or "").strip() or None) if new_val is not None else None
+        old_val = getattr(blocker, field)
+        if str(old_val or "") != str(new_val or ""):
+            changes.append((field, old_val, new_val))
+            setattr(blocker, field, new_val)
+    if changes:
+        summary_parts = [f"{f}: {o or '—'} → {n or '—'}" for f, o, n in changes]
+        write_change(
+            db, blocker.project_id, "blocker_updated", changed_by=changed_by,
+            field_name=blocker.title,
+            summary=f"Blocker '{blocker.title}' updated: {'; '.join(summary_parts)}",
+            source_type=source_type,
+        )
+    db.commit()
+    db.refresh(blocker)
+    return blocker
+
+
+def resolve_blocker(
+    db: Session,
+    blocker_id: int,
+    resolved_by_user_id: int | None = None,
+    changed_by: str = "user",
+    source_type: str = "manual_edit",
+):
+    """Lock 6: one-click resolve. Sets status, resolved_at, resolved_by_user_id
+    AND writes blocker_resolved change-log row. The change-log row IS the
+    auditable history record."""
+    ProjectBlocker = _import_blocker()
+    blocker = db.query(ProjectBlocker).filter(ProjectBlocker.id == blocker_id).first()
+    if not blocker or blocker.status == "resolved":
+        return None
+    blocker.status = "resolved"
+    blocker.resolved_at = datetime.utcnow()
+    blocker.resolved_by_user_id = resolved_by_user_id
+    write_change(
+        db, blocker.project_id, "blocker_resolved", changed_by=changed_by,
+        field_name=blocker.title,
+        summary=f"Blocker resolved: '{blocker.title}'",
+        source_type=source_type,
+    )
+    db.commit()
+    db.refresh(blocker)
+    return blocker
+
+
+def get_active_blockers_for_project(db: Session, project_id: int) -> list:
+    """Newest first. Used by Command Center tile + Pulse cascade."""
+    ProjectBlocker = _import_blocker()
+    return (
+        db.query(ProjectBlocker)
+        .filter(ProjectBlocker.project_id == project_id,
+                ProjectBlocker.status == "active")
+        .order_by(ProjectBlocker.created_at.desc())
+        .all()
+    )
+
+
+def get_blockers_by_phase(db: Session, phase_id: int, only_active: bool = True) -> list:
+    """Used by phase-strip dot derivation + Timeline History (Build 08)."""
+    ProjectBlocker = _import_blocker()
+    q = db.query(ProjectBlocker).filter(ProjectBlocker.phase_id == phase_id)
+    if only_active:
+        q = q.filter(ProjectBlocker.status == "active")
+    return q.order_by(ProjectBlocker.created_at.desc()).all()
+
+
+def get_active_phase_blocker_ids(db: Session, project_id: int) -> set:
+    """Lock 3: returns the set of phase_ids that have ≥1 active blocker.
+    Phase-strip red dot iterates this set. Project-level blockers (phase_id=NULL)
+    are excluded so they never light up a phase block."""
+    ProjectBlocker = _import_blocker()
+    rows = (
+        db.query(ProjectBlocker.phase_id)
+        .filter(ProjectBlocker.project_id == project_id,
+                ProjectBlocker.status == "active",
+                ProjectBlocker.phase_id.isnot(None))
+        .distinct()
+        .all()
+    )
+    return {r[0] for r in rows}

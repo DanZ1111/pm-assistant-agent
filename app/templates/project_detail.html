@@ -164,9 +164,16 @@
           </dl>
         </div>
 
-        <div class="pulse-card pulse-action-card{% if delay %} pulse-action-danger{% elif health.needs_info %} pulse-action-warning{% endif %}">
+        <div class="pulse-card pulse-action-card{% if command_center_state and command_center_state.active_blocker_count > 0 %} pulse-action-danger{% elif delay %} pulse-action-danger{% elif health.needs_info %} pulse-action-warning{% endif %}">
           <div class="pulse-card-label">{{ t('pulse.attention_needed') }}</div>
-          {% if delay %}
+          {% if command_center_state and command_center_state.newest_active_blocker %}
+            {# v1.3 Build 07B Lock 5: active blocker beats delay/thesis/missing-field #}
+            <div class="pulse-action-title">{{ t('pulse.blocker_action_title') }}</div>
+            <p class="pulse-action-copy">{{ t('pulse.blocker_action_copy', title=command_center_state.newest_active_blocker.title) }}</p>
+            <a href="#timeline-command-center" class="pulse-action-link" onclick="setProjectWorkspace('timeline', true)">
+              <i class="bi bi-shield-exclamation me-1"></i>{{ t('pulse.open_command_center') }}
+            </a>
+          {% elif delay %}
             <div class="pulse-action-title">{{ t('pulse.delayed_title') }}</div>
             <p class="pulse-action-copy">{{ t('pulse.delayed_copy', phase=delay.blocking_phase, days=delay.days_late) }}</p>
             <a href="#timeline" class="pulse-action-link" onclick="setProjectWorkspace('timeline', true)">
@@ -562,9 +569,11 @@
       <div class="cc-result-banner{% if cc_result == 'ok' %} cc-result-ok{% else %} cc-result-error{% endif %}"
            data-cc-result="{{ cc_result }}" data-cc-action="{{ cc_action or '' }}" role="status">
         <span class="cc-result-text">
-          {% if cc_result == 'ok' %}{{ t('timeline.cc_result_ok') }}
+          {% if cc_result == 'ok' and cc_action == 'resolve-blocker' %}{{ t('timeline.cc_result_blocker_resolved') }}
+          {% elif cc_result == 'ok' %}{{ t('timeline.cc_result_ok') }}
           {% elif cc_result == 'reason_required' %}{{ t('timeline.cc_result_reason_required') }}
           {% elif cc_result == 'empty_update' %}{{ t('timeline.cc_result_empty_update') }}
+          {% elif cc_result == 'blocker_empty_title' %}{{ t('timeline.cc_result_blocker_empty_title') }}
           {% elif cc_result == 'phase_already_done' %}{{ t('timeline.cc_result_phase_already_done') }}
           {% elif cc_result == 'not_authorized' %}{{ t('timeline.cc_result_not_authorized') }}
           {% else %}{{ cc_result }}{% endif %}
@@ -577,7 +586,11 @@
         {% for entry in command_center_state.phase_strip %}
         {% set p = entry.phase %}
         {% set state = entry.state %}
-        <div class="timeline-phase-block" data-status="{{ state }}" title="{{ p.phase_name }}">
+        {% set has_blocker = p.id in command_center_state.blocker_phase_ids %}
+        <div class="timeline-phase-block{% if has_blocker %} timeline-phase-has-blocker{% endif %}"
+             data-status="{{ state }}"
+             {% if has_blocker %}data-blocker="active"{% endif %}
+             title="{{ p.phase_name }}{% if has_blocker %} — active blocker{% endif %}">
           {% if state == 'done' %}
             <i class="bi bi-check-circle-fill"></i>
           {% elif state == 'current' %}
@@ -590,6 +603,7 @@
             <i class="bi bi-circle"></i>
           {% endif %}
           <span class="timeline-phase-name">{{ p.phase_name }}</span>
+          {% if has_blocker %}<span class="timeline-phase-blocker-dot" aria-label="active blocker"></span>{% endif %}
         </div>
         {% if not loop.last %}<i class="bi bi-chevron-right timeline-phase-arrow" aria-hidden="true"></i>{% endif %}
         {% endfor %}
@@ -664,18 +678,65 @@
         </div>
       </div>
 
-      {# Main blocker — EXPLICIT placeholder per doc §1.5 #}
-      <div class="timeline-placeholder timeline-placeholder-blocker" data-placeholder="blocker">
-        <div class="timeline-placeholder-head">
+      {# v1.3 Build 07B — Honest Main Blocker tile. Replaces the Build 06
+         placeholder. Shows newest active blocker + active count badge
+         (Lock 4: no +N more expanded list — count only). Empty state is
+         honest "No active blockers." #}
+      {% set _b = command_center_state.newest_active_blocker %}
+      <div class="timeline-blocker-tile{% if _b %} timeline-blocker-active{% else %} timeline-blocker-empty{% endif %}"
+           data-blocker-state="{% if _b %}active{% else %}empty{% endif %}"
+           data-blocker-count="{{ command_center_state.active_blocker_count }}">
+        <div class="timeline-blocker-head">
           <i class="bi bi-shield-exclamation me-2"></i>
-          <strong>{{ t('timeline.blocker_placeholder_title') }}</strong>
-          <span class="timeline-placeholder-badge">{{ t('timeline.placeholder_label') }}</span>
+          <strong>{{ t('timeline.blocker_title') }}</strong>
+          {% if command_center_state.active_blocker_count > 1 %}
+          <span class="timeline-blocker-more-badge">{{ t('timeline.blocker_more_count', n=command_center_state.active_blocker_count - 1) }}</span>
+          {% endif %}
         </div>
-        <p class="timeline-placeholder-body">{{ t('timeline.blocker_placeholder_body') }}</p>
-        {% if can_view_journal %}
-        <a class="timeline-placeholder-link" href="#journal">
-          <i class="bi bi-arrow-right me-1"></i>{{ t('timeline.blocker_open_journal') }}
-        </a>
+        {% if _b %}
+          <div class="timeline-blocker-title-row">
+            <span class="timeline-blocker-severity timeline-blocker-severity-{{ _b.severity }}">
+              {% if _b.severity == 'low' %}{{ t('timeline.blocker_severity_low') }}
+              {% elif _b.severity == 'high' %}{{ t('timeline.blocker_severity_high') }}
+              {% else %}{{ t('timeline.blocker_severity_medium') }}{% endif %}
+            </span>
+            <span class="timeline-blocker-title-text">{{ _b.title }}</span>
+          </div>
+          {% if _b.description %}
+          <p class="timeline-blocker-description">{{ _b.description }}</p>
+          {% endif %}
+          <div class="timeline-blocker-meta">
+            {% set _days_ago = (command_center_state.today - _b.created_at.date()).days %}
+            {% if _days_ago == 0 %}
+              {{ t('timeline.blocker_opened_today', author=(_b.created_by.display_name or _b.created_by.username) if _b.created_by else 'unknown') }}
+            {% else %}
+              {{ t('timeline.blocker_opened_meta', n=_days_ago, author=(_b.created_by.display_name or _b.created_by.username) if _b.created_by else 'unknown') }}
+            {% endif %}
+            {% if _b.phase %}
+              · {{ _b.phase.phase_name }}
+            {% endif %}
+          </div>
+          {% if can_edit %}
+          <div class="timeline-blocker-actions">
+            <form method="post" action="/projects/{{ project.id }}/command/resolve-blocker" class="d-inline">
+              <input type="hidden" name="blocker_id" value="{{ _b.id }}">
+              <button type="submit" class="btn btn-sm btn-success" data-action="resolve-blocker">
+                <i class="bi bi-check2 me-1"></i>{{ t('timeline.btn_resolve_blocker') }}
+              </button>
+            </form>
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                    data-cc-form="edit-blocker"
+                    data-blocker-id="{{ _b.id }}"
+                    data-blocker-title="{{ _b.title }}"
+                    data-blocker-description="{{ _b.description or '' }}"
+                    data-blocker-severity="{{ _b.severity }}"
+                    data-blocker-phase-id="{{ _b.phase_id or '' }}">
+              <i class="bi bi-pencil me-1"></i>{{ t('timeline.btn_edit_blocker') }}
+            </button>
+          </div>
+          {% endif %}
+        {% else %}
+          <p class="timeline-blocker-empty-text">{{ t('timeline.blocker_empty') }}</p>
         {% endif %}
       </div>
 
@@ -719,10 +780,9 @@
         </button>
         {% endif %}
         {% if can_edit %}
-        <button type="button" class="btn btn-sm btn-outline-secondary" disabled
-                title="{{ t('timeline.btn_add_blocker_tooltip') }}"
-                data-action="add-blocker-disabled">
-          <i class="bi bi-shield-x me-1"></i>{{ t('timeline.btn_add_blocker_disabled') }}
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                data-action="add-blocker" data-cc-form="add-blocker">
+          <i class="bi bi-shield-exclamation me-1"></i>{% if command_center_state.active_blocker_count > 0 %}{{ t('timeline.btn_add_another_blocker') }}{% else %}{{ t('timeline.btn_add_blocker') }}{% endif %}
         </button>
         {% endif %}
         {% if can_use_ai_intake_user %}
@@ -819,6 +879,71 @@
           </div>
         </form>
         {% endif %}
+
+        {# v1.3 Build 07B — Add Blocker form panel #}
+        <form class="cc-action-form" data-cc-panel="add-blocker" hidden data-cc-disable-on-submit
+              method="post" action="/projects/{{ project.id }}/command/add-blocker">
+          <div class="cc-action-form-title">
+            <i class="bi bi-shield-exclamation me-2"></i>{{ t('timeline.btn_add_blocker') }}
+          </div>
+          <label class="cc-action-form-label" for="cc-blocker-title">{{ t('timeline.cc_blocker_title_label') }}</label>
+          <input id="cc-blocker-title" type="text" name="title" required maxlength="200"
+                 class="cc-action-form-input"
+                 placeholder="{{ t('timeline.cc_blocker_title_placeholder') }}">
+          <label class="cc-action-form-label" for="cc-blocker-description">{{ t('timeline.cc_blocker_description_label') }}</label>
+          <textarea id="cc-blocker-description" name="description" rows="2" class="cc-action-form-input"></textarea>
+          <label class="cc-action-form-label" for="cc-blocker-severity">{{ t('timeline.cc_blocker_severity_label') }}</label>
+          <select id="cc-blocker-severity" name="severity" class="cc-action-form-input">
+            <option value="low">{{ t('timeline.blocker_severity_low') }}</option>
+            <option value="medium" selected>{{ t('timeline.blocker_severity_medium') }}</option>
+            <option value="high">{{ t('timeline.blocker_severity_high') }}</option>
+          </select>
+          <label class="cc-action-form-label" for="cc-blocker-phase">{{ t('timeline.cc_blocker_phase_label') }}</label>
+          <select id="cc-blocker-phase" name="phase_id" class="cc-action-form-input">
+            <option value="">{{ t('timeline.cc_blocker_phase_none') }}</option>
+            {% for entry in command_center_state.phase_strip %}
+            <option value="{{ entry.phase.id }}">{{ entry.phase.phase_name }}</option>
+            {% endfor %}
+          </select>
+          <div class="cc-action-form-buttons">
+            <button type="submit" class="btn btn-sm btn-primary">{{ t('timeline.cc_btn_confirm') }}</button>
+            <button type="button" class="btn btn-sm btn-link" data-cc-cancel>{{ t('timeline.cc_btn_cancel') }}</button>
+          </div>
+        </form>
+
+        {# v1.3 Build 07B — Edit Blocker form panel.
+           JS populates the input values from the [Edit] button's data-* attrs
+           when the user clicks Edit on the active tile. #}
+        <form class="cc-action-form" data-cc-panel="edit-blocker" hidden
+              method="post" action="/projects/{{ project.id }}/command/edit-blocker">
+          <input type="hidden" name="blocker_id" data-cc-edit-blocker-id>
+          <div class="cc-action-form-title">
+            <i class="bi bi-pencil me-2"></i>{{ t('timeline.btn_edit_blocker') }}
+          </div>
+          <label class="cc-action-form-label" for="cc-edit-blocker-title">{{ t('timeline.cc_blocker_title_label') }}</label>
+          <input id="cc-edit-blocker-title" type="text" name="title" required maxlength="200"
+                 class="cc-action-form-input" data-cc-edit-blocker-title>
+          <label class="cc-action-form-label" for="cc-edit-blocker-description">{{ t('timeline.cc_blocker_description_label') }}</label>
+          <textarea id="cc-edit-blocker-description" name="description" rows="2"
+                    class="cc-action-form-input" data-cc-edit-blocker-description></textarea>
+          <label class="cc-action-form-label" for="cc-edit-blocker-severity">{{ t('timeline.cc_blocker_severity_label') }}</label>
+          <select id="cc-edit-blocker-severity" name="severity" class="cc-action-form-input" data-cc-edit-blocker-severity>
+            <option value="low">{{ t('timeline.blocker_severity_low') }}</option>
+            <option value="medium">{{ t('timeline.blocker_severity_medium') }}</option>
+            <option value="high">{{ t('timeline.blocker_severity_high') }}</option>
+          </select>
+          <label class="cc-action-form-label" for="cc-edit-blocker-phase">{{ t('timeline.cc_blocker_phase_label') }}</label>
+          <select id="cc-edit-blocker-phase" name="phase_id" class="cc-action-form-input" data-cc-edit-blocker-phase>
+            <option value="">{{ t('timeline.cc_blocker_phase_none') }}</option>
+            {% for entry in command_center_state.phase_strip %}
+            <option value="{{ entry.phase.id }}">{{ entry.phase.phase_name }}</option>
+            {% endfor %}
+          </select>
+          <div class="cc-action-form-buttons">
+            <button type="submit" class="btn btn-sm btn-primary">{{ t('timeline.cc_btn_confirm') }}</button>
+            <button type="button" class="btn btn-sm btn-link" data-cc-cancel>{{ t('timeline.cc_btn_cancel') }}</button>
+          </div>
+        </form>
 
       </div>
       {% endif %}

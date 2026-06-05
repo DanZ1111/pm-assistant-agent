@@ -134,6 +134,10 @@ MIGRATIONS = [
         "005_v1_3_add_variant_structured_specs",
         lambda eng: _add_variant_structured_specs(eng),
     ),
+    (
+        "006_v1_3_add_project_blockers",
+        lambda eng: _create_project_blockers(eng),
+    ),
 ]
 
 
@@ -147,6 +151,45 @@ def _add_variant_structured_specs(engine):
     add_column_if_missing(engine, "project_variants", "handle_summary", "TEXT")
     add_column_if_missing(engine, "project_variants", "mechanism_summary", "TEXT")
     add_column_if_missing(engine, "project_variants", "dimensions_summary", "TEXT")
+
+
+def _create_project_blockers(engine):
+    """v1.3 Build 07B — first-class blocker model with active/resolved
+    lifecycle. Per V13_BUILD07B_EXECUTION_PLAN.md.
+
+    Idempotent: CREATE TABLE IF NOT EXISTS + CREATE INDEX IF NOT EXISTS.
+    Works on both SQLite (live dev) and PostgreSQL (Railway prod).
+    Mirrors Build 30A's _create_project_creation_tokens() pattern.
+    """
+    inspector = inspect(engine)
+    if "project_blockers" in inspector.get_table_names():
+        log.info("project_blockers table already present — skip create")
+    else:
+        with engine.begin() as conn:
+            conn.execute(text(
+                "CREATE TABLE project_blockers ("
+                "  id INTEGER PRIMARY KEY,"
+                "  project_id INTEGER NOT NULL REFERENCES projects(id),"
+                "  phase_id INTEGER NULL REFERENCES project_phases(id),"
+                "  title VARCHAR NOT NULL,"
+                "  description TEXT NULL,"
+                "  severity VARCHAR NOT NULL DEFAULT 'medium',"
+                "  status VARCHAR NOT NULL DEFAULT 'active',"
+                "  created_at DATETIME NOT NULL,"
+                "  created_by_user_id INTEGER NULL REFERENCES users(id),"
+                "  resolved_at DATETIME NULL,"
+                "  resolved_by_user_id INTEGER NULL REFERENCES users(id)"
+                ")"
+            ))
+    with engine.begin() as conn:
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_pb_project_status "
+            "ON project_blockers(project_id, status)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_pb_phase "
+            "ON project_blockers(phase_id)"
+        ))
 
 
 def _create_project_creation_tokens(engine):

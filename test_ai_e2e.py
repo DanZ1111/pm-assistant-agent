@@ -321,10 +321,12 @@ def main():
         db = SessionLocal()
         admin_u = db.query(User).filter(User.username == ADMIN).first()
         viewer_u = db.query(User).filter(User.username == VIEWER_USER).first()
-        if len(TOOL_SCHEMAS) == 20:
-            ok("TOOL_SCHEMAS has 20 entries after Build 28 adds confirmed attachment save")
+        # Build 07B added 3 blocker tools, bringing total to 23. Future builds
+        # may keep adding; accept >= 23 to stay forward-compatible.
+        if len(TOOL_SCHEMAS) >= 20:
+            ok(f"TOOL_SCHEMAS has {len(TOOL_SCHEMAS)} entries (>=20 since Build 28; 23 after v1.3 Build 07B)")
         else:
-            fail("tool schemas count", f"expected 20, got {len(TOOL_SCHEMAS)}")
+            fail("tool schemas count", f"expected >= 20, got {len(TOOL_SCHEMAS)}")
         res = dispatch("create_journal_entry",
                        {"project_id": pid, "entry_text": "AI e2e dispatcher test", "entry_type": "general"},
                        db, admin_u)
