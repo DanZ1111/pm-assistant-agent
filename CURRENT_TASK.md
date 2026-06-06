@@ -1,7 +1,7 @@
 # CURRENT_TASK.md
 
 ## Task
-v1.3 Build 09 — Planning Sandbox Design (design-only). Shipped. Awaiting Build 10 (release hardening).
+v1.3 Build 09 **amended** — Planning Sandbox engineering response to ChatGPT-shaped PRD. Shipped. Awaiting Build 10 (release hardening).
 
 ## Handoff rule
 Before editing, inspect:
@@ -13,41 +13,69 @@ Git/code is the source of truth.
 
 ## What just shipped in this session
 
-- **Build 09 — Planning Sandbox Design (design-only)**, committed as one atomic commit (see latest `git log`).
-  - `V13_BUILD09_PLANNING_SANDBOX_DESIGN.md` (~24 KB) — comprehensive design lock covering all 8 user-specified sections: purpose, 6 template types, module model, dependency/overlap, estimated launch math, save-as-template flow, 6 open schema decisions (with recommendations), and the recommended v1.4 4-sub-build implementation sequence.
-  - `test_v13_build09.py` — **31/31 PASS**. Regression-guard: asserts design doc exists, all 8 locked sections present, all 6 template types named, all 6 schema decisions present, 4 v1.4 sub-builds present, AND zero scope drift (no migration drift, no i18n drift, no new tables, no can_overlap/overlap_group columns, no new AI tools).
+- **Build 09 amendment** committed as one atomic commit (see latest `git log`). Build 09 stays design-only; this corrects the design target.
+  - `V13_BUILD09_PLANNING_SANDBOX_DESIGN.md` (~35 KB) — rewritten as the **engineering response to the Planning Sandbox PRD**. PRD captured verbatim as Appendix A. Original Build 09 shipped at `fc064a6` was form-based + persisted-on-project; that's now corrected to visual canvas + draft/apply separation.
+  - `test_v13_build09.py` — rewritten with 56/56 PASS. Asserts the amended structure: PRD appendix, visual-canvas + draft/apply locks, Cytoscape.js decision, 10 PRD open questions locked, 8 v1.4 sub-builds (not 4), 7-table schema sketch, Backend Honesty Mapping, Risk register, amendment row in Decision log, AND the design-only invariants (no migrations, no new tables, no AI tools, no i18n drift).
   - No app code changed. No schema. No migration. No i18n. No AI tools. No routes.
+  - Original commit `fc064a6` is preserved in history; the amendment is a new commit so the iteration is visible.
 
-## Build 09 — design lock highlights (for v1.4 reference)
+## Build 09 amended — design lock highlights (for v1.4 reference)
 
-### Schema decisions locked (Q1–Q6)
-1. **Templates as DB rows**, not static config (`timeline_templates` + `timeline_template_modules`).
-2. **Dependencies in a join table**, not a JSON column (cycle detection + topological sort need queryable edges).
-3. **Copy-down module → phase** when applying a template (historical project phases must not mutate when source template evolves).
-4. **Persisted sandbox state** on the project itself (no separate `sandbox_drafts` table; every edit flows through `crud.update_phase` and writes a normal `phase_plan_changes` audit row).
-5. **AI tool surface**: read + apply tools (confirmation-required), no `create_timeline_template` AI tool (matches `delete_variant` UI-only pattern).
-6. **Python DAG, not SQL CTE** for the dependency engine (project scale 8–14 phases doesn't warrant DB-side recursion).
+### Product invariants (non-negotiable per PRD)
+- **Visual workflow canvas**, not a form-based editor. Drag-drop modules from right panel, draw edges, top-to-bottom orientation with height ∝ duration (4 discrete size bins).
+- **Sandbox ≠ committed project plan.** Dragging a node MUST NOT mutate live `project_phases`. Users explicitly "Apply" to commit.
+- Single sandbox per project (UNIQUE constraint on `planning_sandboxes.project_id`). Multiple drafts deferred to v1.5+.
+- All edit paths preserve `actual_start_date` — Apply REFUSES to overwrite a project where any phase has started.
 
-### v1.4 sub-build sequence (locked)
-| Sub-build | Scope | Risk |
-|---|---|---|
-| v1.4 Build 01 | Template tables + seed 6 system templates + admin-only template list page | Low |
-| v1.4 Build 02 | "Apply template" flow on New Project form + AI intake confirm | Medium |
-| v1.4 Build 03 | Sandbox UI: edit durations + dependencies + overlap + live estimated launch | **High** |
-| v1.4 Build 04 | "Save current as template" | Low |
+### Schema (locked, 7 new tables, 4 migrations)
+| Migration | Tables |
+|---|---|
+| 007 | `planning_module_library`, `planning_sandboxes`, `planning_sandbox_nodes`, `planning_sandbox_edges` |
+| 008 | (reserved; optional column tweaks during v1.4-04 Connect Nodes) |
+| 009 | `planning_apply_events` (audit; Build 08 Timeline History reads this) |
+| 010 | `planning_templates`, `planning_template_nodes`, `planning_template_edges` + seed 6 system templates |
 
-### Out of scope for v1.3 entirely (per Build 09 doc)
-Any DB table for templates, any migration, any UI for templates, any route changes, any AI tool addition, any seed data, any change to `PHASE_TEMPLATES`, any cycle-detection / topological-sort code.
+### Canvas library (locked)
+**Cytoscape.js + cytoscape-dagre.** ~60 KB gzipped, vanilla JS, purpose-built for node-edge graphs. Cycle detection + topological sort + dagre auto-layout out of the box. Lazy-loaded only on `/projects/{id}/sandbox` route so Timeline page payload unchanged.
+
+### v1.4 sub-build sequence (locked, 8 builds)
+| # | Build | Scope | Risk |
+|---|---|---|---|
+| v1.4-01 | Schema + Module Library + admin module list page | Low |
+| v1.4-02 | Schedule Engine (pure Python, ~30 fixture assertions, no UI) | Medium |
+| v1.4-03 | Static Canvas Renderer (read-only Cytoscape.js render) | Medium |
+| v1.4-04 | Module Palette + Drag-to-Add (no edges yet) | Medium-high |
+| v1.4-05 | Connect Nodes (drag handles + cycle detection) | **High** |
+| v1.4-06 | Node Property Panel (right-panel state transition) | Medium |
+| v1.4-07 | Apply to Project Plan (audit row + Q2 refuse path) | **High** |
+| v1.4-08 | Save as Template + AI tools (3 new: list/apply template, apply sandbox) | Medium |
+
+Total v1.4 Sandbox surface: 4 migrations, 7 new tables, ~12 crud helpers, 3 AI tools, ~150 test assertions across 8 plan-first execution slices.
+
+### 10 PRD open questions — locked answers
+| # | Locked answer |
+|---|---|
+| Q1 | Start blank OR template (both). Picker on first-open. |
+| Q2 | Apply replaces draft only; REFUSES if any phase has `actual_start_date IS NOT NULL`. |
+| Q3 | Server is source of truth; client mirrors for responsiveness. |
+| Q4 | Manual node positioning + one-click "Tidy" via cytoscape-dagre. |
+| Q5 | Both drag handles AND property-panel multi-select for edges. |
+| Q6 | 4 discrete node-height bins (S/M/L/XL), not strict pixel scaling. |
+| Q7 | Disconnected branches allowed with soft warning banner. |
+| Q8 | Sandbox permissions inherit `can_edit_project`. |
+| Q9 | One sandbox per project (UNIQUE constraint). |
+| Q10 | Global templates with creator+admin ownership; no project-scoped templates. |
+
+### Out of scope for v1.4 implementation
+Cross-project resource allocation; factory capacity; AI-generated plans; real-time multi-user editing; calendar/iCal/CSV export; sandbox as source of truth post-Apply; multiple drafts per project; append-after-advanced-phases apply mode; project-scoped templates; working-days/holiday handling; critical-path highlighting; lag time; resource constraints; PERT estimates.
 
 ## Verification at ship time
 
-- `python3 test_v13_build09.py` — **31/31 PASS**.
-- Regression sweep all green:
-  - `test_v13_build01..08` — 380 assertions total, all PASS.
-  - `test_build_v121` — 19/19.
+- `python3 test_v13_build09.py` — **56/56 PASS**.
+- Full regression: v1.3 Builds 01-08 (380 assertions), `test_v13_build09` 56, `test_delete_project_ai_intake_regression` 17, `test_build_v121` 19 — all green.
 - i18n parity: **714/714** (unchanged).
 - Migration count: **6** (unchanged).
-- Code changes outside the new doc + new test file: **zero** (verified by test invariants).
+- Code changes outside the doc + test files: **zero** (verified by test invariants).
 
 ## v1.3 Build series status
 
@@ -63,20 +91,23 @@ Any DB table for templates, any migration, any UI for templates, any route chang
 | 07A — Timeline Command Actions (3 routes) | shipped | `57b48c3` |
 | 07B — Project Blockers | shipped | `5dfff4e` |
 | 08 — Timeline Updates / History | shipped | `3ab1dc8` |
-| **09 — Planning Sandbox Design (design-only)** | **shipped this session** | latest |
-| 10 — v1.3.0 Release Hardening | next | — |
+| Project-delete FK fix (cross-cutting) | shipped | `b8a9687` |
+| 09 — Planning Sandbox Design (original) | shipped | `fc064a6` |
+| **09 amended — Engineering response to PRD** | **shipped this session** | latest |
+| 10 — v1.3.0 Release Hardening | **next** | — |
 
 ## Next step — Build 10 (v1.3.0 Release Hardening)
 
-Final v1.3 build. Suggested scope (per masterplan §"Testing Standard"):
-1. **Version bump**: `app/version.py` `v1.2.0-build30` → `v1.3.0`. Update build name + LAST_UPDATED. Update visible version strings if any exist outside `app/version.py`.
-2. **Roll up CHANGELOG**: collapse the Unreleased section's v1.3 Builds 01-09 entries into a single `## v1.3.0` heading with a release narrative + dated.
-3. **Update MASTERPLAN.md**: mark all 10 v1.3 builds as ✓ SHIPPED with their commit hashes; add v1.3.0 to the version history table if one exists.
-4. **Write `test_v13_build10.py`** as the release-proof regression: re-runs all v1.3 Builds 01-09 + v1.2.1 baseline, asserts the version string, asserts the CHANGELOG has a v1.3.0 entry. Mirrors `test_build29.py`'s shape (which served the same role for v1.2.0).
-5. **Address the legacy Change Log viewer leak** discovered during Build 08:
-   - **Risk assessment**: low. The leak surfaces `event_note` audit rows whose summary mirrors journal-entry text to viewer in the `#changes` section (line 1497 in `project_detail.html`). Viewer permissions are otherwise correct everywhere else (Build 08's `#timeline-history` already hides these). Severity: information disclosure to a role that already has read access to projects; not a privilege escalation.
-   - **Recommendation**: include the fix in Build 10 — it's small (~10 LOC in the template's `change-log` for-loop to also skip `event_note` rows whose summary starts with "Journal entry added:" when `not can_view_journal`). Add a single assertion in `test_v13_build10.py` to lock the fix. Avoids shipping v1.3.0 with a known viewer-visibility bug.
-   - **Alternative**: ship v1.3.0 first, fix as v1.3.1 patch. Defensible if the rest of the release is critical and we want the change set to be exactly Builds 01-09. **My vote: include in Build 10** because the fix is trivial and shipping a known leak in a release flagged as "release-hardening" reads poorly.
+Final v1.3 build. Suggested scope (carried forward from earlier session):
+1. **Version bump**: `app/version.py` → `v1.3.0`. Update build name + LAST_UPDATED.
+2. **Roll up CHANGELOG**: collapse the Unreleased section's v1.3 Builds 01-09 entries (including the delete-FK fix and the Build 09 amendment) into a single `## v1.3.0` heading with release narrative + dated.
+3. **Update MASTERPLAN.md**: mark all 10 v1.3 builds ✓ SHIPPED with commit hashes.
+4. **Write `test_v13_build10.py`** as the release-proof regression that re-runs all v1.3 Builds 01-09 + v1.2.1 baseline + delete-fix regression + the new Change Log leak fix below. Asserts the version string and the `## v1.3.0` CHANGELOG entry.
+5. **Fix the legacy Change Log viewer leak** discovered during Build 08:
+   - Risk: low. Information disclosure to a role that already has project read access. Not a privilege escalation.
+   - Fix: ~10 LOC in `app/templates/project_detail.html` `#changes` for-loop to skip `event_note` rows whose summary starts with "Journal entry added:" when `not can_view_journal`.
+   - Lock with 1 assertion in `test_v13_build10.py`.
+   - Recommendation: include in Build 10 vs. ship v1.3.0 with a known leak.
 
 ## Deferred to future builds (carried forward)
 
@@ -87,9 +118,12 @@ Final v1.3 build. Suggested scope (per masterplan §"Testing Standard"):
 - Bulk delete from the projects list / soft-delete with undo window.
 - Auto-provisioning script for Railway.
 - One-time admin cleanup of the original 6 admin-linked duplicates from the Build 30A incident.
-- **Planning Sandbox implementation** — design locked in Build 09; implementation is v1.4 Builds 01-04 per the sequence in `V13_BUILD09_PLANNING_SANDBOX_DESIGN.md` §8.
+- **Planning Sandbox implementation** — design locked in Build 09 amended; implementation is v1.4 sub-builds 01-08 per the sequence in `V13_BUILD09_PLANNING_SANDBOX_DESIGN.md` §4.
 - Cursor pagination beyond 200 Timeline History events (per Build 08 Lock 11).
 - Recently-resolved blockers section in Command Center (per Build 07B Lock 10).
+- Multiple sandbox drafts per project (per Build 09 amended Q9 — v1.5+ candidate).
+- Append-after-advanced-phases apply mode (per Build 09 amended Q2 — v1.5+ candidate).
+- Critical-path highlighting on the sandbox canvas (v1.5+ nice-to-have).
 
 ## v1.3 process pattern (closing the series)
 
@@ -99,5 +133,6 @@ Every build in this series:
 - Got an Architecture Review when schema changed (Build 07B, Build 05B) OR in reverse when schema was deliberately NOT changed (Build 08 — proved existing tables sufficient; Build 09 — locked the design for v1.4).
 - Got a "Scope discipline" lock (introduced in Build 07B Lock 10, carried through Builds 08 and 09) — an explicit out-of-scope list to prevent feature creep mid-build.
 - Got a regression sweep + commit before moving to the next build.
+- **For Build 09 specifically: the amendment pattern** — when a shipped design doc turned out to assume the wrong product after external (PRD) review, the response was a fresh commit that rewrote the doc + updated the regression test + added a dated Decision log row, NOT a silent rewrite or a `git commit --amend`. The pattern is reusable for future design-doc corrections.
 
 This pattern scales. v1.4 Sandbox builds should reuse it verbatim.
