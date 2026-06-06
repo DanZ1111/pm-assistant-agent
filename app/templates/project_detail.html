@@ -1502,6 +1502,11 @@
       <div class="change-log">
         {% set sensitive_fields = ['factory', 'engineer', 'target_factory_cost'] %}
         {% for c in changes %}
+        {# v1.3 Build 10 — hide journal-mirror event_notes from viewers. Mirrors Build 08's
+           timeline-history filter; closes the leak where 'Journal entry added: ...' audit
+           rows surfaced journal content to viewers who cannot view the source journal. #}
+        {% if c.change_type == 'event_note' and not can_view_journal and c.summary and c.summary.startswith('Journal entry added:') %}
+        {% else %}
         {# Hide sensitive field changes from viewers #}
         {% if c.change_type == 'field_update' and c.field_name in sensitive_fields and not can_sensitive %}
         {% else %}
@@ -1522,6 +1527,7 @@
           <div class="change-by">{{ c.changed_by }}</div>
         </div>
         {% endif %}
+        {% endif %}{# end Build 10 journal-mirror viewer filter #}
         {% endfor %}
       </div>
       {% else %}

@@ -56,16 +56,22 @@ def main():
     print("\n── Runtime version source ──")
     from app.version import CURRENT_BUILD_NAME, CURRENT_VERSION, LAST_UPDATED
 
-    # v1.2.1 release proof — tolerant of post-release patches (1.2.1-buildNN, 1.2.2)
-    if CURRENT_VERSION.startswith("1.2.") and CURRENT_VERSION not in ("1.2.0",):
-        ok(f"app.version CURRENT_VERSION is on the v1.2.1+ line ({CURRENT_VERSION})")
+    # v1.2.1 release proof — tolerant of any post-v1.2.0 line (1.2.1-buildNN,
+    # 1.2.2, 1.3.x, ...). The release-proof markers in VERSION.md / CHANGELOG.md /
+    # MASTERPLAN.md / USER_GUIDE.md still locked below; this file's job is to
+    # prove v1.2.1 shipped at some point in the past and its content survived.
+    # As of v1.3.0 (2026-06-06) CURRENT_VERSION moved off the 1.2.x line.
+    if CURRENT_VERSION and CURRENT_VERSION != "1.2.0":
+        ok(f"app.version CURRENT_VERSION is past v1.2.0 ({CURRENT_VERSION})")
     else:
-        fail("CURRENT_VERSION", f"expected v1.2.1+, got {CURRENT_VERSION}")
+        fail("CURRENT_VERSION", f"expected post-v1.2.0, got {CURRENT_VERSION}")
 
-    if CURRENT_BUILD_NAME and "1.2.1" in CURRENT_BUILD_NAME:
-        ok(f"app.version CURRENT_BUILD_NAME identifies v1.2.1 ({CURRENT_BUILD_NAME!r})")
+    # CURRENT_BUILD_NAME no longer required to mention v1.2.1 — v1.3.0 ships
+    # without it. The release-proof v1.2.1 marker lives in VERSION.md / CHANGELOG.md.
+    if CURRENT_BUILD_NAME:
+        ok(f"app.version CURRENT_BUILD_NAME is set ({CURRENT_BUILD_NAME!r})")
     else:
-        fail("CURRENT_BUILD_NAME", f"expected v1.2.1 reference, got {CURRENT_BUILD_NAME!r}")
+        fail("CURRENT_BUILD_NAME", f"empty — should be set")
 
     if LAST_UPDATED and len(LAST_UPDATED) == 10 and LAST_UPDATED.count("-") == 2:
         ok(f"app.version LAST_UPDATED is ISO date format ({LAST_UPDATED})")
@@ -80,11 +86,15 @@ def main():
 
     # v1.2.1 release proof — these strings must persist even as later patches
     # update the Current Version / Current Build header.
+    # v1.2.1 release-proof markers — the historic v1.2.1 narrative must persist
+    # in VERSION.md even after the version bumps past v1.2.1. The
+    # "**Current Version:** v1.2.1" header was correct at ship time; future
+    # bumps overwrite it, so we no longer assert it here. The narrative section
+    # + "v1.2.1 released" status line are the load-bearing release proof.
     contains_all(
         "VERSION.md documents the v1.2.1 release",
         version_md,
         [
-            "**Current Version:** v1.2.1",
             "v1.2.1 released",
             "## What's new in v1.2.1",
         ],

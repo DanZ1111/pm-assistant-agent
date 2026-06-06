@@ -3242,6 +3242,69 @@ A PM hit Submit on the manual New Project form, the request was slow, she clicke
 
 ---
 
+## v1.3.0 — Project Detail Command Center ✓ SHIPPED v1.3.0
+
+#### Goal
+
+Turn Project Detail from a database-style record page into a daily PM command center. Split the page into **Overview** (concept / visuals / variants / files) and **Timeline** (Command Center / Detailed Table / History) workspaces, each tuned for the daily workflow PMs actually run. Lock the v1.4 Planning Sandbox design (visual canvas + draft/apply separation) for next-version implementation.
+
+#### Builds shipped (10 in series + 1 cross-cutting fix)
+
+| Build | Name | Commit |
+|---|---|---|
+| 01 | Workspace Shell — Overview / Timeline tabs, `#timeline` anchor, Commercial Snapshot removed | `448364e` |
+| 02 | Project Pulse v1 — rules-based next-action cascade | `ea0460c` |
+| 03 + 04 | Product Concept + Renderings Overview (shipped together) | `bc80506` |
+| 05 | Variant Command Cards (layout-only, Option A) | `4d8c847` |
+| 05B | Structured Variant Specs (migration 005: 6 new nullable columns) | `dd96cf2` |
+| 06 | Timeline Command Center Shell (display-only) | `4a800d6` |
+| 07A | Timeline Command Actions Backend (3 routes: finish / adjust / add-update) | `57b48c3` |
+| 07B | Project Blockers (migration 006: `project_blockers` table + lifecycle + Pulse integration + 3 AI tools) | `5dfff4e` |
+| 08 | Timeline Updates / History (derived view over 3 source tables; 6 filter chips; viewer permission filtering) | `3ab1dc8` |
+| 09 (+ Amendment 1 `fd59cf9` + Amendment 2 `9fce749`) | Planning Sandbox Design (design-only; engineering response to ChatGPT PRD + Codex V14 plan additions) | `fc064a6` |
+| Cross-cutting | Project delete FK fix (Marine-project Railway 500 → AI-intake project delete now works; SQLite FK enforcement enabled in dev) | `b8a9687` |
+| 10 | v1.3.0 Release Hardening — version bump + CHANGELOG rollup + Change Log viewer-leak fix + release-proof regression | this commit |
+
+#### Scope (this hardening build itself)
+
+- Bump `app/version.py` from `1.2.1` → `1.3.0`.
+- Update VERSION.md header + add `## What's new in v1.3.0` section + extend Version Map with v1.2.0 / v1.2.1 / v1.3.0 rows.
+- Roll up `## Unreleased` v1.3 entries into `## v1.3.0 — Project Detail Command Center` heading in CHANGELOG.md; reset Unreleased to empty placeholder.
+- Add this `## v1.3.0 — Project Detail Command Center ✓ SHIPPED v1.3.0` MASTERPLAN.md section.
+- Fix legacy Build 13 `#changes` viewer leak in `project_detail.html` (3-line patch — hide `event_note` rows whose summary starts with "Journal entry added:" when `not can_view_journal`).
+- Write `test_v13_build10.py` as the release-proof regression. Asserts runtime constants, doc rollup, full v1.3 test-file inventory (test_v13_build01–10), i18n parity at 714/714, migration count at 6, the Change Log fix presence + behavior, cross-cutting locks (FK enforcement, delete_project AI-conversation cleanup, Build 07B + Build 08 helpers + models), and subprocess invocation of every v1.3 + v1.2.1 + delete-fix regression file.
+- Relax `test_build_v121.py` CURRENT_VERSION assertion to tolerate v1.3+ runtime while preserving every v1.2.1 release-proof marker (VERSION.md / CHANGELOG.md / USER_GUIDE.md / MASTERPLAN.md content).
+
+No new database schema in this hardening build itself; migrations 005 + 006 shipped with Builds 05B + 07B and are preserved. Migration count locks at 6 for v1.3.0. v1.4 sandbox adds 4 more (007–010 per Build 09 amended design).
+
+i18n parity locked at **714/714 EN/zh** at the v1.3.0 ship. Up from 651/651 at v1.3 Build 06 start and 537/537 at v1.1.0.
+
+USER_GUIDE.md v1.3.0 Chinese summary block is **deferred** to v1.4 (needs native-speaker review). The existing v1.2.1 中文速览 block stays.
+
+#### Verification
+
+- `python3 test_v13_build10.py` — release-proof regression.
+- Full v1.3 regression: `test_v13_build01..09` (380 + 99 = 479 assertions).
+- Cross-cutting: `test_delete_project_ai_intake_regression.py` (17/17).
+- Backward-compat: `test_build_v121.py` (19/19 — survives v1.3.0 bump).
+- AI e2e: `test_ai_e2e.py` (15P/2S/0F; SKIPs are OPENAI key issues, not regressions).
+- Browser: navbar Help button shows `v1.3.0`. Viewer page Change Log section does NOT show journal text from `event_note` audit rows.
+
+#### Next: v1.4 Planning Sandbox
+
+Per Build 09 design lock (`V13_BUILD09_PLANNING_SANDBOX_DESIGN.md`):
+- **v1.4-01** Schema + Module Library (migration 007 + seed 6 system templates).
+- **v1.4-02** Schedule Engine (pure Python, ~30 fixture assertions).
+- **v1.4-03** Static Canvas Renderer (Cytoscape.js + cytoscape-dagre).
+- **v1.4-04** Module Palette + Add/Edit Nodes.
+- **v1.4-05** Connect Nodes (drag handles + cycle detection).
+- **v1.4-06** Canvas Interaction Hardening (Tidy + duration bins + warning banner + read-only applied snapshots).
+- **v1.4-07** Apply to Project Plan (10-step transaction; 4 preconditions including active-blocker check).
+- **v1.4-08** Save as Template + 3 AI tools.
+- **v1.4-09** Release Hardening (version bump 1.4.0; scenario contract runner; `AI_TOOLS_REGISTRY.md` updated for sandbox tools).
+
+---
+
 ## Requirements (Build 1)
 
 ```
