@@ -6,6 +6,8 @@ from sqlalchemy import func, or_, update
 from app.models import (
     Project, ProjectPhase, ProjectFile, ProjectChange, AIMessage,
     ProjectCreationToken, User,
+    PlanningModule, PlanningTemplate, PlanningTemplateNode, PlanningTemplateEdge,
+    PlanningSandbox, PlanningSandboxNode, PlanningSandboxEdge,
 )
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app", "uploads")
@@ -1004,6 +1006,429 @@ def get_missing_critical_summary(db: Session) -> dict:
     summary["timeline_phases"] = no_phases
 
     return summary
+
+
+def list_planning_modules(db: Session, active_only: bool = True) -> list[PlanningModule]:
+    """v1.4 Build 01 — read-only module library for admin inspection."""
+    q = db.query(PlanningModule)
+    if active_only:
+        q = q.filter(PlanningModule.is_active.is_(True))
+    return q.order_by(PlanningModule.sort_order, PlanningModule.title).all()
+
+
+def list_planning_templates(db: Session, active_only: bool = True) -> list[PlanningTemplate]:
+    """v1.4 Build 01 — read-only system/user template inventory."""
+    q = db.query(PlanningTemplate)
+    if active_only:
+        q = q.filter(PlanningTemplate.is_active.is_(True))
+    return q.order_by(PlanningTemplate.sort_order, PlanningTemplate.name).all()
+
+
+def get_planning_template_counts(db: Session) -> dict[int, dict[str, int]]:
+    """Return node/edge counts keyed by template id for the admin modules page."""
+    node_rows = (
+        db.query(PlanningTemplateNode.template_id, func.count(PlanningTemplateNode.id))
+        .group_by(PlanningTemplateNode.template_id)
+        .all()
+    )
+    edge_rows = (
+        db.query(PlanningTemplateEdge.template_id, func.count(PlanningTemplateEdge.id))
+        .group_by(PlanningTemplateEdge.template_id)
+        .all()
+    )
+    counts: dict[int, dict[str, int]] = {}
+    for template_id, count in node_rows:
+        counts.setdefault(template_id, {"nodes": 0, "edges": 0})["nodes"] = count
+    for template_id, count in edge_rows:
+        counts.setdefault(template_id, {"nodes": 0, "edges": 0})["edges"] = count
+    return counts
+
+
+def get_active_planning_sandbox(db: Session, project_id: int) -> PlanningSandbox | None:
+    """Return the one editable draft sandbox for a project, if present."""
+    return (
+        db.query(PlanningSandbox)
+        .filter(PlanningSandbox.project_id == project_id, PlanningSandbox.status == "draft")
+        .order_by(PlanningSandbox.updated_at.desc())
+        .first()
+    )
+
+
+def create_sandbox_blank(db: Session, project_id: int, user_id: int | None = None) -> PlanningSandbox:
+    """v1.4 Build 03 — create the project's draft sandbox with no nodes.
+
+    If a draft already exists, return it. This mirrors the one-draft lock and
+    keeps double-clicks from creating duplicate drafts.
+    """
+    existing = get_active_planning_sandbox(db, project_id)
+    if existing:
+        return existing
+    now = datetime.utcnow()
+    sandbox = PlanningSandbox(
+        project_id=project_id,
+        name="Planning Sandbox",
+        status="draft",
+        created_by_user_id=user_id,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(sandbox)
+    db.commit()
+    db.refresh(sandbox)
+    return sandbox
+
+
+def create_sandbox_from_template(
+    db: Session,
+    project_id: int,
+    template_key: str,
+    user_id: int | None = None,
+) -> PlanningSandbox:
+    """Clone a PlanningTemplate graph into the project's draft sandbox."""
+    existing = get_active_planning_sandbox(db, project_id)
+    if existing:
+        return existing
+
+    template = (
+        db.query(PlanningTemplate)
+        .filter(
+            PlanningTemplate.template_key == template_key,
+            PlanningTemplate.is_active.is_(True),
+        )
+        .first()
+    )
+    if not template:
+        raise ValueError("template_not_found")
+
+    now = datetime.utcnow()
+    sandbox = PlanningSandbox(
+        project_id=project_id,
+        name=f"{template.name} Sandbox",
+        status="draft",
+        base_template_key=template.template_key,
+        created_by_user_id=user_id,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(sandbox)
+    db.flush()
+
+    node_map: dict[int, PlanningSandboxNode] = {}
+    for template_node in sorted(template.nodes, key=lambda n: (n.sort_order, n.id)):
+        module = template_node.module
+        sandbox_node = PlanningSandboxNode(
+            sandbox_id=sandbox.id,
+            module_key=template_node.module_key,
+            title=template_node.title,
+            category=module.category if module else None,
+            phase_type=module.phase_type if module else "design",
+            duration_days=template_node.duration_days,
+            owner_role=template_node.owner_role,
+            deliverable=template_node.deliverable,
+            exit_criteria=template_node.exit_criteria,
+            x_position=template_node.x_position,
+            y_position=template_node.y_position,
+            sort_order=template_node.sort_order,
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(sandbox_node)
+        db.flush()
+        node_map[template_node.id] = sandbox_node
+
+    for template_edge in template.edges:
+        from_node = node_map.get(template_edge.from_node_id)
+        to_node = node_map.get(template_edge.to_node_id)
+        if not from_node or not to_node:
+            continue
+        db.add(PlanningSandboxEdge(
+            sandbox_id=sandbox.id,
+            from_node_id=from_node.id,
+            to_node_id=to_node.id,
+            dependency_type=template_edge.dependency_type,
+            created_at=now,
+        ))
+
+    db.commit()
+    db.refresh(sandbox)
+    return sandbox
+
+
+def get_sandbox_canvas_payload(db: Session, sandbox_id: int) -> dict:
+    """Return Cytoscape-friendly read payload for the static canvas."""
+    sandbox = db.query(PlanningSandbox).filter(PlanningSandbox.id == sandbox_id).first()
+    if not sandbox:
+        return {"sandbox": None, "elements": [], "schedule": compute_sandbox_schedule(db, sandbox_id)}
+
+    schedule = compute_sandbox_schedule(db, sandbox_id, require_nodes=False)
+    scheduled_by_id = {node["id"]: node for node in schedule.get("nodes", [])}
+    elements = []
+    for node in sandbox.nodes:
+        scheduled = scheduled_by_id.get(node.id, {})
+        elements.append({
+            "data": {
+                "id": f"node-{node.id}",
+                "db_id": node.id,
+                "label": node.title,
+                "phase_type": node.phase_type,
+                "duration_days": node.duration_days,
+                "owner_role": node.owner_role or "",
+                "start_day": scheduled.get("start_day"),
+                "end_day": scheduled.get("end_day"),
+                "warning_codes": scheduled.get("warning_codes", []),
+            },
+            "position": {"x": node.x_position, "y": node.y_position},
+            "classes": f"phase-{node.phase_type}",
+        })
+    for edge in sandbox.edges:
+        elements.append({
+            "data": {
+                "id": f"edge-{edge.id}",
+                "db_id": edge.id,
+                "source": f"node-{edge.from_node_id}",
+                "target": f"node-{edge.to_node_id}",
+                "dependency_type": edge.dependency_type,
+            }
+        })
+    return {"sandbox": sandbox, "elements": elements, "schedule": schedule}
+
+
+def compute_sandbox_schedule(db: Session, sandbox_id: int, require_nodes: bool = False) -> dict:
+    """v1.4 Build 02 — server-authoritative Planning Sandbox schedule engine.
+
+    Calculates earliest start/end days for a sandbox DAG. The helper is read-
+    only: it never mutates sandbox rows and never touches ProjectPhase.
+    """
+    sandbox = db.query(PlanningSandbox).filter(PlanningSandbox.id == sandbox_id).first()
+    if not sandbox:
+        return _sandbox_schedule_result(
+            sandbox_id=sandbox_id,
+            hard_errors=[{"code": "sandbox_not_found", "detail": "Sandbox not found"}],
+        )
+
+    nodes = (
+        db.query(PlanningSandboxNode)
+        .filter(PlanningSandboxNode.sandbox_id == sandbox_id)
+        .order_by(PlanningSandboxNode.sort_order, PlanningSandboxNode.id)
+        .all()
+    )
+    edges = (
+        db.query(PlanningSandboxEdge)
+        .filter(PlanningSandboxEdge.sandbox_id == sandbox_id)
+        .order_by(PlanningSandboxEdge.id)
+        .all()
+    )
+
+    hard_errors = []
+    soft_warnings = []
+    if require_nodes and not nodes:
+        hard_errors.append({"code": "zero_nodes", "detail": "Sandbox is empty"})
+
+    node_by_id = {node.id: node for node in nodes}
+    for node in nodes:
+        if not (node.title or "").strip():
+            hard_errors.append({"code": "missing_title", "node_id": node.id})
+        if node.duration_days is None or node.duration_days <= 0:
+            hard_errors.append({"code": "invalid_duration", "node_id": node.id})
+
+    outgoing = {node.id: set() for node in nodes}
+    incoming = {node.id: set() for node in nodes}
+    for edge in edges:
+        from_node = node_by_id.get(edge.from_node_id)
+        to_node = node_by_id.get(edge.to_node_id)
+        if from_node is None or to_node is None:
+            stored_from = from_node or db.query(PlanningSandboxNode).filter(PlanningSandboxNode.id == edge.from_node_id).first()
+            stored_to = to_node or db.query(PlanningSandboxNode).filter(PlanningSandboxNode.id == edge.to_node_id).first()
+            if stored_from is not None and stored_to is not None:
+                hard_errors.append({"code": "cross_sandbox_edge", "edge_id": edge.id})
+            else:
+                hard_errors.append({"code": "dangling_edge", "edge_id": edge.id})
+            continue
+        if from_node.sandbox_id != sandbox_id or to_node.sandbox_id != sandbox_id:
+            hard_errors.append({"code": "cross_sandbox_edge", "edge_id": edge.id})
+            continue
+        outgoing[edge.from_node_id].add(edge.to_node_id)
+        incoming[edge.to_node_id].add(edge.from_node_id)
+
+    topo_ids, cycle_ids = _topological_sort(node_by_id, outgoing, incoming)
+    if cycle_ids:
+        hard_errors.append({"code": "circular_dependency", "node_ids": cycle_ids})
+
+    if hard_errors:
+        return _sandbox_schedule_result(
+            sandbox_id=sandbox_id,
+            hard_errors=hard_errors,
+            soft_warnings=soft_warnings,
+            nodes=[_schedule_node_payload(node) for node in nodes],
+        )
+
+    start_days: dict[int, int] = {}
+    end_days: dict[int, int] = {}
+    for node_id in topo_ids:
+        node = node_by_id[node_id]
+        upstream_ends = [end_days[parent_id] for parent_id in incoming[node_id]]
+        start = max(upstream_ends) if upstream_ends else 0
+        end = start + int(node.duration_days)
+        start_days[node_id] = start
+        end_days[node_id] = end
+
+    terminal_ids = [node_id for node_id in topo_ids if not outgoing[node_id]]
+    total_days = max((end_days[node_id] for node_id in terminal_ids), default=0)
+
+    component_count = _count_undirected_components(node_by_id, outgoing, incoming)
+    if component_count > 1:
+        soft_warnings.append({
+            "code": "disconnected_branch",
+            "component_count": component_count,
+            "detail": f"This sandbox has {component_count} disconnected branches.",
+        })
+
+    ancestors_cache: dict[int, set[int]] = {}
+    for node_id in topo_ids:
+        node = node_by_id[node_id]
+        node_warnings = []
+        if node.duration_days > 60:
+            node_warnings.append("very_long_duration")
+            soft_warnings.append({"code": "very_long_duration", "node_id": node_id})
+        if not node.owner_role:
+            node_warnings.append("missing_owner")
+            soft_warnings.append({"code": "missing_owner", "node_id": node_id})
+        if not node.deliverable:
+            node_warnings.append("missing_deliverable")
+            soft_warnings.append({"code": "missing_deliverable", "node_id": node_id})
+        if not node.exit_criteria:
+            node_warnings.append("missing_exit_criteria")
+            soft_warnings.append({"code": "missing_exit_criteria", "node_id": node_id})
+        ancestors = _sandbox_ancestors(node_id, incoming, ancestors_cache)
+        ancestor_types = {node_by_id[ancestor_id].phase_type for ancestor_id in ancestors}
+        if node.phase_type == "packaging" and "design" not in ancestor_types:
+            node_warnings.append("packaging_before_design")
+            soft_warnings.append({"code": "packaging_before_design", "node_id": node_id})
+        if node.phase_type == "production" and not ({"prototype", "review"} & ancestor_types):
+            node_warnings.append("production_before_sample")
+            soft_warnings.append({"code": "production_before_sample", "node_id": node_id})
+        node._schedule_warning_codes = node_warnings
+
+    for node_id in terminal_ids:
+        node = node_by_id[node_id]
+        if node.phase_type not in ("launch", "production", "review"):
+            soft_warnings.append({"code": "terminal_not_launch_like", "node_id": node_id})
+            current = getattr(node, "_schedule_warning_codes", [])
+            node._schedule_warning_codes = [*current, "terminal_not_launch_like"]
+
+    schedule_nodes = [
+        _schedule_node_payload(
+            node_by_id[node_id],
+            start_day=start_days[node_id],
+            end_day=end_days[node_id],
+            upstream_ids=sorted(incoming[node_id]),
+            downstream_ids=sorted(outgoing[node_id]),
+            is_terminal=node_id in terminal_ids,
+            warning_codes=getattr(node_by_id[node_id], "_schedule_warning_codes", []),
+        )
+        for node_id in topo_ids
+    ]
+
+    return _sandbox_schedule_result(
+        sandbox_id=sandbox_id,
+        hard_errors=[],
+        soft_warnings=soft_warnings,
+        nodes=schedule_nodes,
+        topological_node_ids=topo_ids,
+        terminal_node_ids=terminal_ids,
+        total_days=total_days,
+        connected_component_count=component_count,
+    )
+
+
+def _sandbox_schedule_result(
+    sandbox_id: int,
+    hard_errors: list | None = None,
+    soft_warnings: list | None = None,
+    nodes: list | None = None,
+    topological_node_ids: list | None = None,
+    terminal_node_ids: list | None = None,
+    total_days: int = 0,
+    connected_component_count: int = 0,
+) -> dict:
+    return {
+        "sandbox_id": sandbox_id,
+        "hard_errors": hard_errors or [],
+        "soft_warnings": soft_warnings or [],
+        "nodes": nodes or [],
+        "topological_node_ids": topological_node_ids or [],
+        "terminal_node_ids": terminal_node_ids or [],
+        "total_days": total_days,
+        "connected_component_count": connected_component_count,
+    }
+
+
+def _schedule_node_payload(
+    node,
+    start_day: int | None = None,
+    end_day: int | None = None,
+    upstream_ids: list | None = None,
+    downstream_ids: list | None = None,
+    is_terminal: bool = False,
+    warning_codes: list | None = None,
+) -> dict:
+    return {
+        "id": node.id,
+        "title": node.title,
+        "phase_type": node.phase_type,
+        "duration_days": node.duration_days,
+        "owner_role": node.owner_role,
+        "start_day": start_day,
+        "end_day": end_day,
+        "upstream_ids": upstream_ids or [],
+        "downstream_ids": downstream_ids or [],
+        "is_terminal": is_terminal,
+        "warning_codes": warning_codes or [],
+    }
+
+
+def _topological_sort(node_by_id: dict, outgoing: dict, incoming: dict) -> tuple[list[int], list[int]]:
+    incoming_counts = {node_id: len(incoming[node_id]) for node_id in node_by_id}
+    ready = sorted([node_id for node_id, count in incoming_counts.items() if count == 0])
+    result = []
+    while ready:
+        node_id = ready.pop(0)
+        result.append(node_id)
+        for child_id in sorted(outgoing[node_id]):
+            incoming_counts[child_id] -= 1
+            if incoming_counts[child_id] == 0:
+                ready.append(child_id)
+                ready.sort()
+    if len(result) == len(node_by_id):
+        return result, []
+    cycle_ids = sorted([node_id for node_id in node_by_id if node_id not in result])
+    return result, cycle_ids
+
+
+def _count_undirected_components(node_by_id: dict, outgoing: dict, incoming: dict) -> int:
+    unseen = set(node_by_id)
+    count = 0
+    while unseen:
+        count += 1
+        stack = [unseen.pop()]
+        while stack:
+            node_id = stack.pop()
+            neighbors = set(outgoing[node_id]) | set(incoming[node_id])
+            for neighbor_id in list(neighbors & unseen):
+                unseen.remove(neighbor_id)
+                stack.append(neighbor_id)
+    return count
+
+
+def _sandbox_ancestors(node_id: int, incoming: dict, cache: dict[int, set[int]]) -> set[int]:
+    if node_id in cache:
+        return cache[node_id]
+    ancestors = set()
+    for parent_id in incoming[node_id]:
+        ancestors.add(parent_id)
+        ancestors.update(_sandbox_ancestors(parent_id, incoming, cache))
+    cache[node_id] = ancestors
+    return ancestors
 
 
 # ---------------------------------------------------------------------------

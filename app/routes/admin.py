@@ -43,3 +43,24 @@ def database_inspector(request: Request, db: Session = Depends(get_db)):
         "recent_changes": changes_with_names,
         "current_user": current_user,
     })
+
+
+@router.get("/admin/modules", response_class=HTMLResponse)
+def planning_modules_inspector(request: Request, db: Session = Depends(get_db)):
+    """v1.4 Build 01 — read-only planning module/template inventory."""
+    current_user = get_current_user(request, db)
+    try:
+        require_admin(current_user)
+    except _RedirectException as e:
+        return e.response
+
+    modules = crud.list_planning_modules(db, active_only=False)
+    templates_rows = crud.list_planning_templates(db, active_only=False)
+    template_counts = crud.get_planning_template_counts(db)
+
+    return templates.TemplateResponse(request, "admin_modules.html", {
+        "current_user": current_user,
+        "modules": modules,
+        "planning_templates": templates_rows,
+        "template_counts": template_counts,
+    })

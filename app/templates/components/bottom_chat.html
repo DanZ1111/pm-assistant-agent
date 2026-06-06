@@ -40,7 +40,18 @@
     <button type="submit" id="chatSubmitBtn" class="bottom-chat-submit" disabled title="{{ t('btn.send') }}">
       <i class="bi bi-send"></i>
     </button>
+    <button type="button" id="bottomChatCollapseBtn" class="bottom-chat-collapse"
+            title="{{ t('chat.collapse_dock') }}" aria-label="{{ t('chat.collapse_dock') }}"
+            aria-controls="bottomChatForm" aria-expanded="true">
+      <i class="bi bi-chevron-down"></i>
+    </button>
   </form>
+  <button type="button" id="bottomChatRestoreBtn" class="bottom-chat-restore"
+          title="{{ t('chat.expand_dock') }}" aria-label="{{ t('chat.expand_dock') }}"
+          aria-controls="bottomChatForm" hidden>
+    <i class="bi bi-chat-dots"></i>
+    <span>AI</span>
+  </button>
 </div>
 
 <aside id="aiSidePanel" class="ai-side-panel" aria-hidden="true">

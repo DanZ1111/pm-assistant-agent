@@ -328,24 +328,28 @@ def main():
         else:
             fail(f"mobile spec missing: {label}", "")
 
-    # ── 14. INVARIANTS — no schema / no migration / no i18n drift ──
-    # Build 09 (amended OR original) ships ZERO code. The test enforces this
-    # by asserting the runtime state hasn't moved.
-    print("\n── 14. Invariants — no schema / no migration / no i18n drift ──")
+    # ── 14. INVARIANTS — Build 09 itself was design-only ──
+    # v1.4 is allowed to implement the sandbox later. This regression preserves
+    # the Build 09 design-only contract without failing once v1.4 migrations
+    # legitimately exist in the current runtime.
+    print("\n── 14. Invariants — Build 09 itself was design-only ──")
     from app.migrations import MIGRATIONS
-    if len(MIGRATIONS) == 6:
-        ok("MIGRATIONS count still 6 (Build 09 amendment added zero migrations)")
+    migration_names = [name for name, _ in MIGRATIONS]
+    if "006_v1_3_add_project_blockers" in migration_names and not any("v1_3_build09" in name for name in migration_names):
+        ok(f"No Build 09 migration entry; later v1.4 migrations may exist (count now {len(MIGRATIONS)})")
     else:
-        fail("migration drift", f"expected 6, got {len(MIGRATIONS)}")
+        fail("Build 09 migration drift", f"unexpected migration names: {migration_names}")
 
     with open("app/i18n/en.json", encoding="utf-8") as f: en = json.load(f)
     with open("app/i18n/zh.json", encoding="utf-8") as f: zh = json.load(f)
-    if len(en) == 714 and len(zh) == 714 and set(en) == set(zh):
-        ok("i18n parity unchanged at 714/714 (Build 09 added zero keys)")
+    if len(en) >= 714 and len(zh) >= 714 and set(en) == set(zh):
+        ok(f"i18n parity preserves v1.3 Build 09 minimum; later keys may exist (now {len(en)})")
     else:
         fail("i18n drift", f"en={len(en)} zh={len(zh)}")
 
-    # No Planning Sandbox tables present in dev DB
+    # Before v1.4, no Planning Sandbox tables were present. Once v1.4 begins,
+    # those tables are expected; keep this assertion tolerant so the Build 09
+    # design proof can remain green after implementation starts.
     conn = sqlite3.connect("pm_tracker.db")
     try:
         tables = {r[0] for r in conn.execute(
@@ -360,6 +364,8 @@ def main():
     present = sandbox_tables & tables
     if not present:
         ok("No Planning Sandbox tables present in DB (design-only respected)")
+    elif any(name.startswith("007_v1_4") or name.startswith("010_v1_4") for name in migration_names):
+        ok(f"Planning Sandbox tables present because v1.4 implementation has started: {sorted(present)}")
     else:
         fail("table drift", f"unexpected tables: {present}")
 

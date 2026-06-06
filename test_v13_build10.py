@@ -161,17 +161,13 @@ def main():
         ],
     )
 
-    # The v1.3.0 hardening unreleased block should be empty / placeholder.
-    if "## Unreleased\n\n(nothing yet" in changelog or "## Unreleased\n\n_" in changelog:
-        ok("CHANGELOG.md Unreleased section reset to empty placeholder")
+    # Future v1.4+ work is allowed under Unreleased. The v1.3 release proof
+    # only needs to ensure no v1.3 rollup entries leaked back above v1.3.0.
+    unreleased_section = changelog.split("## Unreleased", 1)[1].split("\n## ", 1)[0]
+    if "v1.3 Build" not in unreleased_section and "Project Detail Command Center" not in unreleased_section:
+        ok("CHANGELOG.md Unreleased section has no v1.3 leftover")
     else:
-        # Tolerant: as long as there's no v1.3 leftover under Unreleased
-        unreleased_section = changelog.split("## Unreleased", 1)[1].split("\n## ", 1)[0]
-        if "v1.3 Build" not in unreleased_section and len(unreleased_section.strip()) < 200:
-            ok("CHANGELOG.md Unreleased section is empty of v1.3 leftover")
-        else:
-            fail("Unreleased section",
-                 f"still has v1.3 content under Unreleased ({len(unreleased_section)} chars)")
+        fail("Unreleased section", "still has v1.3 content under Unreleased")
 
     print("\n── 3. v1.3 test-file inventory + cross-cutting tests ──")
     expected_v13_tests = [f"test_v13_build{n:02d}.py" for n in range(1, 11)]
@@ -206,12 +202,22 @@ def main():
     else:
         fail("i18n key count", f"expected ≥ 714, got {len(en)}")
 
-    print("\n── 5. Migration count locked at 6 ──")
+    print("\n── 5. v1.3 migration inventory preserved ──")
     from app.migrations import MIGRATIONS
-    if len(MIGRATIONS) == 6:
-        ok(f"MIGRATIONS count is 6 (002, 003, 004, 005, 006 + bootstrap)")
+    migration_names = [name for name, _ in MIGRATIONS]
+    required_v13 = {
+        "001_v1_1_add_language_to_users",
+        "002_v1_1_add_conversation_id_to_ai_messages",
+        "003_v1_2_add_price_text_fields",
+        "004_v1_2_add_project_creation_tokens",
+        "005_v1_3_add_variant_structured_specs",
+        "006_v1_3_add_project_blockers",
+    }
+    missing_migrations = sorted(required_v13 - set(migration_names))
+    if not missing_migrations:
+        ok(f"v1.3 migration inventory preserved; later builds may add more (count now {len(MIGRATIONS)})")
     else:
-        fail("migration count", f"expected 6, got {len(MIGRATIONS)}")
+        fail("v1.3 migration inventory", f"missing {missing_migrations}")
 
     print("\n── 6. Build 10 — legacy Change Log viewer leak fix ──")
     template = read("app/templates/project_detail.html")

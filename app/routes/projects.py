@@ -1,3 +1,4 @@
+import json
 import os
 import uuid
 from fastapi import APIRouter, Depends, Request, Form, HTTPException, UploadFile, File
@@ -556,6 +557,63 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
         "current_project_name": project.name,
         **i18n_context(request, current_user),
     })
+
+
+@router.get("/projects/{project_id}/sandbox", response_class=HTMLResponse)
+def planning_sandbox(request: Request, project_id: int, db: Session = Depends(get_db)):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    can_edit = can_edit_project(current_user, project)
+    sandbox = crud.get_active_planning_sandbox(db, project_id)
+    templates_rows = crud.list_planning_templates(db)
+    payload = crud.get_sandbox_canvas_payload(db, sandbox.id) if sandbox else None
+
+    return templates.TemplateResponse(request, "planning_sandbox.html", {
+        "project": project,
+        "current_user": current_user,
+        "can_edit": can_edit,
+        "planning_templates": templates_rows,
+        "sandbox": sandbox,
+        "sandbox_payload": payload,
+        "sandbox_elements_json": json.dumps(payload["elements"] if payload else []),
+        **i18n_context(request, current_user),
+    })
+
+
+@router.post("/projects/{project_id}/sandbox/create")
+def create_planning_sandbox(
+    request: Request,
+    project_id: int,
+    template_key: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if not can_edit_project(current_user, project):
+        return RedirectResponse(url=f"/projects/{project_id}/sandbox?error=not_authorized", status_code=303)
+
+    if template_key:
+        try:
+            crud.create_sandbox_from_template(db, project_id, template_key, current_user.id)
+        except ValueError:
+            return RedirectResponse(url=f"/projects/{project_id}/sandbox?error=template_not_found", status_code=303)
+    else:
+        crud.create_sandbox_blank(db, project_id, current_user.id)
+
+    return RedirectResponse(url=f"/projects/{project_id}/sandbox", status_code=303)
 
 
 # ---------------------------------------------------------------------------

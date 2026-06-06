@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Planning Modules — PM Tracker{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title"><i class="bi bi-diagram-3 me-2"></i>Planning Modules</h1>
+  <p class="page-subtitle">Read-only v1.4 Planning Sandbox seed library. Editing arrives in a later sandbox build.</p>
+</div>
+
+<div class="px-4">
+  <div class="admin-section">
+    <h2 class="admin-section-title">Module Library</h2>
+    {% if modules %}
+    <div class="table-responsive">
+      <table class="table admin-table">
+        <thead>
+          <tr>
+            <th>Module</th>
+            <th>Category</th>
+            <th>Phase Type</th>
+            <th>Default Owner</th>
+            <th>Duration</th>
+            <th>Deliverable</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for module in modules %}
+          <tr>
+            <td>
+              <div class="fw-semibold">{{ module.title }}</div>
+              <code class="small text-muted">{{ module.module_key }}</code>
+            </td>
+            <td><span class="badge bg-secondary">{{ module.category }}</span></td>
+            <td>{{ module.phase_type }}</td>
+            <td>{{ module.default_owner_role or "—" }}</td>
+            <td>{{ module.default_duration_days }} days</td>
+            <td class="small">{{ module.default_deliverable or "—" }}</td>
+            <td>
+              {% if module.is_active %}
+              <span class="badge bg-success">Active</span>
+              {% else %}
+              <span class="badge bg-light text-muted">Inactive</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted">No planning modules have been seeded yet.</p>
+    {% endif %}
+  </div>
+
+  <div class="admin-section">
+    <h2 class="admin-section-title">System Templates</h2>
+    {% if planning_templates %}
+    <div class="table-responsive">
+      <table class="table admin-table">
+        <thead>
+          <tr>
+            <th>Template</th>
+            <th>Type</th>
+            <th>Nodes</th>
+            <th>Edges</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for template in planning_templates %}
+          {% set counts = template_counts.get(template.id, {"nodes": 0, "edges": 0}) %}
+          <tr>
+            <td>
+              <div class="fw-semibold">{{ template.name }}</div>
+              <code class="small text-muted">{{ template.template_key }}</code>
+            </td>
+            <td>
+              {% if template.is_system %}
+              <span class="badge bg-primary">System</span>
+              {% else %}
+              <span class="badge bg-secondary">User</span>
+              {% endif %}
+            </td>
+            <td>{{ counts.nodes }}</td>
+            <td>{{ counts.edges }}</td>
+            <td class="small">{{ template.description or "—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted">No planning templates have been seeded yet.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

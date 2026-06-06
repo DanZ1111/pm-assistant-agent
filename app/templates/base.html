@@ -6,7 +6,7 @@
   <title>{% block title %}PM Tracker{% endblock %}</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-  <link href="/static/css/styles.css" rel="stylesheet">
+  <link href="/static/css/styles.css?v={{ STATIC_ASSET_VERSION }}" rel="stylesheet">
 </head>
 <body>
 
@@ -37,6 +37,9 @@
       {% if current_user and current_user.role == 'admin' %}
       <a class="nav-link px-3 {% if request.url.path == '/admin/database' %}active{% endif %}" href="/admin/database">
         <i class="bi bi-database me-1"></i>{{ t('nav.database') }}
+      </a>
+      <a class="nav-link px-3 {% if request.url.path == '/admin/modules' %}active{% endif %}" href="/admin/modules">
+        <i class="bi bi-diagram-3 me-1"></i>Modules
       </a>
       <a class="nav-link px-3 {% if request.url.path.startswith('/admin/users') %}active{% endif %}" href="/admin/users">
         <i class="bi bi-people me-1"></i>{{ t('nav.users') }}
@@ -329,7 +332,7 @@
 {% endif %}
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script type="module" src="/static/js/main.js"></script>
+<script type="module" src="/static/js/main.js?v={{ STATIC_ASSET_VERSION }}"></script>
 {% block extra_js %}{% endblock %}
 <script>
 (function () {

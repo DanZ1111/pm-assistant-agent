@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, Float, Date, DateTime, JSON, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, Text, Float, Date, DateTime, JSON, ForeignKey, Boolean, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -50,6 +50,10 @@ class Project(Base):
     blockers = relationship("ProjectBlocker", back_populates="project",
                             cascade="all, delete-orphan",
                             order_by="ProjectBlocker.created_at.desc()")
+    # v1.4 Build 01 — Planning Sandbox draft/applied graph storage.
+    planning_sandboxes = relationship("PlanningSandbox", back_populates="project",
+                                      cascade="all, delete-orphan",
+                                      order_by="PlanningSandbox.updated_at.desc()")
 
     @property
     def target_factory_cost_display(self) -> str | None:
@@ -350,6 +354,187 @@ class ProjectBlocker(Base):
     phase = relationship("ProjectPhase", back_populates="blockers", foreign_keys=[phase_id])
     created_by = relationship("User", foreign_keys=[created_by_user_id])
     resolved_by = relationship("User", foreign_keys=[resolved_by_user_id])
+
+
+# ---------------------------------------------------------------------------
+# v1.4 — Planning Sandbox graph model
+# ---------------------------------------------------------------------------
+
+class PlanningModule(Base):
+    """Reusable planning block for the future visual Planning Sandbox.
+
+    Build 01 seeds this library only. Later builds clone modules into sandbox
+    nodes, then Apply copies sandbox nodes into ProjectPhase rows.
+    """
+    __tablename__ = "planning_module_library"
+
+    module_key = Column(String, primary_key=True)
+    title = Column(String, nullable=False)
+    category = Column(String, nullable=False)
+    phase_type = Column(String, nullable=False)
+    default_duration_days = Column(Integer, nullable=False)
+    default_owner_role = Column(String, nullable=True)
+    default_deliverable = Column(Text, nullable=True)
+    default_exit_criteria = Column(Text, nullable=True)
+    description = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    sort_order = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    sandbox_nodes = relationship("PlanningSandboxNode", back_populates="module")
+    template_nodes = relationship("PlanningTemplateNode", back_populates="module")
+
+
+class PlanningSandbox(Base):
+    __tablename__ = "planning_sandboxes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    name = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="draft")
+    base_template_key = Column(String, nullable=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    applied_at = Column(DateTime, nullable=True)
+    applied_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    last_computed_total_days = Column(Integer, nullable=True)
+
+    project = relationship("Project", back_populates="planning_sandboxes")
+    created_by = relationship("User", foreign_keys=[created_by_user_id])
+    applied_by = relationship("User", foreign_keys=[applied_by_user_id])
+    nodes = relationship("PlanningSandboxNode", back_populates="sandbox",
+                         cascade="all, delete-orphan",
+                         order_by="PlanningSandboxNode.sort_order")
+    edges = relationship("PlanningSandboxEdge", back_populates="sandbox",
+                         cascade="all, delete-orphan")
+
+
+class PlanningSandboxNode(Base):
+    __tablename__ = "planning_sandbox_nodes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    sandbox_id = Column(Integer, ForeignKey("planning_sandboxes.id"), nullable=False)
+    module_key = Column(String, ForeignKey("planning_module_library.module_key"), nullable=True)
+    title = Column(String, nullable=False)
+    category = Column(String, nullable=True)
+    phase_type = Column(String, nullable=False)
+    duration_days = Column(Integer, nullable=False)
+    owner_role = Column(String, nullable=True)
+    deliverable = Column(Text, nullable=True)
+    exit_criteria = Column(Text, nullable=True)
+    x_position = Column(Float, nullable=False, default=0)
+    y_position = Column(Float, nullable=False, default=0)
+    sort_order = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    sandbox = relationship("PlanningSandbox", back_populates="nodes")
+    module = relationship("PlanningModule", back_populates="sandbox_nodes")
+    outgoing_edges = relationship("PlanningSandboxEdge",
+                                  foreign_keys="PlanningSandboxEdge.from_node_id",
+                                  back_populates="from_node",
+                                  cascade="all, delete-orphan")
+    incoming_edges = relationship("PlanningSandboxEdge",
+                                  foreign_keys="PlanningSandboxEdge.to_node_id",
+                                  back_populates="to_node",
+                                  cascade="all, delete-orphan")
+
+
+class PlanningSandboxEdge(Base):
+    __tablename__ = "planning_sandbox_edges"
+    __table_args__ = (
+        UniqueConstraint("from_node_id", "to_node_id", name="uq_planning_sandbox_edge_pair"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    sandbox_id = Column(Integer, ForeignKey("planning_sandboxes.id"), nullable=False)
+    from_node_id = Column(Integer, ForeignKey("planning_sandbox_nodes.id"), nullable=False)
+    to_node_id = Column(Integer, ForeignKey("planning_sandbox_nodes.id"), nullable=False)
+    dependency_type = Column(String, nullable=False, default="finish_to_start")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    sandbox = relationship("PlanningSandbox", back_populates="edges")
+    from_node = relationship("PlanningSandboxNode",
+                             foreign_keys=[from_node_id],
+                             back_populates="outgoing_edges")
+    to_node = relationship("PlanningSandboxNode",
+                           foreign_keys=[to_node_id],
+                           back_populates="incoming_edges")
+
+
+class PlanningTemplate(Base):
+    __tablename__ = "planning_templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    template_key = Column(String, unique=True, nullable=False, index=True)
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    is_system = Column(Boolean, nullable=False, default=False)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    sort_order = Column(Integer, nullable=False, default=0)
+
+    created_by = relationship("User", foreign_keys=[created_by_user_id])
+    nodes = relationship("PlanningTemplateNode", back_populates="template",
+                         cascade="all, delete-orphan",
+                         order_by="PlanningTemplateNode.sort_order")
+    edges = relationship("PlanningTemplateEdge", back_populates="template",
+                         cascade="all, delete-orphan")
+
+
+class PlanningTemplateNode(Base):
+    __tablename__ = "planning_template_nodes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    template_id = Column(Integer, ForeignKey("planning_templates.id"), nullable=False)
+    module_key = Column(String, ForeignKey("planning_module_library.module_key"), nullable=True)
+    title = Column(String, nullable=False)
+    duration_days = Column(Integer, nullable=False)
+    owner_role = Column(String, nullable=True)
+    deliverable = Column(Text, nullable=True)
+    exit_criteria = Column(Text, nullable=True)
+    x_position = Column(Float, nullable=False, default=0)
+    y_position = Column(Float, nullable=False, default=0)
+    sort_order = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    template = relationship("PlanningTemplate", back_populates="nodes")
+    module = relationship("PlanningModule", back_populates="template_nodes")
+    outgoing_edges = relationship("PlanningTemplateEdge",
+                                  foreign_keys="PlanningTemplateEdge.from_node_id",
+                                  back_populates="from_node",
+                                  cascade="all, delete-orphan")
+    incoming_edges = relationship("PlanningTemplateEdge",
+                                  foreign_keys="PlanningTemplateEdge.to_node_id",
+                                  back_populates="to_node",
+                                  cascade="all, delete-orphan")
+
+
+class PlanningTemplateEdge(Base):
+    __tablename__ = "planning_template_edges"
+    __table_args__ = (
+        UniqueConstraint("from_node_id", "to_node_id", name="uq_planning_template_edge_pair"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    template_id = Column(Integer, ForeignKey("planning_templates.id"), nullable=False)
+    from_node_id = Column(Integer, ForeignKey("planning_template_nodes.id"), nullable=False)
+    to_node_id = Column(Integer, ForeignKey("planning_template_nodes.id"), nullable=False)
+    dependency_type = Column(String, nullable=False, default="finish_to_start")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    template = relationship("PlanningTemplate", back_populates="edges")
+    from_node = relationship("PlanningTemplateNode",
+                             foreign_keys=[from_node_id],
+                             back_populates="outgoing_edges")
+    to_node = relationship("PlanningTemplateNode",
+                           foreign_keys=[to_node_id],
+                           back_populates="incoming_edges")
 
 
 class ProjectVariant(Base):

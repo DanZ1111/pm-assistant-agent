@@ -558,11 +558,20 @@
        per the doc §1.5 "no fake intelligence" discipline. #}
     {% if phases %}
     <section class="detail-section timeline-command-center" id="timeline-command-center">
-      <div class="section-header">
-        <h2 class="section-title">
-          <i class="bi bi-speedometer2 me-2"></i>{{ t('timeline.command_center') }}
-        </h2>
-      </div>
+      <div class="timeline-command-card">
+        <div class="timeline-command-card-head">
+          <div>
+            <div class="timeline-command-eyebrow">{{ t('timeline.execution_workspace') }}</div>
+            <h2 class="timeline-command-title">
+              <i class="bi bi-speedometer2 me-2"></i>{{ t('timeline.command_center') }}
+            </h2>
+            <p class="timeline-command-subtitle">{{ t('timeline.command_center_subtitle') }}</p>
+          </div>
+          <div class="timeline-command-status">
+            <span>{{ t('timeline.current_phase') }}</span>
+            <strong>{{ current_phase.phase_name if current_phase else "—" }}</strong>
+          </div>
+        </div>
 
       {# Build 07A — Command Center action result banner (PRG redirect target) #}
       {% if cc_result %}
@@ -678,6 +687,7 @@
         </div>
       </div>
 
+      <div class="timeline-command-support-grid">
       {# v1.3 Build 07B — Honest Main Blocker tile. Replaces the Build 06
          placeholder. Shows newest active blocker + active count badge
          (Lock 4: no +N more expanded list — count only). Empty state is
@@ -740,19 +750,20 @@
         {% endif %}
       </div>
 
-      {# AI Nudge — EXPLICIT placeholder per doc §1.5 #}
-      <div class="timeline-placeholder timeline-placeholder-nudge" data-placeholder="ai-nudge">
-        <div class="timeline-placeholder-head">
+      {# Assistant suggestions — honest empty state until AI-backed nudges ship.
+         data-placeholder remains as a non-visible regression hook only. #}
+      <div class="timeline-assistant-suggestion" data-placeholder="ai-nudge">
+        <div class="timeline-assistant-head">
           <i class="bi bi-stars me-2"></i>
           <strong>{{ t('timeline.ai_nudge_title') }}</strong>
-          <span class="timeline-placeholder-badge">{{ t('timeline.placeholder_label') }}</span>
         </div>
-        <p class="timeline-placeholder-body">{{ t('timeline.ai_nudge_body') }}</p>
+        <p class="timeline-assistant-body">{{ t('timeline.ai_nudge_body') }}</p>
         {% if current_user and current_user.role in ('admin', 'pm', 'viewer') %}
-        <a class="timeline-placeholder-link" href="#" onclick="document.body.classList.add('side-panel-open'); var p=document.getElementById('aiSidePanel'); if(p)p.classList.add('open'); return false;">
+        <a class="timeline-assistant-link" href="#" onclick="document.body.classList.add('side-panel-open'); var p=document.getElementById('aiSidePanel'); if(p)p.classList.add('open'); return false;">
           <i class="bi bi-chat-dots me-1"></i>{{ t('timeline.ai_nudge_open_panel') }}
         </a>
         {% endif %}
+      </div>
       </div>
 
       {# Build 07A — Command Center action buttons.
@@ -947,14 +958,15 @@
 
       </div>
       {% endif %}
+      </div>
     </section>
     {% endif %}
 
     <!-- 2. Timeline (Build 17 — Plan / Reality split) — now collapsible via Build 06 -->
-    <section class="detail-section" id="timeline">
+    <section class="detail-section timeline-map-section" id="timeline">
       <div class="section-header">
-        <h2 class="section-title"><i class="bi bi-calendar-range me-2"></i>{{ t('section.timeline') }}</h2>
-        <span class="text-muted small">{{ t('timeline.plan_reality_hint') }}</span>
+        <h2 class="section-title"><i class="bi bi-calendar-range me-2"></i>{{ t('timeline.map_title') }}</h2>
+        <span class="text-muted small">{{ t('timeline.map_hint') }}</span>
       </div>
 
       {% if timeline_error %}
@@ -1148,7 +1160,11 @@
       <div class="timeline-history-filters" role="tablist">
         {% for chip in [('all','history_filter_all'),('delays','history_filter_delays'),('decisions','history_filter_decisions'),('blockers','history_filter_blockers'),('phase_changes','history_filter_phase_changes'),('files','history_filter_files')] %}
         <button type="button" class="timeline-history-chip{% if chip[0] == 'all' %} timeline-history-chip-active{% endif %}"
-                data-filter="{{ chip[0] }}">{{ t('timeline.' ~ chip[1]) }}</button>
+                data-filter="{{ chip[0] }}"
+                role="tab"
+                aria-selected="{% if chip[0] == 'all' %}true{% else %}false{% endif %}">
+          {{ t('timeline.' ~ chip[1]) }}
+        </button>
         {% endfor %}
       </div>
       {% endif %}
@@ -1172,35 +1188,47 @@
             data-event-source="{{ event.source_table }}"
             data-event-source-id="{{ event.source_id }}"
             {% if loop.index > 50 %}data-pagination="hidden"{% endif %}>
-          <div class="timeline-history-row-head">
-            <span class="timeline-history-time">
-              <i class="bi bi-clock me-1"></i>{{ event.occurred_at.strftime('%b %d, %Y · %H:%M') }}
+          <div class="timeline-history-card">
+            <span class="timeline-history-type-icon timeline-history-type-{{ event.bucket }}" aria-hidden="true">
+              {% if event.bucket == 'delays' %}<i class="bi bi-exclamation-triangle"></i>
+              {% elif event.bucket == 'decisions' %}<i class="bi bi-check2-circle"></i>
+              {% elif event.bucket == 'blockers' %}<i class="bi bi-shield-exclamation"></i>
+              {% elif event.bucket == 'phase_changes' %}<i class="bi bi-arrow-left-right"></i>
+              {% elif event.bucket == 'files' %}<i class="bi bi-paperclip"></i>
+              {% else %}<i class="bi bi-dot"></i>{% endif %}
             </span>
-            <span class="timeline-history-badges">
-              <span class="timeline-history-bucket-badge timeline-history-bucket-{{ event.bucket }}">
-                {% if event.bucket == 'delays' %}{{ t('timeline.history_event_delay') }}
-                {% elif event.bucket == 'decisions' %}{{ t('timeline.history_event_decision') }}
-                {% elif event.bucket == 'blockers' %}{{ t('timeline.history_event_blocker') }}
-                {% elif event.bucket == 'phase_changes' %}{{ t('timeline.history_event_phase_change') }}
-                {% elif event.bucket == 'files' %}{{ t('timeline.history_event_file_uploaded') }}
-                {% else %}{{ event.bucket }}{% endif %}
-              </span>
-              {% if event.subtype == 'sample' %}<span class="timeline-history-subtype-badge">{{ t('timeline.history_event_sample_update') }}</span>
-              {% elif event.subtype == 'rendering' %}<span class="timeline-history-subtype-badge">{{ t('timeline.history_event_rendering_update') }}</span>
-              {% elif event.subtype == 'packaging' %}<span class="timeline-history-subtype-badge">{{ t('timeline.history_event_packaging_update') }}</span>
-              {% elif event.subtype == 'cost' %}<span class="timeline-history-subtype-badge">{{ t('timeline.history_event_cost_update') }}</span>
-              {% elif event.subtype %}<span class="timeline-history-subtype-badge">{{ event.subtype }}</span>
-              {% endif %}
-              {% if event.is_ai %}<span class="timeline-history-ai-badge" title="{{ t('timeline.history_ai_badge') }}"><i class="bi bi-robot"></i></span>{% endif %}
-            </span>
-          </div>
-          <div class="timeline-history-title">{{ event.title }}</div>
-          {% if event.body %}<p class="timeline-history-body">{{ event.body }}</p>{% endif %}
-          <div class="timeline-history-meta">
-            <span class="timeline-history-actor">{{ t('timeline.history_by_actor', actor=event.actor) }}</span>
-            {% if event.link_anchor %}
-            <a class="timeline-history-anchor" href="{{ event.link_anchor }}">{{ t('timeline.history_anchor_view') }} →</a>
-            {% endif %}
+            <div class="timeline-history-content">
+              <div class="timeline-history-row-head">
+                <span class="timeline-history-time">
+                  <i class="bi bi-clock me-1"></i>{{ event.occurred_at.strftime('%b %d, %Y · %H:%M') }}
+                </span>
+                <span class="timeline-history-badges">
+                  <span class="timeline-history-bucket-badge timeline-history-bucket-{{ event.bucket }}">
+                    {% if event.bucket == 'delays' %}{{ t('timeline.history_event_delay') }}
+                    {% elif event.bucket == 'decisions' %}{{ t('timeline.history_event_decision') }}
+                    {% elif event.bucket == 'blockers' %}{{ t('timeline.history_event_blocker') }}
+                    {% elif event.bucket == 'phase_changes' %}{{ t('timeline.history_event_phase_change') }}
+                    {% elif event.bucket == 'files' %}{{ t('timeline.history_event_file_uploaded') }}
+                    {% else %}{{ event.bucket }}{% endif %}
+                  </span>
+                  {% if event.subtype == 'sample' %}<span class="timeline-history-subtype-badge">{{ t('timeline.history_event_sample_update') }}</span>
+                  {% elif event.subtype == 'rendering' %}<span class="timeline-history-subtype-badge">{{ t('timeline.history_event_rendering_update') }}</span>
+                  {% elif event.subtype == 'packaging' %}<span class="timeline-history-subtype-badge">{{ t('timeline.history_event_packaging_update') }}</span>
+                  {% elif event.subtype == 'cost' %}<span class="timeline-history-subtype-badge">{{ t('timeline.history_event_cost_update') }}</span>
+                  {% elif event.subtype %}<span class="timeline-history-subtype-badge">{{ event.subtype }}</span>
+                  {% endif %}
+                  {% if event.is_ai %}<span class="timeline-history-ai-badge" title="{{ t('timeline.history_ai_badge') }}"><i class="bi bi-robot"></i></span>{% endif %}
+                </span>
+              </div>
+              <div class="timeline-history-title">{{ event.title }}</div>
+              {% if event.body %}<p class="timeline-history-body">{{ event.body }}</p>{% endif %}
+              <div class="timeline-history-meta">
+                <span class="timeline-history-actor">{{ t('timeline.history_by_actor', actor=event.actor) }}</span>
+                {% if event.link_anchor %}
+                <a class="timeline-history-anchor" href="{{ event.link_anchor }}">{{ t('timeline.history_anchor_view') }} →</a>
+                {% endif %}
+              </div>
+            </div>
           </div>
         </li>
         {% endfor %}
@@ -1572,13 +1600,14 @@ function setProjectWorkspace(workspace, updateHash) {
   });
 
   if (updateHash) {
-    var nextHash = target === 'timeline' ? '#timeline' : '#overview';
+    var nextHash = target === 'timeline' ? '#timeline-command-center' : '#overview';
     history.replaceState(null, '', window.location.pathname + window.location.search + nextHash);
   }
 }
 
 function syncProjectWorkspaceFromHash() {
-  setProjectWorkspace(window.location.hash === '#timeline' ? 'timeline' : 'overview', false);
+  var hash = window.location.hash;
+  setProjectWorkspace((hash === '#timeline' || hash === '#timeline-command-center') ? 'timeline' : 'overview', false);
 }
 
 document.querySelectorAll('[data-workspace-tab]').forEach(function (tab) {

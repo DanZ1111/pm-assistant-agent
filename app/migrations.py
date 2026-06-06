@@ -138,7 +138,541 @@ MIGRATIONS = [
         "006_v1_3_add_project_blockers",
         lambda eng: _create_project_blockers(eng),
     ),
+    (
+        "007_v1_4_create_planning_sandbox_core",
+        lambda eng: _create_planning_sandbox_core(eng),
+    ),
+    (
+        "010_v1_4_create_planning_templates",
+        lambda eng: _create_planning_templates(eng),
+    ),
 ]
+
+
+PLANNING_MODULE_SEEDS = [
+    ("project_brief", "Project Brief", "PRODUCT", "design", 2, "pm",
+     "Clear project requirements and constraints",
+     "PM confirms scope, target user, target price, and must-have constraints",
+     "Initial commercial and product framing.", 10),
+    ("product_concept", "Product Concept", "PRODUCT", "design", 5, "pm",
+     "Product thesis and positioning",
+     "Concept explains who it is for, why it exists, and what makes it different",
+     "Strategic concept before design work starts.", 20),
+    ("industrial_design", "Industrial Design", "PRODUCT", "design", 14, "designer",
+     "Sketches, CAD direction, and form language",
+     "PM approves the design direction for sampling",
+     "Visual and ergonomic design work.", 30),
+    ("mechanical_engineering", "Mechanical Engineering", "PRODUCT", "engineering", 10, "engineer",
+     "Mechanism and construction review",
+     "Engineer signs off that the design is buildable",
+     "Mechanism, lock, tolerance, and structural review.", 40),
+    ("blade_steel_validation", "Blade Steel Validation", "FACTORY", "review", 10, "engineer",
+     "Steel suitability review",
+     "Steel choice is compatible with performance, cost, and factory process",
+     "Material validation for blade steel choices.", 50),
+    ("handle_material_validation", "Handle Material Validation", "FACTORY", "review", 7, "engineer",
+     "Handle material suitability review",
+     "Material risk and finish expectations are understood",
+     "Validation for handle material and finish risk.", 60),
+    ("rendering", "Rendering", "ASSET", "asset", 7, "designer",
+     "Product rendering or visual reference",
+     "Rendering is approved for internal alignment",
+     "Visual asset creation before or during sampling.", 70),
+    ("prototype_sample", "Prototype Sample", "FACTORY", "prototype", 21, "factory",
+     "Physical prototype sample",
+     "Sample arrives and is ready for PM review",
+     "Factory prototype or first sample round.", 80),
+    ("sample_review", "Sample Review", "PRODUCT", "review", 5, "pm",
+     "Sample feedback and decision",
+     "PM records approval, revision request, or rejection",
+     "Hands-on review of physical sample.", 90),
+    ("factory_feedback", "Factory Feedback", "FACTORY", "review", 7, "factory",
+     "Factory comments and feasibility notes",
+     "Factory confirms constraints, risks, and next changes",
+     "Factory response to sample/design feedback.", 100),
+    ("quotation", "Quotation", "COMMERCIAL", "review", 5, "factory",
+     "Factory quotation",
+     "Factory provides cost, MOQ, lead time, and terms",
+     "Commercial quote collection.", 110),
+    ("cost_review", "Cost Review", "COMMERCIAL", "review", 3, "pm",
+     "Cost and MSRP review",
+     "PM confirms whether the product still fits the target price architecture",
+     "PM price/cost decision point.", 120),
+    ("packaging_design", "Packaging Design", "ASSET", "packaging", 10, "designer",
+     "Packaging structure and artwork direction",
+     "Packaging direction is ready for quote or sample",
+     "Packaging creative and structural planning.", 130),
+    ("packaging_quote", "Packaging Quote", "COMMERCIAL", "packaging", 5, "factory",
+     "Packaging cost quote",
+     "Packaging cost and MOQ are known",
+     "Packaging cost validation.", 140),
+    ("compliance_review", "Compliance Review", "COMPLIANCE", "compliance", 7, "pm",
+     "Compliance and market-readiness checklist",
+     "Known compliance risks are accepted or resolved",
+     "Market, labeling, safety, or retail compliance check.", 150),
+    ("tooling", "Tooling", "FACTORY", "production", 21, "factory",
+     "Tooling or fixture preparation",
+     "Factory confirms tooling is complete",
+     "Tooling work before pre-production.", 160),
+    ("pre_production_sample", "Pre-production Sample", "FACTORY", "production", 14, "factory",
+     "Pre-production sample",
+     "PM approves pre-production sample",
+     "Final sample before mass production.", 170),
+    ("mass_production", "Mass Production", "FACTORY", "production", 30, "factory",
+     "Mass production run",
+     "Production is complete and ready for QC/shipping",
+     "Production execution.", 180),
+    ("quality_control", "Quality Control", "FACTORY", "review", 5, "factory",
+     "QC report or inspection result",
+     "QC result is accepted or issues are documented",
+     "Inspection and quality gate.", 190),
+    ("product_photography", "Product Photography", "ASSET", "asset", 5, "designer",
+     "Photo assets",
+     "Assets are ready for sales/listing use",
+     "Photo or marketing image production.", 200),
+    ("amazon_listing", "Amazon Listing Prep", "COMMERCIAL", "launch", 7, "pm",
+     "Amazon listing content",
+     "Listing copy, images, keywords, and pricing are ready",
+     "Marketplace launch preparation.", 210),
+    ("launch_prep", "Launch Prep", "COMMERCIAL", "launch", 7, "pm",
+     "Launch checklist",
+     "Launch tasks are ready for release",
+     "Final launch coordination.", 220),
+    ("launch_review", "Launch Review", "COMMERCIAL", "review", 3, "pm",
+     "Launch readiness review",
+     "PM confirms go/no-go",
+     "Final commercial review before launch.", 230),
+    ("launch", "Launch", "COMMERCIAL", "launch", 1, "pm",
+     "Product launched",
+     "Product is live or handed off to sales channel",
+     "Launch milestone.", 240),
+]
+
+
+SYSTEM_TEMPLATE_SEEDS = [
+    {
+        "key": "simple_oem_knife",
+        "name": "Simple OEM Knife",
+        "description": "Fast linear OEM knife workflow with light design risk.",
+        "sort": 10,
+        "nodes": [
+            ("brief", "project_brief", "Project Brief", 2, "pm", 0, 0),
+            ("design", "industrial_design", "Design Direction", 10, "designer", 0, 120),
+            ("sample", "prototype_sample", "Factory Sample", 18, "factory", 0, 260),
+            ("quote", "quotation", "Quotation", 5, "factory", 0, 430),
+            ("production", "mass_production", "Mass Production", 28, "factory", 0, 560),
+            ("launch", "launch", "Launch", 1, "pm", 0, 740),
+        ],
+        "edges": [("brief", "design"), ("design", "sample"), ("sample", "quote"),
+                  ("quote", "production"), ("production", "launch")],
+    },
+    {
+        "key": "standard_folding_knife",
+        "name": "Standard Folding Knife",
+        "description": "Balanced folding-knife workflow with design, engineering, sample, packaging, and launch gates.",
+        "sort": 20,
+        "nodes": [
+            ("concept", "product_concept", "Product Concept", 5, "pm", 0, 0),
+            ("design", "industrial_design", "Industrial Design", 14, "designer", -140, 130),
+            ("engineering", "mechanical_engineering", "Engineering Review", 10, "engineer", 140, 130),
+            ("sample", "prototype_sample", "Prototype Sample", 21, "factory", 0, 300),
+            ("review", "sample_review", "Sample Review", 5, "pm", 0, 490),
+            ("quote", "quotation", "Quotation", 5, "factory", -120, 620),
+            ("packaging", "packaging_design", "Packaging Design", 10, "designer", 120, 620),
+            ("pps", "pre_production_sample", "Pre-production Sample", 14, "factory", 0, 780),
+            ("production", "mass_production", "Mass Production", 30, "factory", 0, 950),
+            ("launch", "launch", "Launch", 1, "pm", 0, 1140),
+        ],
+        "edges": [("concept", "design"), ("concept", "engineering"), ("design", "sample"),
+                  ("engineering", "sample"), ("sample", "review"), ("review", "quote"),
+                  ("review", "packaging"), ("quote", "pps"), ("packaging", "pps"),
+                  ("pps", "production"), ("production", "launch")],
+    },
+    {
+        "key": "new_mechanism_knife",
+        "name": "New Mechanism Knife",
+        "description": "Higher-risk mechanism workflow with extra engineering and second sample loop.",
+        "sort": 30,
+        "nodes": [
+            ("concept", "product_concept", "Product Concept", 5, "pm", 0, 0),
+            ("engineering", "mechanical_engineering", "Mechanism Engineering", 14, "engineer", 0, 130),
+            ("steel", "blade_steel_validation", "Steel Validation", 10, "engineer", -150, 280),
+            ("proto1", "prototype_sample", "Prototype 1", 21, "factory", 150, 280),
+            ("review1", "sample_review", "Prototype 1 Review", 5, "pm", 0, 470),
+            ("feedback", "factory_feedback", "Factory Revision Feedback", 7, "factory", 0, 610),
+            ("proto2", "prototype_sample", "Prototype 2", 18, "factory", 0, 750),
+            ("quote", "quotation", "Quotation", 5, "factory", 0, 920),
+            ("pps", "pre_production_sample", "Pre-production Sample", 14, "factory", 0, 1060),
+            ("production", "mass_production", "Mass Production", 30, "factory", 0, 1230),
+            ("launch", "launch", "Launch", 1, "pm", 0, 1420),
+        ],
+        "edges": [("concept", "engineering"), ("engineering", "steel"), ("engineering", "proto1"),
+                  ("steel", "review1"), ("proto1", "review1"), ("review1", "feedback"),
+                  ("feedback", "proto2"), ("proto2", "quote"), ("quote", "pps"),
+                  ("pps", "production"), ("production", "launch")],
+    },
+    {
+        "key": "gift_set_combo_pack",
+        "name": "Gift Set / Combo Pack",
+        "description": "Combo workflow with product, accessory, and packaging branches converging before production.",
+        "sort": 40,
+        "nodes": [
+            ("concept", "product_concept", "Set Concept", 5, "pm", 0, 0),
+            ("knife_design", "industrial_design", "Knife Design", 12, "designer", -180, 140),
+            ("packaging", "packaging_design", "Gift Packaging Design", 14, "designer", 180, 140),
+            ("sample", "prototype_sample", "Set Sample", 21, "factory", 0, 330),
+            ("pack_quote", "packaging_quote", "Packaging Quote", 5, "factory", 180, 500),
+            ("quote", "quotation", "Product Quotation", 5, "factory", -180, 500),
+            ("cost", "cost_review", "Commercial Review", 3, "pm", 0, 640),
+            ("production", "mass_production", "Mass Production", 30, "factory", 0, 790),
+            ("launch", "launch", "Launch", 1, "pm", 0, 980),
+        ],
+        "edges": [("concept", "knife_design"), ("concept", "packaging"),
+                  ("knife_design", "sample"), ("packaging", "sample"),
+                  ("packaging", "pack_quote"), ("sample", "quote"),
+                  ("pack_quote", "cost"), ("quote", "cost"),
+                  ("cost", "production"), ("production", "launch")],
+    },
+    {
+        "key": "packaging_heavy_retail",
+        "name": "Packaging-heavy Retail Product",
+        "description": "Retail workflow where packaging, compliance, and photography are first-class branches.",
+        "sort": 50,
+        "nodes": [
+            ("brief", "project_brief", "Retail Brief", 3, "pm", 0, 0),
+            ("design", "industrial_design", "Product Design", 12, "designer", -200, 140),
+            ("packaging", "packaging_design", "Retail Packaging", 16, "designer", 120, 140),
+            ("compliance", "compliance_review", "Compliance Review", 7, "pm", 320, 140),
+            ("sample", "prototype_sample", "Retail Sample", 21, "factory", 0, 340),
+            ("photo", "product_photography", "Product Photography", 5, "designer", 220, 520),
+            ("quote", "quotation", "Final Quote", 5, "factory", -120, 520),
+            ("production", "mass_production", "Mass Production", 30, "factory", 0, 700),
+            ("launch", "launch", "Launch", 1, "pm", 0, 900),
+        ],
+        "edges": [("brief", "design"), ("brief", "packaging"), ("brief", "compliance"),
+                  ("design", "sample"), ("packaging", "sample"), ("compliance", "sample"),
+                  ("sample", "photo"), ("sample", "quote"), ("photo", "production"),
+                  ("quote", "production"), ("production", "launch")],
+    },
+    {
+        "key": "amazon_launch_product",
+        "name": "Amazon Launch Product",
+        "description": "Workflow optimized for marketplace assets, listing prep, QC, and launch readiness.",
+        "sort": 60,
+        "nodes": [
+            ("concept", "product_concept", "Amazon Product Concept", 5, "pm", 0, 0),
+            ("design", "industrial_design", "Design", 12, "designer", -120, 140),
+            ("sample", "prototype_sample", "Sample", 18, "factory", -120, 310),
+            ("photo", "product_photography", "Photography", 5, "designer", 120, 310),
+            ("listing", "amazon_listing", "Amazon Listing Prep", 7, "pm", 120, 470),
+            ("qc", "quality_control", "Quality Control", 5, "factory", -120, 470),
+            ("launch_review", "launch_review", "Launch Readiness Review", 3, "pm", 0, 620),
+            ("launch", "launch", "Launch", 1, "pm", 0, 760),
+        ],
+        "edges": [("concept", "design"), ("design", "sample"), ("design", "photo"),
+                  ("photo", "listing"), ("sample", "qc"), ("listing", "launch_review"),
+                  ("qc", "launch_review"), ("launch_review", "launch")],
+    },
+]
+
+
+def _create_planning_sandbox_core(engine):
+    """v1.4 Build 01 — Planning Sandbox core graph tables + module seeds.
+
+    Idempotent and isolated. These tables are draft planning storage only; no
+    project_phases writes happen in this build.
+    """
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    with engine.begin() as conn:
+        if "planning_module_library" not in tables:
+            conn.execute(text(
+                "CREATE TABLE planning_module_library ("
+                "  module_key VARCHAR PRIMARY KEY,"
+                "  title VARCHAR NOT NULL,"
+                "  category VARCHAR NOT NULL,"
+                "  phase_type VARCHAR NOT NULL,"
+                "  default_duration_days INTEGER NOT NULL,"
+                "  default_owner_role VARCHAR NULL,"
+                "  default_deliverable TEXT NULL,"
+                "  default_exit_criteria TEXT NULL,"
+                "  description TEXT NULL,"
+                "  is_active BOOLEAN NOT NULL DEFAULT TRUE,"
+                "  sort_order INTEGER NOT NULL DEFAULT 0,"
+                "  created_at TIMESTAMP NOT NULL,"
+                "  updated_at TIMESTAMP NOT NULL"
+                ")"
+            ))
+        if "planning_sandboxes" not in tables:
+            conn.execute(text(
+                "CREATE TABLE planning_sandboxes ("
+                "  id INTEGER PRIMARY KEY,"
+                "  project_id INTEGER NOT NULL REFERENCES projects(id),"
+                "  name VARCHAR NOT NULL,"
+                "  status VARCHAR NOT NULL DEFAULT 'draft',"
+                "  base_template_key VARCHAR NULL,"
+                "  created_by_user_id INTEGER NULL REFERENCES users(id),"
+                "  created_at TIMESTAMP NOT NULL,"
+                "  updated_at TIMESTAMP NOT NULL,"
+                "  applied_at TIMESTAMP NULL,"
+                "  applied_by_user_id INTEGER NULL REFERENCES users(id),"
+                "  last_computed_total_days INTEGER NULL"
+                ")"
+            ))
+        if "planning_sandbox_nodes" not in tables:
+            conn.execute(text(
+                "CREATE TABLE planning_sandbox_nodes ("
+                "  id INTEGER PRIMARY KEY,"
+                "  sandbox_id INTEGER NOT NULL REFERENCES planning_sandboxes(id),"
+                "  module_key VARCHAR NULL REFERENCES planning_module_library(module_key),"
+                "  title VARCHAR NOT NULL,"
+                "  category VARCHAR NULL,"
+                "  phase_type VARCHAR NOT NULL,"
+                "  duration_days INTEGER NOT NULL,"
+                "  owner_role VARCHAR NULL,"
+                "  deliverable TEXT NULL,"
+                "  exit_criteria TEXT NULL,"
+                "  x_position REAL NOT NULL DEFAULT 0,"
+                "  y_position REAL NOT NULL DEFAULT 0,"
+                "  sort_order INTEGER NOT NULL DEFAULT 0,"
+                "  created_at TIMESTAMP NOT NULL,"
+                "  updated_at TIMESTAMP NOT NULL"
+                ")"
+            ))
+        if "planning_sandbox_edges" not in tables:
+            conn.execute(text(
+                "CREATE TABLE planning_sandbox_edges ("
+                "  id INTEGER PRIMARY KEY,"
+                "  sandbox_id INTEGER NOT NULL REFERENCES planning_sandboxes(id),"
+                "  from_node_id INTEGER NOT NULL REFERENCES planning_sandbox_nodes(id),"
+                "  to_node_id INTEGER NOT NULL REFERENCES planning_sandbox_nodes(id),"
+                "  dependency_type VARCHAR NOT NULL DEFAULT 'finish_to_start',"
+                "  created_at TIMESTAMP NOT NULL,"
+                "  UNIQUE (from_node_id, to_node_id)"
+                ")"
+            ))
+
+        conn.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_planning_sandboxes_one_draft "
+            "ON planning_sandboxes(project_id) WHERE status = 'draft'"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_planning_sandboxes_project "
+            "ON planning_sandboxes(project_id)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_planning_sandbox_nodes_sandbox "
+            "ON planning_sandbox_nodes(sandbox_id)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_planning_sandbox_edges_sandbox "
+            "ON planning_sandbox_edges(sandbox_id)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_planning_sandbox_edges_to "
+            "ON planning_sandbox_edges(to_node_id)"
+        ))
+
+    _seed_planning_modules(engine)
+
+
+def _create_planning_templates(engine):
+    """v1.4 Build 01 — template tables + 6 system workflow templates.
+
+    Ships early so v1.4 Build 03 can render from templates without another
+    schema pass.
+    """
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    with engine.begin() as conn:
+        if "planning_templates" not in tables:
+            conn.execute(text(
+                "CREATE TABLE planning_templates ("
+                "  id INTEGER PRIMARY KEY,"
+                "  template_key VARCHAR UNIQUE NOT NULL,"
+                "  name VARCHAR NOT NULL,"
+                "  description TEXT NULL,"
+                "  is_system BOOLEAN NOT NULL DEFAULT FALSE,"
+                "  created_by_user_id INTEGER NULL REFERENCES users(id),"
+                "  is_active BOOLEAN NOT NULL DEFAULT TRUE,"
+                "  created_at TIMESTAMP NOT NULL,"
+                "  updated_at TIMESTAMP NOT NULL,"
+                "  sort_order INTEGER NOT NULL DEFAULT 0"
+                ")"
+            ))
+        if "planning_template_nodes" not in tables:
+            conn.execute(text(
+                "CREATE TABLE planning_template_nodes ("
+                "  id INTEGER PRIMARY KEY,"
+                "  template_id INTEGER NOT NULL REFERENCES planning_templates(id),"
+                "  module_key VARCHAR NULL REFERENCES planning_module_library(module_key),"
+                "  title VARCHAR NOT NULL,"
+                "  duration_days INTEGER NOT NULL,"
+                "  owner_role VARCHAR NULL,"
+                "  deliverable TEXT NULL,"
+                "  exit_criteria TEXT NULL,"
+                "  x_position REAL NOT NULL DEFAULT 0,"
+                "  y_position REAL NOT NULL DEFAULT 0,"
+                "  sort_order INTEGER NOT NULL DEFAULT 0,"
+                "  created_at TIMESTAMP NOT NULL,"
+                "  updated_at TIMESTAMP NOT NULL"
+                ")"
+            ))
+        if "planning_template_edges" not in tables:
+            conn.execute(text(
+                "CREATE TABLE planning_template_edges ("
+                "  id INTEGER PRIMARY KEY,"
+                "  template_id INTEGER NOT NULL REFERENCES planning_templates(id),"
+                "  from_node_id INTEGER NOT NULL REFERENCES planning_template_nodes(id),"
+                "  to_node_id INTEGER NOT NULL REFERENCES planning_template_nodes(id),"
+                "  dependency_type VARCHAR NOT NULL DEFAULT 'finish_to_start',"
+                "  created_at TIMESTAMP NOT NULL,"
+                "  UNIQUE (from_node_id, to_node_id)"
+                ")"
+            ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_planning_templates_active "
+            "ON planning_templates(is_active, is_system, sort_order)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_planning_template_nodes_template "
+            "ON planning_template_nodes(template_id)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_planning_template_edges_template "
+            "ON planning_template_edges(template_id)"
+        ))
+
+    _seed_system_planning_templates(engine)
+
+
+def _seed_planning_modules(engine):
+    now = datetime.utcnow()
+    with engine.begin() as conn:
+        for (
+            module_key, title, category, phase_type, duration, owner_role,
+            deliverable, exit_criteria, description, sort_order,
+        ) in PLANNING_MODULE_SEEDS:
+            exists = conn.execute(
+                text("SELECT 1 FROM planning_module_library WHERE module_key = :module_key"),
+                {"module_key": module_key},
+            ).first()
+            if exists:
+                continue
+            conn.execute(text(
+                "INSERT INTO planning_module_library ("
+                "module_key, title, category, phase_type, default_duration_days, "
+                "default_owner_role, default_deliverable, default_exit_criteria, "
+                "description, is_active, sort_order, created_at, updated_at"
+                ") VALUES ("
+                ":module_key, :title, :category, :phase_type, :duration, "
+                ":owner_role, :deliverable, :exit_criteria, :description, "
+                ":is_active, :sort_order, :created_at, :updated_at)"
+            ), {
+                "module_key": module_key,
+                "title": title,
+                "category": category,
+                "phase_type": phase_type,
+                "duration": duration,
+                "owner_role": owner_role,
+                "deliverable": deliverable,
+                "exit_criteria": exit_criteria,
+                "description": description,
+                "is_active": True,
+                "sort_order": sort_order,
+                "created_at": now,
+                "updated_at": now,
+            })
+
+
+def _seed_system_planning_templates(engine):
+    now = datetime.utcnow()
+    with engine.begin() as conn:
+        for template in SYSTEM_TEMPLATE_SEEDS:
+            row = conn.execute(
+                text("SELECT id FROM planning_templates WHERE template_key = :template_key"),
+                {"template_key": template["key"]},
+            ).first()
+            if row is None:
+                conn.execute(text(
+                    "INSERT INTO planning_templates ("
+                    "template_key, name, description, is_system, created_by_user_id, "
+                    "is_active, created_at, updated_at, sort_order"
+                    ") VALUES ("
+                    ":template_key, :name, :description, :is_system, NULL, "
+                    ":is_active, :created_at, :updated_at, :sort_order)"
+                ), {
+                    "template_key": template["key"],
+                    "name": template["name"],
+                    "description": template["description"],
+                    "is_system": True,
+                    "is_active": True,
+                    "created_at": now,
+                    "updated_at": now,
+                    "sort_order": template["sort"],
+                })
+                row = conn.execute(
+                    text("SELECT id FROM planning_templates WHERE template_key = :template_key"),
+                    {"template_key": template["key"]},
+                ).first()
+
+            template_id = row[0]
+            node_count = conn.execute(
+                text("SELECT COUNT(*) FROM planning_template_nodes WHERE template_id = :template_id"),
+                {"template_id": template_id},
+            ).scalar()
+            if node_count:
+                continue
+
+            node_ids = {}
+            for sort_order, (local_key, module_key, title, duration, owner_role, x_pos, y_pos) in enumerate(template["nodes"], 1):
+                module = conn.execute(text(
+                    "SELECT default_deliverable, default_exit_criteria "
+                    "FROM planning_module_library WHERE module_key = :module_key"
+                ), {"module_key": module_key}).first()
+                deliverable = module[0] if module else None
+                exit_criteria = module[1] if module else None
+                conn.execute(text(
+                    "INSERT INTO planning_template_nodes ("
+                    "template_id, module_key, title, duration_days, owner_role, "
+                    "deliverable, exit_criteria, x_position, y_position, sort_order, "
+                    "created_at, updated_at"
+                    ") VALUES ("
+                    ":template_id, :module_key, :title, :duration_days, :owner_role, "
+                    ":deliverable, :exit_criteria, :x_position, :y_position, :sort_order, "
+                    ":created_at, :updated_at)"
+                ), {
+                    "template_id": template_id,
+                    "module_key": module_key,
+                    "title": title,
+                    "duration_days": duration,
+                    "owner_role": owner_role,
+                    "deliverable": deliverable,
+                    "exit_criteria": exit_criteria,
+                    "x_position": x_pos,
+                    "y_position": y_pos,
+                    "sort_order": sort_order,
+                    "created_at": now,
+                    "updated_at": now,
+                })
+                node_row = conn.execute(text(
+                    "SELECT id FROM planning_template_nodes "
+                    "WHERE template_id = :template_id AND sort_order = :sort_order"
+                ), {"template_id": template_id, "sort_order": sort_order}).first()
+                node_ids[local_key] = node_row[0]
+
+            for from_key, to_key in template["edges"]:
+                conn.execute(text(
+                    "INSERT INTO planning_template_edges ("
+                    "template_id, from_node_id, to_node_id, dependency_type, created_at"
+                    ") VALUES ("
+                    ":template_id, :from_node_id, :to_node_id, 'finish_to_start', :created_at)"
+                ), {
+                    "template_id": template_id,
+                    "from_node_id": node_ids[from_key],
+                    "to_node_id": node_ids[to_key],
+                    "created_at": now,
+                })
 
 
 def _add_variant_structured_specs(engine):

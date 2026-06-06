@@ -158,12 +158,13 @@ def main():
         fail("Build 08 keys", f"missing: {missing}")
 
     # ── 2. Migration count unchanged ──
-    print("\n── 2. Migrations unchanged ──")
+    print("\n── 2. Build 08 added no migration of its own ──")
     from app.migrations import MIGRATIONS
-    if len(MIGRATIONS) == 6:
-        ok("MIGRATIONS still 6 entries (no schema change in Build 08)")
+    migration_names = [name for name, _ in MIGRATIONS]
+    if "006_v1_3_add_project_blockers" in migration_names and not any("v1_3_build08" in name for name in migration_names):
+        ok(f"Build 08 preserved migration inventory; later builds may add more (count now {len(MIGRATIONS)})")
     else:
-        fail("migration count", f"expected 6, got {len(MIGRATIONS)}")
+        fail("migration inventory", f"unexpected Build 08 migration drift: {migration_names}")
 
     # ── 3. Project setup with multi-source activity ──
     print("\n── 3. Project setup — exercise all 3 source tables ──")

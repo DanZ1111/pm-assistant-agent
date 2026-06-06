@@ -137,10 +137,11 @@ def main():
     else:
         fail("indexes", f"got {idx}")
     from app.migrations import MIGRATIONS
-    if len(MIGRATIONS) == 6:
-        ok("MIGRATIONS count = 6 (after migration 006)")
+    migration_names = [name for name, _ in MIGRATIONS]
+    if len(MIGRATIONS) >= 6 and "006_v1_3_add_project_blockers" in migration_names:
+        ok(f"MIGRATIONS include Build 07B migration 006 (count now {len(MIGRATIONS)})")
     else:
-        fail("migration count", f"expected 6, got {len(MIGRATIONS)}")
+        fail("migration inventory", f"missing 006_v1_3_add_project_blockers in {migration_names}")
 
     # ── 2. Model + relationships ──
     print("\n── 2. ProjectBlocker model + relationships ──")

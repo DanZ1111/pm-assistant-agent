@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — {{ t('sandbox.title') }}{% endblock %}
+
+{% block content %}
+<div class="sandbox-shell">
+  <div class="sandbox-header">
+    <div>
+      <a href="/projects/{{ project.id }}#timeline" class="btn-back mb-2"><i class="bi bi-arrow-left"></i> {{ t('sandbox.back_to_project') }}</a>
+      <h1 class="page-title mb-1"><i class="bi bi-diagram-3 me-2"></i>{{ t('sandbox.title') }}</h1>
+      <p class="page-subtitle">{{ project.name }} · {{ t('sandbox.subtitle') }}</p>
+    </div>
+    {% if sandbox %}
+    <div class="sandbox-summary">
+      <div>
+        <span class="sandbox-summary-label">{{ t('sandbox.estimate') }}</span>
+        <strong>{{ sandbox_payload.schedule.total_days }} {{ t('sandbox.days') }}</strong>
+      </div>
+      <div>
+        <span class="sandbox-summary-label">{{ t('sandbox.nodes') }}</span>
+        <strong>{{ sandbox_payload.schedule.nodes|length }}</strong>
+      </div>
+      <div>
+        <span class="sandbox-summary-label">{{ t('sandbox.warnings') }}</span>
+        <strong>{{ sandbox_payload.schedule.soft_warnings|length }}</strong>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if request.query_params.get('error') %}
+  <div class="alert alert-warning mx-4">
+    {% if request.query_params.get('error') == 'not_authorized' %}
+      {{ t('sandbox.error_not_authorized') }}
+    {% elif request.query_params.get('error') == 'template_not_found' %}
+      {{ t('sandbox.error_template_not_found') }}
+    {% else %}
+      {{ t('sandbox.error_generic') }}
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if not sandbox %}
+  <section class="sandbox-picker">
+    <div class="sandbox-picker-main">
+      <h2>{{ t('sandbox.start_title') }}</h2>
+      <p>{{ t('sandbox.start_copy') }}</p>
+      {% if can_edit %}
+      <form method="post" action="/projects/{{ project.id }}/sandbox/create">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-plus-lg me-1"></i>{{ t('sandbox.start_blank') }}
+        </button>
+      </form>
+      {% else %}
+      <p class="text-muted">{{ t('sandbox.viewer_picker_hint') }}</p>
+      {% endif %}
+    </div>
+    <div class="sandbox-template-grid">
+      {% for template in planning_templates %}
+      <div class="sandbox-template-card">
+        <div class="sandbox-template-title">{{ template.name }}</div>
+        <p>{{ template.description }}</p>
+        {% if can_edit %}
+        <form method="post" action="/projects/{{ project.id }}/sandbox/create">
+          <input type="hidden" name="template_key" value="{{ template.template_key }}">
+          <button type="submit" class="btn btn-sm btn-outline-primary">
+            {{ t('sandbox.start_from_template') }}
+          </button>
+        </form>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% else %}
+  <section class="sandbox-workspace">
+    <div class="sandbox-canvas-panel">
+      <div class="sandbox-canvas-toolbar">
+        <div>
+          <strong>{{ sandbox.name }}</strong>
+          <span class="badge bg-secondary ms-2">{{ sandbox.status }}</span>
+          {% if sandbox.base_template_key %}
+          <span class="text-muted small ms-2">{{ sandbox.base_template_key }}</span>
+          {% endif %}
+        </div>
+        <span class="text-muted small">{{ t('sandbox.read_only_build') }}</span>
+      </div>
+      {% if sandbox_payload.schedule.hard_errors %}
+      <div class="sandbox-warning-strip sandbox-error-strip">
+        <i class="bi bi-exclamation-triangle me-1"></i>
+        {{ t('sandbox.hard_errors') }}:
+        {{ sandbox_payload.schedule.hard_errors | map(attribute='code') | join(', ') }}
+      </div>
+      {% elif sandbox_payload.schedule.soft_warnings %}
+      <div class="sandbox-warning-strip">
+        <i class="bi bi-exclamation-circle me-1"></i>
+        {{ sandbox_payload.schedule.soft_warnings | map(attribute='code') | join(', ') }}
+      </div>
+      {% endif %}
+      <div id="sandboxCanvas"
+           class="sandbox-canvas"
+           data-elements='{{ sandbox_elements_json | safe }}'
+           data-empty-label="{{ t('sandbox.empty_canvas') }}"></div>
+    </div>
+    <aside class="sandbox-side-panel">
+      <h2>{{ t('sandbox.details_title') }}</h2>
+      {% if sandbox_payload.schedule.nodes %}
+      <ol class="sandbox-node-list">
+        {% for node in sandbox_payload.schedule.nodes %}
+        <li>
+          <strong>{{ node.title }}</strong>
+          <span>{{ node.duration_days }} {{ t('sandbox.days') }}</span>
+          {% if node.start_day is not none and node.end_day is not none %}
+          <small>{{ t('sandbox.day_range', start=node.start_day, end=node.end_day) }}</small>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ol>
+      {% else %}
+      <p class="text-muted">{{ t('sandbox.empty_canvas') }}</p>
+      {% endif %}
+    </aside>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if sandbox %}
+<script src="https://cdn.jsdelivr.net/npm/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+<script src="/static/js/planning_sandbox.js"></script>
+{% endif %}
+{% endblock %}

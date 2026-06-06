@@ -182,6 +182,8 @@ import { createComposerController } from './composer_controller.js';
   var dockForm = document.getElementById('bottomChatForm');
   var dockInput = document.getElementById('chatInputTextarea');
   var dockSubmit = document.getElementById('chatSubmitBtn');
+  var dockCollapseBtn = document.getElementById('bottomChatCollapseBtn');
+  var dockRestoreBtn = document.getElementById('bottomChatRestoreBtn');
   var panel = document.getElementById('aiSidePanel');
   var panelForm = document.getElementById('panelChatForm');
   var panelInput = document.getElementById('panelChatInput');
@@ -203,6 +205,31 @@ import { createComposerController } from './composer_controller.js';
   var activeMode = 'intake';
   var activeScope = defaultProjectId ? 'project' : 'global';
   var pendingAttachments = [];
+
+  function setDockCollapsed(collapsed) {
+    bar.classList.toggle('is-collapsed', collapsed);
+    document.body.classList.toggle('assistant-dock-collapsed', collapsed);
+    if (dockCollapseBtn) {
+      dockCollapseBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    }
+    if (dockRestoreBtn) {
+      dockRestoreBtn.hidden = !collapsed;
+    }
+    if (!collapsed) {
+      window.setTimeout(function () { dockInput.focus(); }, 120);
+    }
+  }
+
+  if (dockCollapseBtn) {
+    dockCollapseBtn.addEventListener('click', function () {
+      setDockCollapsed(true);
+    });
+  }
+  if (dockRestoreBtn) {
+    dockRestoreBtn.addEventListener('click', function () {
+      setDockCollapsed(false);
+    });
+  }
 
   // Autosize is a layout concern, separate from IME-safe Enter handling.
   // The IME / submit logic lives in composer_controller.js.
@@ -820,10 +847,9 @@ import { createComposerController } from './composer_controller.js';
       section.setAttribute('data-active-filter', name);
       // Update chip active state
       section.querySelectorAll('.timeline-history-chip').forEach(function (c) {
-        c.classList.toggle(
-          'timeline-history-chip-active',
-          c.getAttribute('data-filter') === name
-        );
+        var isActive = c.getAttribute('data-filter') === name;
+        c.classList.toggle('timeline-history-chip-active', isActive);
+        c.setAttribute('aria-selected', isActive ? 'true' : 'false');
       });
       // Compute filter empty state — count visible rows (not hidden by
       // pagination AND not hidden by the active filter).

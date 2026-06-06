@@ -86,10 +86,28 @@ from app.routes import intake as _r_intake, help as _r_help, auth as _r_auth  # 
 from app.routes import admin_users as _r_admin_users, calendar as _r_calendar, ideas as _r_ideas  # noqa: E402
 from app.i18n import t as _i18n_t, current_locale as _i18n_current_locale  # noqa: E402  Build 23 — Jinja2 globals
 
+
+def _static_asset_version() -> str:
+    """Cache-bust first-party CSS/JS when static files change.
+
+    The human app version can stay stable during a rescue patch, but browsers
+    still need a new URL when styles.css or main.js changes.
+    """
+    static_paths = ("app/static/css/styles.css", "app/static/js/main.js")
+    latest_mtime = 0
+    for path in static_paths:
+        try:
+            latest_mtime = max(latest_mtime, int(os.path.getmtime(path)))
+        except OSError:
+            continue
+    return f"{CURRENT_VERSION}-{LAST_UPDATED}-{latest_mtime}"
+
+
 _GLOBALS = {
     "APP_VERSION": CURRENT_VERSION,
     "APP_BUILD_NAME": CURRENT_BUILD_NAME,
     "APP_LAST_UPDATED": LAST_UPDATED,
+    "STATIC_ASSET_VERSION": _static_asset_version(),
     "t": _i18n_t,  # Build 23 — i18n translation function
     "current_locale": _i18n_current_locale,
 }
