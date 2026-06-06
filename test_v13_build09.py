@@ -1,17 +1,20 @@
 """v1.3 Build 09 — Planning Sandbox Engineering Design (design-only) tests.
 
-Amended 2026-06-06: the original Build 09 doc shipped at fc064a6 was
-form-based + persisted-on-project. After PRD review with ChatGPT, the
-user clarified the actual product is a VISUAL WORKFLOW CANVAS with
-EXPLICIT DRAFT/APPLY SEPARATION. The doc was rewritten as an engineering
-response to the PRD; the PRD is captured as Appendix A.
+Amended TWICE on 2026-06-06:
+- Amendment 1: rewrite as engineering response to ChatGPT PRD (visual canvas
+  + draft/apply separation).
+- Amendment 2: fold Codex's V14_PLANNING_SANDBOX_IMPLEMENTATION_PLAN.md
+  additions: 9-build v1.4 sequence (was 8), active-blocker check on Apply,
+  10-step Apply transaction, semantic soft warnings, "edge crosses sandbox
+  boundary" hard error, concrete route URL list, service-helper checklist,
+  mobile guidance, sections 12-14 added to body.
 
-This test asserts the AMENDED structure: PRD appendix presence,
-Cytoscape.js library decision lock, 10 PRD open questions locked with
-defaults, 8-sub-build v1.4 sequence (not 4), 7-table schema sketch,
-draft/apply separation as a non-negotiable, AND the design-only
-invariants (no migrations, no new tables, no i18n drift, no new AI
-tools).
+This test asserts the doubly-amended structure: PRD appendix presence,
+Cytoscape.js library decision lock, 10 PRD open questions locked, 9-build
+v1.4 sequence (not 4 or 8), 7-table schema sketch with Codex's column
+additions, Apply preconditions including active-blocker check, route +
+service helper enumeration, mobile guidance, AND the design-only
+invariants (no migrations, no new tables, no i18n drift, no new AI tools).
 """
 import json
 import os
@@ -38,11 +41,12 @@ def main():
     print("\n── 1. Design doc exists + is substantial ──")
     if os.path.exists(DESIGN_DOC):
         size = os.path.getsize(DESIGN_DOC)
-        # Amended doc is ~35-50 KB (engineering response + PRD appendix)
-        if size >= 20000:
-            ok(f"{DESIGN_DOC} exists, {size} bytes (≥ 20 KB amended target)")
+        # Doubly-amended doc is ~50-70 KB (engineering response + PRD appendix
+        # + Codex-folded sections 12-14)
+        if size >= 40000:
+            ok(f"{DESIGN_DOC} exists, {size} bytes (≥ 40 KB doubly-amended target)")
         else:
-            fail("doc too small", f"only {size} bytes — amendment may not have landed")
+            fail("doc too small", f"only {size} bytes — Amendment 2 may not have landed")
     else:
         fail("doc missing", f"{DESIGN_DOC} not found")
         _p(); return False
@@ -50,12 +54,16 @@ def main():
     with open(DESIGN_DOC, encoding="utf-8") as f:
         doc = f.read()
 
-    # ── 2. Amendment note present ──
-    print("\n── 2. Amendment note explicitly present ──")
-    if "Amendment note (2026-06-06)" in doc:
-        ok("Dated amendment note present")
+    # ── 2. Both amendment notes present ──
+    print("\n── 2. Amendment 1 + Amendment 2 notes both present ──")
+    if "Amendment 1 note (2026-06-06)" in doc:
+        ok("Amendment 1 note present")
     else:
-        fail("amendment note", "missing — readers won't know this is the revised version")
+        fail("amendment 1 note", "missing")
+    if "Amendment 2 note (2026-06-06)" in doc:
+        ok("Amendment 2 note present (Codex additions folded in)")
+    else:
+        fail("amendment 2 note", "missing — readers won't see Codex additions")
 
     # ── 3. PRD captured verbatim as Appendix A ──
     print("\n── 3. PRD captured as Appendix A ──")
@@ -111,10 +119,10 @@ def main():
         else:
             fail(f"open Q {qn} missing", "not in engineering decisions")
 
-    # ── 7. v1.4 sequence is 8 sub-builds (not 4) ──
-    print("\n── 7. v1.4 sequence is 8 sub-builds ──")
+    # ── 7. v1.4 sequence is 9 sub-builds (Amendment 2: was 8) ──
+    print("\n── 7. v1.4 sequence is 9 sub-builds ──")
     subbuilds = ["v1.4-01", "v1.4-02", "v1.4-03", "v1.4-04",
-                 "v1.4-05", "v1.4-06", "v1.4-07", "v1.4-08"]
+                 "v1.4-05", "v1.4-06", "v1.4-07", "v1.4-08", "v1.4-09"]
     for sb in subbuilds:
         if sb in doc:
             ok(f"v1.4 sub-build present: {sb}")
@@ -125,6 +133,15 @@ def main():
         ok("Old 4-sub-build naming ('v1.4 Build 01') no longer present")
     else:
         fail("old naming lingers", "doc still references old 4-build sequence")
+    # Codex's two new slices are named explicitly
+    if "Canvas Interaction Hardening" in doc:
+        ok("v1.4-06 named 'Canvas Interaction Hardening' (Codex addition)")
+    else:
+        fail("v1.4-06 name", "Canvas Interaction Hardening slice missing")
+    if "Release Hardening" in doc:
+        ok("v1.4-09 named 'Release Hardening' (Codex addition)")
+    else:
+        fail("v1.4-09 name", "Release Hardening slice missing")
 
     # ── 8. Schema sketch covers 7 new tables ──
     print("\n── 8. Schema sketch covers 7 new tables ──")
@@ -182,12 +199,134 @@ def main():
     else:
         fail("risk register", "missing")
 
-    # ── 13. Decision log includes the 2026-06-06 amendment row ──
-    print("\n── 13. Decision log carries the amendment row ──")
+    # ── 13. Decision log includes both amendment rows ──
+    print("\n── 13. Decision log carries both amendment rows ──")
     if "AMENDMENT: visual canvas + draft/apply separation" in doc:
-        ok("Decision log row for the amendment is present")
+        ok("Decision log row for Amendment 1 present")
     else:
-        fail("decision log amendment", "row missing — doc instruction requires this")
+        fail("decision log amendment 1", "row missing")
+    if "Amendment 2" in doc and "Folded Codex" in doc:
+        ok("Decision log row for Amendment 2 (Codex additions) present")
+    else:
+        fail("decision log amendment 2", "row missing")
+
+    # ── 14. Codex-folded sections 12/13/14 present ──
+    print("\n── 14. Codex-folded sections 12/13/14 present ──")
+    for header, label in [
+        ("## 12. Apply detailed semantics", "§12 Apply detailed semantics"),
+        ("## 13. Routes and service-layer helpers", "§13 Routes + service helpers"),
+        ("## 14. Mobile guidance", "§14 Mobile guidance"),
+    ]:
+        if header in doc:
+            ok(f"Section present: {label}")
+        else:
+            fail(f"section missing: {label}", "")
+
+    # ── 15. Active-blocker precondition on Apply (Codex addition) ──
+    print("\n── 15. Active-blocker check on Apply (Codex addition) ──")
+    if "active_blocker_attached" in doc and "ProjectBlocker" in doc:
+        ok("Apply precondition: no active ProjectBlocker on existing phases")
+    else:
+        fail("active-blocker check", "Q2 + §12.3 should reference ProjectBlocker check")
+
+    # ── 16. 10-step Apply transaction sequence ──
+    print("\n── 16. Apply transaction is enumerated 10 steps ──")
+    if "Apply transaction sequence (10 steps)" in doc:
+        ok("10-step Apply sequence documented")
+    else:
+        fail("Apply sequence", "§12.5 should list the 10-step transaction")
+
+    # ── 17. Hard error 'edge crosses sandbox boundary' (Codex addition) ──
+    print("\n── 17. 'edge crosses sandbox boundary' hard error ──")
+    if "cross_sandbox_edge" in doc:
+        ok("Hard error 'cross_sandbox_edge' documented in §12.1")
+    else:
+        fail("cross-sandbox-edge hard error", "§12.1 should include this code")
+
+    # ── 18. Semantic soft warnings (Codex addition) ──
+    print("\n── 18. Semantic soft warnings (Codex addition) ──")
+    semantic_warnings = ["packaging_before_design", "production_before_sample",
+                          "terminal_not_launch_like", "missing_deliverable"]
+    for w in semantic_warnings:
+        if w in doc:
+            ok(f"Soft warning: {w}")
+        else:
+            fail(f"soft warning missing: {w}", "")
+
+    # ── 19. Route URL list enumerated (Codex addition) ──
+    print("\n── 19. Route URLs enumerated in §13 ──")
+    expected_routes = [
+        "/projects/{project_id}/sandbox/create",
+        "/projects/{project_id}/sandbox/{sandbox_id}/apply",
+        "/projects/{project_id}/sandbox/{sandbox_id}/nodes",
+        "/projects/{project_id}/sandbox/{sandbox_id}/nodes/{node_id}/update",
+        "/projects/{project_id}/sandbox/{sandbox_id}/nodes/{node_id}/position",
+        "/projects/{project_id}/sandbox/{sandbox_id}/edges",
+        "/projects/{project_id}/sandbox/{sandbox_id}/save-template",
+    ]
+    for url in expected_routes:
+        if url in doc:
+            ok(f"Route URL: {url}")
+        else:
+            fail(f"route missing: {url}", "")
+
+    # ── 20. Service helper checklist (Codex addition) ──
+    print("\n── 20. Service helpers enumerated in §13.2 ──")
+    expected_helpers = [
+        "create_sandbox_blank", "create_sandbox_from_template",
+        "list_modules", "list_templates",
+        "create_sandbox_node", "update_sandbox_node",
+        "delete_sandbox_node", "create_sandbox_edge",
+        "compute_sandbox_schedule", "validate_sandbox_for_apply",
+        "apply_sandbox_to_project", "save_sandbox_as_template",
+    ]
+    for h in expected_helpers:
+        if h in doc:
+            ok(f"Service helper: {h}")
+        else:
+            fail(f"helper missing: {h}", "")
+
+    # ── 21. Schema additions: phase_type on nodes, lifecycle timestamps,
+    #        updated_project_planned_launch_date on apply_events ──
+    print("\n── 21. Schema additions (Codex) ──")
+    schema_additions = [
+        ("phase_type", "phase_type carried to planning_sandbox_nodes"),
+        ("updated_project_planned_launch_date", "updated_project_planned_launch_date on apply_events"),
+        ("uq_planning_sandboxes_one_draft", "partial unique index for draft lifecycle"),
+    ]
+    for marker, label in schema_additions:
+        if marker in doc:
+            ok(f"Schema addition: {label}")
+        else:
+            fail(f"schema addition missing: {label}", "")
+
+    # ── 22. Sandbox lifecycle explicit ──
+    print("\n── 22. Sandbox lifecycle is explicit (draft / applied / archived) ──")
+    if "draft" in doc and "applied" in doc and "archived" in doc:
+        ok("All 3 lifecycle states named")
+    else:
+        fail("lifecycle states", "missing one of draft/applied/archived")
+
+    # ── 23. AI_TOOLS_REGISTRY.md requirement before v1.4 release ──
+    print("\n── 23. AI_TOOLS_REGISTRY.md requirement before v1.4 release ──")
+    if "AI_TOOLS_REGISTRY.md" in doc and "v1.4 release" in doc:
+        ok("AI_TOOLS_REGISTRY.md required to be updated before v1.4 release")
+    else:
+        fail("AI registry req", "missing")
+
+    # ── 24. Mobile guidance specifics ──
+    print("\n── 24. Mobile guidance specifics ──")
+    mobile_markers = [
+        ("Horizontal scroll", "Canvas horizontal scroll allowed"),
+        ("44×44", "Touch target minimum"),
+        ("drawer", "Library/property panel drawer treatment"),
+        ("390×844", "iPhone 13 screenshot target"),
+    ]
+    for marker, label in mobile_markers:
+        if marker in doc:
+            ok(f"Mobile guidance: {label}")
+        else:
+            fail(f"mobile spec missing: {label}", "")
 
     # ── 14. INVARIANTS — no schema / no migration / no i18n drift ──
     # Build 09 (amended OR original) ships ZERO code. The test enforces this

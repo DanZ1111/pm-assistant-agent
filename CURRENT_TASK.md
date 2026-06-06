@@ -1,7 +1,7 @@
 # CURRENT_TASK.md
 
 ## Task
-v1.3 Build 09 **amended** — Planning Sandbox engineering response to ChatGPT-shaped PRD. Shipped. Awaiting Build 10 (release hardening).
+v1.3 Build 09 **amended twice** — engineering response to ChatGPT PRD + Codex's V14 implementation plan additions folded in. Shipped. Awaiting Build 10 (release hardening).
 
 ## Handoff rule
 Before editing, inspect:
@@ -13,11 +13,11 @@ Git/code is the source of truth.
 
 ## What just shipped in this session
 
-- **Build 09 amendment** committed as one atomic commit (see latest `git log`). Build 09 stays design-only; this corrects the design target.
-  - `V13_BUILD09_PLANNING_SANDBOX_DESIGN.md` (~35 KB) — rewritten as the **engineering response to the Planning Sandbox PRD**. PRD captured verbatim as Appendix A. Original Build 09 shipped at `fc064a6` was form-based + persisted-on-project; that's now corrected to visual canvas + draft/apply separation.
-  - `test_v13_build09.py` — rewritten with 56/56 PASS. Asserts the amended structure: PRD appendix, visual-canvas + draft/apply locks, Cytoscape.js decision, 10 PRD open questions locked, 8 v1.4 sub-builds (not 4), 7-table schema sketch, Backend Honesty Mapping, Risk register, amendment row in Decision log, AND the design-only invariants (no migrations, no new tables, no AI tools, no i18n drift).
+- **Build 09 Amendment 2** committed as one atomic commit (see latest `git log`). Build 09 stays design-only; this layers Codex's V14 plan additions onto the Amendment 1 doc.
+  - `V13_BUILD09_PLANNING_SANDBOX_DESIGN.md` (~52 KB; was ~35 KB) — Amendment 1's engineering response preserved; new sections §12 (Apply detailed semantics), §13 (Routes + service-layer helpers), §14 (Mobile guidance) appended; Q2 expanded with active-blocker precondition; schema augmented (phase_type on nodes, lifecycle timestamps on module library, updated_project_planned_launch_date on apply_events, partial unique index on draft lifecycle); v1.4 sub-build sequence expanded 8→9 (added Canvas Interaction Hardening + Release Hardening); Decision log gets a second dated row for Amendment 2.
+  - `test_v13_build09.py` — expanded from 56 to **99/99 PASS** — asserts both amendment notes, 9 sub-builds (not 8), Codex-named slices "Canvas Interaction Hardening" + "Release Hardening", §12/§13/§14 presence, active-blocker check, 10-step Apply transaction, cross-sandbox-edge hard error, semantic soft warnings (packaging_before_design, production_before_sample, terminal_not_launch_like), 7 concrete route URLs, 12 service helpers, schema additions, lifecycle states, AI_TOOLS_REGISTRY.md requirement, mobile guidance specifics — plus the original design-only invariants (no migrations, no new tables, no AI tools, no i18n drift).
   - No app code changed. No schema. No migration. No i18n. No AI tools. No routes.
-  - Original commit `fc064a6` is preserved in history; the amendment is a new commit so the iteration is visible.
+  - Original commit `fc064a6` preserved; Amendment 1 commit `fd59cf9` preserved; Amendment 2 is a new commit so iteration is visible.
 
 ## Build 09 amended — design lock highlights (for v1.4 reference)
 
@@ -38,19 +38,20 @@ Git/code is the source of truth.
 ### Canvas library (locked)
 **Cytoscape.js + cytoscape-dagre.** ~60 KB gzipped, vanilla JS, purpose-built for node-edge graphs. Cycle detection + topological sort + dagre auto-layout out of the box. Lazy-loaded only on `/projects/{id}/sandbox` route so Timeline page payload unchanged.
 
-### v1.4 sub-build sequence (locked, 8 builds)
+### v1.4 sub-build sequence (locked, **9 builds** — Amendment 2 added 06 + 09)
 | # | Build | Scope | Risk |
 |---|---|---|---|
-| v1.4-01 | Schema + Module Library + admin module list page | Low |
+| v1.4-01 | Schema + Module Library + admin module list + seed 6 system templates | Low |
 | v1.4-02 | Schedule Engine (pure Python, ~30 fixture assertions, no UI) | Medium |
 | v1.4-03 | Static Canvas Renderer (read-only Cytoscape.js render) | Medium |
-| v1.4-04 | Module Palette + Drag-to-Add (no edges yet) | Medium-high |
-| v1.4-05 | Connect Nodes (drag handles + cycle detection) | **High** |
-| v1.4-06 | Node Property Panel (right-panel state transition) | Medium |
-| v1.4-07 | Apply to Project Plan (audit row + Q2 refuse path) | **High** |
-| v1.4-08 | Save as Template + AI tools (3 new: list/apply template, apply sandbox) | Medium |
+| v1.4-04 | Module Palette + Add/Edit Nodes | Medium-high |
+| v1.4-05 | Connect Nodes (drag handles + cycle detection; property-panel fallback ships either way) | **High** |
+| **v1.4-06** | **Canvas Interaction Hardening** (Tidy + duration bins + warning banner + read-only applied snapshots) — Amendment 2 | Medium |
+| v1.4-07 | Apply to Project Plan (10-step transaction; 4 preconditions including active-blocker check) | **High** |
+| v1.4-08 | Save as Template + AI tools (3 new: list_timeline_templates / apply_timeline_template / apply_sandbox_to_project) | Medium |
+| **v1.4-09** | **Release Hardening** — version bump 1.3.x → 1.4.0, scenario contract runner, roll-up regression, AI_TOOLS_REGISTRY.md update | Medium |
 
-Total v1.4 Sandbox surface: 4 migrations, 7 new tables, ~12 crud helpers, 3 AI tools, ~150 test assertions across 8 plan-first execution slices.
+Total v1.4 Sandbox surface: 4 migrations, 7 new tables, ~14 crud helpers, 3 implemented AI tools + 2 deferred AI tools documented in registry, ~170 test assertions across 9 plan-first execution slices.
 
 ### 10 PRD open questions — locked answers
 | # | Locked answer |
@@ -93,7 +94,8 @@ Cross-project resource allocation; factory capacity; AI-generated plans; real-ti
 | 08 — Timeline Updates / History | shipped | `3ab1dc8` |
 | Project-delete FK fix (cross-cutting) | shipped | `b8a9687` |
 | 09 — Planning Sandbox Design (original) | shipped | `fc064a6` |
-| **09 amended — Engineering response to PRD** | **shipped this session** | latest |
+| 09 amended — Engineering response to PRD | shipped | `fd59cf9` |
+| **09 amended again — Codex V14 additions folded in** | **shipped this session** | latest |
 | 10 — v1.3.0 Release Hardening | **next** | — |
 
 ## Next step — Build 10 (v1.3.0 Release Hardening)

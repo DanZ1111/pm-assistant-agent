@@ -1,12 +1,44 @@
 # v1.3 Build 09 — Planning Sandbox Engineering Design (design-only)
 
-> **Status:** Amended 2026-06-06. This document is the **engineering response** to the Planning Sandbox PRD (captured verbatim in Appendix A). The PRD is the canonical product vision; this doc is the canonical engineering plan that satisfies it.
+> **Status:** Amended twice on 2026-06-06. This document is the **engineering response** to the Planning Sandbox PRD (captured verbatim in Appendix A). The PRD is the canonical product vision; this doc is the canonical engineering plan that satisfies it.
 >
-> Build 09 ships **zero code, zero schema, zero migrations, zero routes, zero UI**. Build 09's deliverable is this document. v1.4 implements it across 8 sub-builds.
+> Build 09 ships **zero code, zero schema, zero migrations, zero routes, zero UI**. Build 09's deliverable is this document. v1.4 implements it across **9 sub-builds**.
+>
+> **Amendment 2 (2026-06-06):** folded in additions from Codex's `V14_PLANNING_SANDBOX_IMPLEMENTATION_PLAN.md` — see §"Amendment 2 note" below.
 
 ---
 
-## Amendment note (2026-06-06)
+## Amendment 2 note (2026-06-06)
+
+Codex produced an independent v1.4 implementation plan (`V14_PLANNING_SANDBOX_IMPLEMENTATION_PLAN.md`) that strongly agrees with the locks in Amendment 1 (visual canvas, draft/apply separation, server-authoritative graph, explicit Apply, no live mutation before Apply, 4 height bins, top-to-bottom orientation, finish_to_start-only edges, one sandbox per project). It adds engineering rigor in 15 specific places — all folded into this revision:
+
+| # | Codex addition | Where it lands |
+|---|---|---|
+| 1 | "No active blocker on existing phases" as an Apply precondition | §6 Q2 + §12 |
+| 2 | 10-step Apply transaction sequence | §12 |
+| 3 | Apply modal content spec (node count, total days, planned start [default today], computed end, launch update toggle, replacement warning) | §12 |
+| 4 | Semantic soft warnings (packaging-before-design, production-before-sample, terminal not launch-like, missing deliverable/exit_criteria/owner, very-long-node) | §12 |
+| 5 | Hard error "edge crosses sandbox boundary" | §12 |
+| 6 | Concrete route URLs for every endpoint | §13 |
+| 7 | 12-helper service-layer checklist | §13 |
+| 8 | Mobile guidance (canvas horizontal scroll, property panel as drawer) | §14 |
+| 9 | New v1.4 sub-build 06 "Canvas Interaction Hardening" — Tidy + duration bins + warning banner + read-only applied snapshots | §4 (8 → 9 sub-builds) |
+| 10 | New v1.4 sub-build 09 "Release Hardening" — version bump + scenario contract runner | §4 |
+| 11 | `phase_type` column on `planning_sandbox_nodes` (not just module library) | §2 |
+| 12 | `created_at` / `updated_at` on `planning_module_library` | §2 |
+| 13 | `updated_project_planned_launch_date` boolean on `planning_apply_events` | §2 |
+| 14 | Explicit sandbox lifecycle: draft → applied → archived (snapshots remain readable) | §6 Q9 + §2 |
+| 15 | `AI_TOOLS_REGISTRY.md` must be updated before v1.4 release | §4 (v1.4-09) |
+
+Items NOT folded in (because Amendment 1 already covered them or made a different, deliberate choice):
+
+- Canvas library lock (Cytoscape.js + cytoscape-dagre). Codex's plan leaves library choice open; Amendment 1's choice stands.
+- 1:1 PRD §28 Q1–Q10 mapping with rationale. Codex's "Locked Product Decisions" table is shorter; Amendment 1's per-question rationale stays.
+- Backend Honesty Mapping per-element table. Codex requires it before each sub-build; Amendment 1 also delivers the full canvas-element table here.
+
+---
+
+## Amendment 1 note (2026-06-06)
 
 The original Build 09 doc (shipped at commit `fc064a6`) targeted a form-based editor with sandbox state persisted directly on the project. After PRD review with ChatGPT, the user clarified that the actual product is a **visual workflow canvas with explicit draft/apply separation** — closer to XMind/Miro than a form editor.
 
@@ -116,20 +148,23 @@ CREATE TABLE planning_module_library (
     module_key             VARCHAR PRIMARY KEY,           -- 'design', 'prototype', etc.
     title                  VARCHAR NOT NULL,
     category               VARCHAR NOT NULL,              -- PRODUCT / FACTORY / COMMERCIAL
+    phase_type             VARCHAR NOT NULL,              -- design / engineering / prototype / review / production / launch / packaging / compliance / asset
     default_duration_days  INTEGER NOT NULL,
     default_owner_role     VARCHAR NULL,                  -- pm / designer / engineer / factory / null
     default_deliverable    TEXT NULL,
     default_exit_criteria  TEXT NULL,
     description            TEXT NULL,
     is_active              BOOLEAN NOT NULL DEFAULT 1,
-    sort_order             INTEGER NOT NULL DEFAULT 0
+    sort_order             INTEGER NOT NULL DEFAULT 0,
+    created_at             DATETIME NOT NULL,             -- Amendment 2: admin may edit modules over time; honest audit
+    updated_at             DATETIME NOT NULL
 );
 
 CREATE TABLE planning_sandboxes (
     id                          INTEGER PRIMARY KEY,
-    project_id                  INTEGER NOT NULL UNIQUE REFERENCES projects(id),  -- Lock Q9: one per project
+    project_id                  INTEGER NOT NULL REFERENCES projects(id),  -- NOT unique (Amendment 2: applied/archived snapshots remain readable)
     name                        VARCHAR NOT NULL,
-    status                      VARCHAR NOT NULL DEFAULT 'draft',   -- draft / applied / archived
+    status                      VARCHAR NOT NULL DEFAULT 'draft',   -- draft / applied / archived (Amendment 2: lifecycle made explicit)
     base_template_key           VARCHAR NULL,                       -- the template this sandbox was cloned from, if any
     created_by_user_id          INTEGER NULL REFERENCES users(id),
     created_at                  DATETIME NOT NULL,
@@ -138,6 +173,12 @@ CREATE TABLE planning_sandboxes (
     applied_by_user_id          INTEGER NULL REFERENCES users(id),
     last_computed_total_days    INTEGER NULL                        -- cached schedule estimate; recomputed server-side
 );
+-- Lock Q9: only ONE 'draft' sandbox per project. Applied/archived
+-- snapshots may coexist for forensic read access. Enforce via partial
+-- unique index on PostgreSQL; on SQLite, enforce via service-layer
+-- guard in crud.create_sandbox.
+CREATE UNIQUE INDEX uq_planning_sandboxes_one_draft
+    ON planning_sandboxes(project_id) WHERE status = 'draft';
 CREATE INDEX ix_planning_sandboxes_project ON planning_sandboxes(project_id);
 
 CREATE TABLE planning_sandbox_nodes (
@@ -145,13 +186,17 @@ CREATE TABLE planning_sandbox_nodes (
     sandbox_id             INTEGER NOT NULL REFERENCES planning_sandboxes(id),
     module_key             VARCHAR NULL REFERENCES planning_module_library(module_key),  -- nullable for bespoke nodes
     title                  VARCHAR NOT NULL,
+    category               VARCHAR NULL,                  -- Amendment 2: carried from module; used for Library color/grouping
+    phase_type             VARCHAR NOT NULL,              -- Amendment 2: carried from module so Apply can set ProjectPhase.phase_type
     duration_days          INTEGER NOT NULL CHECK (duration_days > 0),
     owner_role             VARCHAR NULL,
     deliverable            TEXT NULL,
     exit_criteria          TEXT NULL,
     x_position             REAL NOT NULL DEFAULT 0,
     y_position             REAL NOT NULL DEFAULT 0,
-    sort_order             INTEGER NOT NULL DEFAULT 0
+    sort_order             INTEGER NOT NULL DEFAULT 0,
+    created_at             DATETIME NOT NULL,
+    updated_at             DATETIME NOT NULL
 );
 CREATE INDEX ix_planning_sandbox_nodes_sandbox ON planning_sandbox_nodes(sandbox_id);
 
@@ -181,15 +226,20 @@ Reserved for tweaks that surface during the Connect Nodes build (e.g., `planning
 
 ```sql
 CREATE TABLE planning_apply_events (
-    id                 INTEGER PRIMARY KEY,
-    project_id         INTEGER NOT NULL REFERENCES projects(id),
-    sandbox_id         INTEGER NOT NULL REFERENCES planning_sandboxes(id),
-    applied_at         DATETIME NOT NULL,
-    applied_by_user_id INTEGER NULL REFERENCES users(id),
-    snapshot_json      JSON NOT NULL,    -- full graph at apply time; debugging + rollback reference
-    phases_created     INTEGER NOT NULL DEFAULT 0,
-    phases_updated     INTEGER NOT NULL DEFAULT 0,
-    phases_deleted     INTEGER NOT NULL DEFAULT 0
+    id                                    INTEGER PRIMARY KEY,
+    project_id                            INTEGER NOT NULL REFERENCES projects(id),
+    sandbox_id                            INTEGER NOT NULL REFERENCES planning_sandboxes(id),
+    applied_at                            DATETIME NOT NULL,
+    applied_by_user_id                    INTEGER NULL REFERENCES users(id),
+    snapshot_json                         JSON NOT NULL,            -- full graph at apply time; debugging + rollback reference
+    node_count                            INTEGER NOT NULL DEFAULT 0,  -- Amendment 2: surfaced for Timeline History badge
+    total_days                            INTEGER NOT NULL DEFAULT 0,  -- Amendment 2: computed estimate at apply time
+    planned_start_date                    DATE NOT NULL,            -- Amendment 2: the start date the PM picked on Apply
+    computed_end_date                     DATE NOT NULL,            -- Amendment 2: planned_start_date + total_days
+    updated_project_planned_launch_date   BOOLEAN NOT NULL DEFAULT 0,  -- Amendment 2: did Apply touch the project's launch date?
+    phases_created                        INTEGER NOT NULL DEFAULT 0,
+    phases_updated                        INTEGER NOT NULL DEFAULT 0,
+    phases_deleted                        INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX ix_planning_apply_events_project ON planning_apply_events(project_id, applied_at DESC);
 ```
@@ -275,27 +325,30 @@ Subsequent v1.4 builds use Cytoscape unless a Decision log entry overrides.
 
 ---
 
-## 4. v1.4 sub-build sequence (locked, 8 builds)
+## 4. v1.4 sub-build sequence (locked, 9 builds)
+
+Amendment 2: sequence expanded from 8 to 9 builds. Added a dedicated **Canvas Interaction Hardening** slice (06) between Node Property Panel and Apply, and a **Release Hardening** slice (09) at the end. Original Apply (was 07) and Save-as-Template (was 08) shift to 07 and 08 in the new numbering.
 
 | # | Build | Scope | Migration | Risk | Why this slice |
 |---|---|---|---|---|---|
-| **v1.4-01** | Schema + Module Library | 4 tables + seed ~20 module rows. Admin-only `/admin/modules` read-only list. NO canvas. | 007 | Low | Schema is load-bearing; isolate. |
-| **v1.4-02** | Schedule Engine | Pure Python `crud.compute_sandbox_schedule(sandbox_id)`. Topological sort + earliest-start propagation. ~30 assertions, fixture sandboxes. NO UI. | — | Medium | Correctness locked before any UI consumes it. Standalone testable. |
-| **v1.4-03** | Static Canvas Renderer | Read-only canvas at `/projects/{id}/sandbox` using Cytoscape.js. Nodes + edges + duration-bin visual. NO drag, NO module palette, NO edits. | — | Medium | Visual rendering decoupled from interaction risk. |
-| **v1.4-04** | Module Palette + Drag-to-Add | Right-panel library, draggable. Drop creates a node with default values. Node position persisted. NO edges yet (edges from v1.4-05). | 008 (placeholder) | Medium-high | Most contained drag interaction. |
-| **v1.4-05** | Connect Nodes | Drag from connection handle to create edge. Cycle detection at edit time (rejects with inline error). | — | High | The hard UI build. |
-| **v1.4-06** | Node Property Panel | Right-panel state transition: library ↔ properties when a node is selected. Edit title/duration/owner/deliverable/exit_criteria. Live schedule recompute on duration change. | — | Medium | Naturally follows v1.4-05 once nodes are selectable. |
-| **v1.4-07** | Apply to Project Plan | Explicit confirm dialog. Server-side commit creates/updates `ProjectPhase` rows from sandbox graph (copy-down). Refuses if any phase has `actual_start_date` (Q2 lock). Writes `planning_apply_events` row. Build 08 Timeline History gains a new "Plan Applied" event bucket. | 009 | High | Touches real project data. |
-| **v1.4-08** | Save as Template | Convert a sandbox to a template via modal. AI tools `list_timeline_templates` + `apply_timeline_template` land here. Seed 6 system templates. | 010 | Medium | Reverse of v1.4-07 + AI registry update. |
+| **v1.4-01** | Schema + Module Library | 4 tables + seed ~20 module rows. Admin-only `/admin/modules` read-only list. Seed 6 system templates. NO canvas. | 007 + 010 (templates seeded early so v1.4-03 can render from them) | Low | Schema is load-bearing; isolate. |
+| **v1.4-02** | Schedule Engine | Pure Python `crud.compute_sandbox_schedule(sandbox_id)`. Topological sort + earliest-start propagation. ~30 assertions, fixture sandboxes covering linear / parallel / multi-parent / disconnected / cycle-rejection / missing-node-edge / duration validation cases. NO UI. | — | Medium | Correctness locked before any UI consumes it. Standalone testable. |
+| **v1.4-03** | Static Canvas Renderer | Read-only canvas at `/projects/{id}/sandbox` using Cytoscape.js. Renders nodes + edges + duration-bin visual + estimate + warnings from the v1.4-02 server output. Sandbox created from blank/template; create flow must NOT mutate `project_phases`. NO drag, NO module palette, NO edits. | — | Medium | Visual rendering decoupled from interaction risk. |
+| **v1.4-04** | Module Palette + Add/Edit Nodes | Right-panel library, draggable. Drop creates a node with module defaults. Edit node fields via property panel. Position persistence. Delete node (and its edges via cascade). Sandbox-only invariant test. | 008 (placeholder) | Medium-high | Most contained drag interaction. |
+| **v1.4-05** | Connect Nodes | Dependency creation + deletion. Drag-handle edge creation **if feasible**; property-panel dependency editing (multi-select) **must ship even if drag handles are deferred**. Cycle detection enforced server-side. Cross-sandbox edge rejection. | — | High | The hard UI build. Property-panel fallback is the contract; drag handles are the polish. |
+| **v1.4-06** | Canvas Interaction Hardening (**NEW — Codex addition**) | One-click **Tidy** layout via cytoscape-dagre. 4 discrete duration bins (S/M/L/XL) finalized. Warning banner (disconnected branches, semantic soft warnings). Empty/loading/error states. **Read-only applied-snapshot behavior** (`status='applied'` sandboxes cannot be edited). | — | Medium | Polish slice between interaction and Apply. Reduces v1.4-07 risk by separating UI concerns. |
+| **v1.4-07** | Apply to Project Plan | Explicit confirm dialog with the 6 modal fields (§12). Server-side commit creates/updates `ProjectPhase` rows from sandbox graph (copy-down, including `phase_type`). Refuses on the 4 active-execution checks (§12). Writes `planning_apply_events` row including `updated_project_planned_launch_date` flag. Build 08 Timeline History gains a new "Plan Applied" event bucket. | 009 | High | Touches real project data. |
+| **v1.4-08** | Save as Template | Convert a sandbox to a reusable template via modal. Template ownership rules: system templates immutable; user templates editable by creator + admin. Template picker (v1.4-03) gains user templates. | (uses 010 already shipped in v1.4-01) | Medium | Reverse of v1.4-07. |
+| **v1.4-09** | Release Hardening (**NEW — Codex addition**) | Version bump `1.3.x → 1.4.0`. Roll up v1.4 CHANGELOG. Scenario contract runner: end-to-end test that creates a sandbox from each of the 6 system templates, edits it, applies it, verifies project plan state. i18n parity check. Migration count + seed invariants check. **`AI_TOOLS_REGISTRY.md` must document the v1.4 AI tool surface** (`list_timeline_templates`, `apply_timeline_template`, `apply_sandbox_to_project`, plus deferred `explain_sandbox_estimate` and `propose_sandbox_edits`). Roll-up regression: v1.3 release baseline + all `test_v14_buildNN.py`. | — | Medium | Closes the v1.4 series cleanly. |
 
 Total v1.4 Sandbox surface:
-- **4 migrations** (007–010).
+- **4 migrations** (007 + 008 placeholder + 009 + 010, with 010 seeded early in v1.4-01).
 - **~7 new tables.**
-- **~12 new crud helpers** across the 8 sub-builds.
-- **3 new AI tools** (`list_timeline_templates`, `apply_timeline_template`, `apply_sandbox_to_project`).
-- **~150 test assertions** across 8 test files (~18 avg per build).
+- **~12 new crud helpers** (see §13 for the enumerated list).
+- **3 implemented AI tools** + 2 deferred AI tools documented in registry.
+- **~170 test assertions** across 9 test files (~19 avg per build, plus scenario contract runner in v1.4-09).
 
-Each sub-build follows the project's plan-first execution pattern (`V14_BUILD0N_EXECUTION_PLAN.md` written and committed before any code).
+Each sub-build follows the project's plan-first execution pattern (`V14_BUILD0N_EXECUTION_PLAN.md` written and committed before any code), and each must include a Backend Honesty Mapping section per Codex's standing rule.
 
 ---
 
@@ -341,15 +394,19 @@ Once a sandbox exists, the picker is hidden; user lands directly on the canvas.
 
 **Locked: Replace draft only; never silently overwrite execution data.**
 
+Apply preconditions (**Amendment 2:** active-blocker check added per Codex):
+- Every existing `ProjectPhase.actual_start_date IS NULL`.
+- Every existing `ProjectPhase.actual_end_date IS NULL`.
+- No existing `ProjectPhase.status` is `in_progress`, `done`, or any other execution-active value.
+- **No active `ProjectBlocker` is attached to any existing phase** (Build 07B integration — an open blocker means the team has flagged this plan as actively in-flight).
+
 Apply behavior:
-- If every existing `ProjectPhase.actual_start_date IS NULL`: replace all phases with the sandbox graph. Write `planning_apply_events` row with `phases_deleted=N, phases_created=M`.
-- If ANY phase has `actual_start_date IS NOT NULL`: refuse with explicit error message. Offer two paths: (a) "Archive these advanced phases first" (manual admin action), or (b) "Append new sandbox phases AFTER the advanced ones" (Phase B feature, deferred to v1.4-07b).
+- All four preconditions pass: replace all phases with the sandbox graph. Write `planning_apply_events` row with `phases_deleted=N, phases_created=M`.
+- Any precondition fails: refuse with explicit error message + the specific failing condition. Offer the manual path "Archive these phases / resolve these blockers first." No "append after advanced phases" mode in v1.4 (deferred).
 
-For v1.4-07's first ship: only (a) is supported. Path (b) becomes a v1.5 candidate if PMs request.
+**Rationale:** PRD §20 explicitly says: *"Avoid silently overwriting active execution data."* Codex's plan adds the active-blocker check, which catches the case where execution hasn't started yet but the team has already flagged blockers — that plan is in active discussion and should not be silently replaced.
 
-**Rationale:** PRD §20 explicitly says: *"Avoid silently overwriting active execution data."* The conservative rule prevents data loss.
-
-**Locks/unlocks:** Apply route returns a structured `{ok:false, error:'phases_in_progress', advanced_phase_ids:[...]}` so the UI can render the explanation. Test coverage in v1.4-07 must include the refuse path.
+**Locks/unlocks:** Apply route returns a structured `{ok:false, error:'preconditions_failed', failing:[...]}` where `failing` enumerates which precondition(s) tripped, so the UI can show specifics. Test coverage in v1.4-07 must include four refuse paths: started-phase, completed-phase, active-status-phase, active-blocker.
 
 ### Q3. Client / server / both graph computation?
 
@@ -428,13 +485,18 @@ A soft-warning banner ("This sandbox has 2 disconnected branches — they will r
 
 ### Q9. One sandbox per project or multiple drafts?
 
-**Locked: One per project for v1.4 first release.**
+**Locked: One ACTIVE DRAFT per project for v1.4. Applied and archived snapshots may coexist for read access.** (Amendment 2: lifecycle made explicit per Codex.)
 
-`UNIQUE(project_id)` on `planning_sandboxes` enforces. Multiple drafts deferred to v1.5+ if PMs report they need scenario comparison.
+Lifecycle:
+- `draft` — the active editable sandbox. Partial unique index enforces ≤ 1 per project (`WHERE status='draft'`).
+- `applied` — a snapshot of the sandbox at Apply time. Read-only; cannot be edited (v1.4-06 enforces UI side). Multiple may exist per project (every Apply produces one).
+- `archived` — a manually archived applied snapshot. Hidden from the default sandbox view but discoverable via Timeline History → "Plan Applied" event drill-down.
 
-**Rationale:** Avoid the "which draft is canonical" UX trap. Single sandbox = clean Apply semantics. PRD §28 lists this as an open question precisely because it's a known UX tradeoff; the conservative answer is one.
+`UNIQUE INDEX ... WHERE status='draft'` enforces the "one active draft" rule. Multiple snapshots for forensic / "what plan did we approve in March?" review are allowed and read-only.
 
-**Locks/unlocks:** Apply replaces the in-place sandbox's contents on next edit; previous-graph history is captured in `planning_apply_events.snapshot_json` for forensic review only, not for "switch back to draft" UX.
+**Rationale:** Codex's plan correctly observes that the v1.4 lifecycle is more nuanced than "one row per project." Forensic readback of historical applied plans is valuable for retrospectives. Banning multiple drafts avoids the UX trap; allowing read-only snapshots adds value at zero risk.
+
+**Locks/unlocks:** Apply transitions the current draft to `status='applied'` AND creates a new draft (or stays in applied-only mode until the PM clicks "Start New Sandbox"). Decision deferred to v1.4-07 implementation plan: the simpler path is "Apply leaves the sandbox in applied state; clicking Open Sandbox after Apply offers 'Start fresh' or 'Clone applied as new draft'." Locked in v1.4-07's plan-first execution.
 
 ### Q10. Global templates only or project-specific?
 
@@ -536,9 +598,146 @@ If any of the above lands in v1.4, it's a Lock violation — revert + open a new
 | **2026-06-06** | **AMENDMENT: visual canvas + draft/apply separation locked** (PRD-driven) | **ChatGPT-shaped PRD made clear the product is a visual workflow editor with explicit Apply, not a form-based directly-persisted editor. Original Build 09 Q4 "persisted on project itself" FLIPPED. v1.4 sequence expanded from 4 to 8 sub-builds to match UI complexity.** |
 | **2026-06-06** | **Cytoscape.js + cytoscape-dagre chosen for canvas rendering** | Vanilla JS, ~60 KB, cycle detection + topological sort + dagre layout out of the box. Avoids forcing React into a Jinja2 codebase. |
 | **2026-06-06** | **All 10 PRD §28 open questions locked with defaults** (per user direction) | See §6 above for question-by-question rationale. Future v1.4 implementer can override with a new dated Decision log row. |
-| **2026-06-06** | **v1.4 sub-build sequence locked at 8 builds** | Schema → schedule engine → static render → drag-to-add → connect → property panel → apply → save-as-template. Each its own plan-first execution. |
+| **2026-06-06** | **v1.4 sub-build sequence locked at 8 builds** (superseded by Amendment 2 — now 9 builds) | Schema → schedule engine → static render → drag-to-add → connect → property panel → apply → save-as-template. Each its own plan-first execution. |
+| **2026-06-06 (Amendment 2)** | **Folded Codex's V14 implementation plan additions** | Active-blocker check on Apply; 10-step Apply transaction; Apply modal content spec; semantic soft warnings; "edge crosses sandbox boundary" hard error; route URL list; 12-helper service-layer checklist; mobile guidance; v1.4-06 Canvas Hardening + v1.4-09 Release Hardening as new slices (8 → 9 builds); `phase_type` on sandbox_nodes; `created_at`/`updated_at` on module library; `updated_project_planned_launch_date` on apply_events; explicit `draft`/`applied`/`archived` lifecycle with partial unique index; AI_TOOLS_REGISTRY.md requirement before v1.4 release. See §"Amendment 2 note" at top of doc for the full table. |
 
 Updates to design require a new dated row above + an updated section, not a silent rewrite.
+
+---
+
+## 12. Apply detailed semantics (Amendment 2 — Codex addition)
+
+### 12.1 Hard validation errors (block Apply outright)
+
+If any of these are present, the graph is invalid; Apply refuses with a `{ok:false, error:'<code>', detail:'...'}` response. The sandbox is allowed to remain in this state (PMs sketch; validation runs on Save Draft / Apply, not on every edit), but Apply will not proceed.
+
+| Error code | Trigger | Detail in response |
+|---|---|---|
+| `zero_nodes` | Sandbox has no nodes when Apply is invoked | Sandbox is empty |
+| `circular_dependency` | DAG check finds a cycle | List of node ids on the offending cycle |
+| `missing_title` | Any node has empty/whitespace `title` | List of offending node ids |
+| `invalid_duration` | Any node has `duration_days <= 0` | List of offending node ids |
+| `dangling_edge` | Edge `from_node_id` or `to_node_id` references a deleted/missing node | List of offending edge ids |
+| `cross_sandbox_edge` | Edge connects nodes from different sandboxes (data corruption) | List of offending edge ids (immediate alert) |
+
+### 12.2 Soft warnings (visible but do not block Apply)
+
+These render as a warning banner above the canvas + as severity chips on the affected nodes/edges. Apply proceeds; the PM acknowledges by clicking Apply.
+
+| Warning code | Trigger | Suggested message |
+|---|---|---|
+| `disconnected_branch` | Graph has ≥2 connected components | "This sandbox has N disconnected branches — they will run in parallel from day 0." |
+| `very_long_duration` | Any node has `duration_days > 60` | "Node '{title}' is {N} days long — consider splitting." |
+| `terminal_not_launch_like` | Any terminal node's `phase_type` is not in `('launch', 'production', 'review')` | "Workflow ends at '{title}' — is that the real launch step?" |
+| `packaging_before_design` | A `phase_type='packaging'` node has zero upstream `phase_type='design'` ancestors | "'{title}' (packaging) is not downstream of any design phase." |
+| `production_before_sample` | A `phase_type='production'` node has zero upstream `phase_type IN ('prototype','review')` ancestors | "'{title}' (production) is not downstream of a sample-approval phase." |
+| `missing_owner` | Any node has NULL `owner_role` | "Node '{title}' has no owner assigned." |
+| `missing_deliverable` | Any node has NULL `deliverable` | "Node '{title}' has no deliverable defined." |
+| `missing_exit_criteria` | Any node has NULL `exit_criteria` | "Node '{title}' has no exit criteria defined." |
+
+The semantic warnings (`packaging_before_design`, `production_before_sample`, `terminal_not_launch_like`) catch the common "I forgot a step" mistake without forcing the PM to follow a rigid sequence.
+
+### 12.3 Apply preconditions (active-execution refusal)
+
+These check the **existing project state**, not the sandbox. Apply refuses if any precondition fails, with response `{ok:false, error:'preconditions_failed', failing:[...]}` enumerating the specific checks:
+
+| Precondition code | Check |
+|---|---|
+| `phase_has_actual_start` | Any `ProjectPhase.actual_start_date IS NOT NULL` |
+| `phase_has_actual_end` | Any `ProjectPhase.actual_end_date IS NOT NULL` |
+| `phase_active_status` | Any `ProjectPhase.status IN ('in_progress', 'done')` |
+| `active_blocker_attached` | Any `ProjectBlocker` row where `status='active'` AND `phase_id IS NOT NULL` (Amendment 2 — Codex addition) |
+
+### 12.4 Apply confirm modal contents
+
+When the PM clicks "Apply" on a valid graph, the modal shows:
+
+| Field | Value source |
+|---|---|
+| **Node count** | `len(sandbox_nodes)` |
+| **Total estimated days** | `compute_sandbox_schedule(sandbox).total_days` |
+| **Planned start date** | Date input, defaults to today; PM can override |
+| **Computed end date** | `planned_start_date + total_days` (live recompute as PM changes start date) |
+| **Update project planned_launch_date?** | Checkbox; default OFF. If ON, sets `Project.planned_launch_date = computed_end_date`. |
+| **Warning** | "Existing planning phases (N) will be replaced with the sandbox phases (M)." Lists the existing phase names that will be deleted. |
+
+### 12.5 Apply transaction sequence (10 steps)
+
+When the PM confirms:
+
+1. **Recompute** the sandbox schedule server-side from the persisted graph (don't trust client-cached values).
+2. **Open DB transaction.**
+3. **Re-check all preconditions** (between modal open and Confirm click, state may have changed). Refuse if any fail.
+4. **Delete only untouched existing phases.** `DELETE FROM project_phases WHERE project_id=? AND actual_start_date IS NULL AND status='not_started'`. (The preconditions in §12.3 guarantee this covers ALL existing phases when preconditions pass.)
+5. **Create new `ProjectPhase` rows** from sandbox nodes in topological / computed order. Copy-down: `phase_name=node.title`, `phase_type=node.phase_type`, `phase_order=topological index`, `owner=resolve(node.owner_role)`, `notes=node.deliverable + ' / ' + node.exit_criteria` (concat for now; v1.5 may split).
+6. **Set planned dates** on each new phase: `planned_start_date = Apply.planned_start_date + node.computed_start_day`, `planned_end_date = planned_start_date + node.duration_days`.
+7. **Update `Project.planned_launch_date`** ONLY if the PM checked the modal toggle. Otherwise leave it alone.
+8. **Update sandbox.** Set `status='applied'`, `applied_at=now()`, `applied_by_user_id=current_user.id`. The applied snapshot remains readable; see Q9.
+9. **Insert `planning_apply_events` row** with `snapshot_json` = full graph at apply time, `node_count`, `total_days`, `planned_start_date`, `computed_end_date`, `updated_project_planned_launch_date` flag, `phases_created=M`, `phases_deleted=N`, `phases_updated=0` (we delete + insert, not update).
+10. **Call `crud.write_change()`** with `change_type='plan_applied'`, summary = `"Plan applied from sandbox: {N} phases over {total_days} days, launching {computed_end_date}"`. Build 08 Timeline History reads this via the existing `project_changes` source PLUS the new `planning_apply_events` source — see §5 Backend Honesty Mapping.
+
+Commit transaction. Redirect PM to project detail page (the new phases are now visible in the existing Detailed Table + Command Center).
+
+---
+
+## 13. Routes and service-layer helpers (Amendment 2 — Codex addition)
+
+### 13.1 Page + interaction routes
+
+| Method | URL | Purpose | Permission |
+|---|---|---|---|
+| GET | `/projects/{project_id}/sandbox` | Render the sandbox page (or template picker if no sandbox exists) | All authenticated |
+| POST | `/projects/{project_id}/sandbox/create` | Create sandbox from blank or template — body: `{template_key: optional}` | `can_edit_project` |
+| POST | `/projects/{project_id}/sandbox/{sandbox_id}/apply` | Apply the sandbox to the project plan (§12) | `can_edit_project` + Apply preconditions |
+| POST | `/projects/{project_id}/sandbox/{sandbox_id}/save-template` | Save current sandbox as a reusable template | `can_edit_project` |
+| POST | `/projects/{project_id}/sandbox/{sandbox_id}/nodes` | Create node — body: `{module_key, title, duration_days, x_position, y_position, ...}` | `can_edit_project` + sandbox is `draft` |
+| POST | `/projects/{project_id}/sandbox/{sandbox_id}/nodes/{node_id}/update` | Edit node fields | `can_edit_project` + sandbox is `draft` |
+| POST | `/projects/{project_id}/sandbox/{sandbox_id}/nodes/{node_id}/position` | Update `x_position`, `y_position` (frequent endpoint; lightweight) | `can_edit_project` + sandbox is `draft` |
+| POST | `/projects/{project_id}/sandbox/{sandbox_id}/nodes/{node_id}/delete` | Delete node + its edges (cascade) | `can_edit_project` + sandbox is `draft` |
+| POST | `/projects/{project_id}/sandbox/{sandbox_id}/edges` | Create edge — body: `{from_node_id, to_node_id}`. Cycle check, cross-sandbox check, finish_to_start dep type. | `can_edit_project` + sandbox is `draft` |
+| POST | `/projects/{project_id}/sandbox/{sandbox_id}/edges/{edge_id}/delete` | Delete edge | `can_edit_project` + sandbox is `draft` |
+
+All sandbox-mutating routes refuse on `status IN ('applied','archived')` to enforce read-only snapshots (Q9).
+
+### 13.2 Service-layer helpers (`app/crud.py`)
+
+12 helpers; thin routes delegate to these. Every mutating helper writes its own audit (via `write_change()` or by writing to `planning_apply_events`).
+
+| Helper | Signature sketch | Purpose |
+|---|---|---|
+| `create_sandbox_blank` | `(db, project_id, user_id) -> Sandbox` | Empty sandbox |
+| `create_sandbox_from_template` | `(db, project_id, template_key, user_id) -> Sandbox` | Clone template's nodes + edges |
+| `list_modules` | `(db, *, active_only=True) -> list[Module]` | Module library (read) |
+| `list_templates` | `(db, user, include_user_templates=True) -> list[Template]` | System + user templates filtered by visibility |
+| `create_sandbox_node` | `(db, sandbox_id, data, user_id) -> Node` | Add node from module defaults or bespoke |
+| `update_sandbox_node` | `(db, node_id, data, user_id) -> Node` | Edit allowlisted fields |
+| `update_sandbox_node_position` | `(db, node_id, x, y) -> Node` | Position-only update (no `updated_at` bump on parent) |
+| `delete_sandbox_node` | `(db, node_id, user_id) -> bool` | Cascade-deletes attached edges |
+| `create_sandbox_edge` | `(db, sandbox_id, from_id, to_id, user_id) -> Edge` | Validates same-sandbox + no-cycle |
+| `delete_sandbox_edge` | `(db, edge_id, user_id) -> bool` | Plain delete |
+| `compute_sandbox_schedule` | `(db, sandbox_id) -> dict` | Schedule engine (§"Schedule engine" hooks); pure Python |
+| `validate_sandbox_for_apply` | `(db, sandbox_id) -> dict` | Returns `{hard_errors: [...], soft_warnings: [...]}` from §12.1 + §12.2 |
+| `apply_sandbox_to_project` | `(db, sandbox_id, planned_start_date, update_launch, user_id) -> ApplyEvent` | The 10-step transaction in §12.5 |
+| `save_sandbox_as_template` | `(db, sandbox_id, name, description, user_id) -> Template` | Reverse of `create_sandbox_from_template` |
+
+(14 helpers total; "12" in Codex's plan undercounted by 2 once `update_node_position` and `validate_sandbox_for_apply` were broken out.)
+
+---
+
+## 14. Mobile guidance (Amendment 2 — Codex addition)
+
+Canvas rendering and editing on mobile/tablet are real use cases (PM checks a sandbox on the factory floor). The canvas does NOT need to be full desktop-grade, but must remain usable.
+
+| Surface | Mobile treatment |
+|---|---|
+| Canvas | Horizontal scroll allowed when the dagre layout exceeds viewport width. Pinch-zoom enabled via Cytoscape's default gesture handling. Minimum touch target: 44×44 px (Apple HIG). |
+| Module library panel | Collapsed by default on viewports ≤ 768px. Tap "Library" button to slide it in as a drawer over the canvas. Tap-outside to dismiss. |
+| Node property panel | Same drawer treatment when a node is selected. Stacked vertically: title → duration → owner → deliverable → exit criteria → "Depends on" multi-select → Delete. |
+| Apply confirm modal | Vertical layout, fields stack one per line, "Confirm" button is full-width at the bottom of the modal. PM can still tap the toggle for "Update launch date". |
+| Tidy button | Visible in the top toolbar; tap to run dagre layout. |
+| Drag handles for edge creation | Deferred on mobile (Lock Q5's fallback rule). Property-panel multi-select is the mobile dependency-creation path. |
+
+Test coverage in v1.4-03 / v1.4-04 / v1.4-06 must include Playwright screenshots at 390×844 (iPhone 13) and 768×1024 (iPad portrait).
 
 ---
 
