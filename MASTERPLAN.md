@@ -3303,6 +3303,20 @@ Per Build 09 design lock (`V13_BUILD09_PLANNING_SANDBOX_DESIGN.md`):
 - **v1.4-08** Save as Template + 3 AI tools.
 - **v1.4-09** Release Hardening (version bump 1.4.0; scenario contract runner; `AI_TOOLS_REGISTRY.md` updated for sandbox tools).
 
+### v1.4.0 — Planning Sandbox Release ✓ SHIPPED v1.4.0
+
+Release-hardening build: `test_v14_build09.py`.
+
+What shipped:
+- Planning Sandbox graph schema + module library + six seeded system templates.
+- Server-authoritative sandbox schedule engine.
+- Project-facing Cytoscape canvas with module palette, node editing, dependency editing, Tidy, warning states, and read-only applied snapshots.
+- Explicit Apply to Timeline flow with active-execution refusal and `planning_apply_events` audit records.
+- Save Workflow as Template flow with private user templates.
+- Scenario contract runner covering all six system templates from create/edit/save through Apply.
+
+No new migration in release hardening. v1.4 schema changes are migrations 007, 009, and 010; migration 008 remains intentionally unused.
+
 ---
 
 ## Requirements (Build 1)

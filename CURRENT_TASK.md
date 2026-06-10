@@ -523,3 +523,54 @@ Build 08 verification:
 Next step:
 - Stop and report Build 08. Do not continue to Build 09 until the user explicitly asks.
 - Likely next sandbox build: v1.4 Build 09 — Release Hardening, version bump to v1.4.0, scenario/PM workflow regression, AI registry roll-up, i18n parity, and full v1.4 regression sweep.
+
+## v1.4 Build 09 completed in working tree
+
+- `V14_BUILD09_EXECUTION_PLAN.md` — new release-hardening execution plan with Architecture Review, Feature Design Review, Backend Honesty Mapping, scenario contract test plan, and acceptance criteria.
+- `app/version.py` — bumped runtime to:
+  - `CURRENT_VERSION = "1.4.0"`
+  - `CURRENT_BUILD_NAME = "v1.4.0 — Planning Sandbox Release (v1.4 Builds 01-09)"`
+  - `LAST_UPDATED = "2026-06-10"`
+- `VERSION.md` — added v1.4.0 release section and updated current-version header/status.
+- `CHANGELOG.md` — added v1.4.0 rollup and cleared Unreleased.
+- `USER_GUIDE.md` — added concise v1.4 Planning Sandbox workflow summary.
+- `MASTERPLAN.md` — marked v1.4.0 Planning Sandbox Release shipped and summarized shipped scope.
+- `AI_TOOLS_REGISTRY.md` — documented planned/deferred sandbox AI surface:
+  - `list_timeline_templates`
+  - `apply_timeline_template`
+  - `apply_sandbox_to_project`
+  - `save_sandbox_as_template`
+  - `explain_sandbox_estimate`
+  - `propose_sandbox_edits`
+  - no `app/ai/tools.py` handler was added.
+- `test_v14_build09.py` — new v1.4 release-proof scenario contract runner:
+  - checks runtime/docs/registry/test inventory/i18n/migration markers,
+  - verifies 24+ module seeds and exactly six system templates,
+  - runs all six system templates through create sandbox → edit first node → persist position → save user template → prove no `project_phases` before Apply → Apply → verify phases/apply event/history.
+- `test_v13_build10.py` — relaxed runtime-version assertions so the v1.3 release proof remains valid after v1.4.0.
+
+Build 09 intentionally does **not** add:
+- migrations,
+- sandbox behavior changes,
+- UI redesign,
+- AI handlers,
+- new product features.
+
+Build 09 verification:
+- `python3 -m py_compile test_v14_build09.py test_v13_build10.py app/version.py` — PASS.
+- `git diff --check` — PASS before final handoff; rerun before commit.
+- `python3 test_v14_build09.py` — 15/15 PASS.
+- `python3 test_v14_build08.py` — 22/22 PASS, run with localhost network access.
+- `python3 test_v14_build07.py` — 26/26 PASS, run with localhost network access.
+- `python3 test_v14_build06.py` — 17/17 PASS, run with localhost network access.
+- `python3 test_v14_build05.py` — 24/24 PASS, run with localhost network access.
+- `python3 test_v14_build04.py` — 26/26 PASS, run with localhost network access.
+- `python3 test_v14_build03.py` — 16/16 PASS.
+- `python3 test_v14_build02.py` — 9/9 PASS.
+- `python3 test_v14_build01.py` — 23/23 PASS.
+- `python3 test_v13_build10.py` — 51/51 PASS, run with localhost network access.
+- `python3 test_build_v121.py` — 19/19 PASS.
+
+Next step:
+- Stop and report Build 09. v1.4.0 is code-complete in the working tree.
+- Do not continue into post-v1.4 work until the user explicitly asks.

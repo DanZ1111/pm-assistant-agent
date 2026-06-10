@@ -1,9 +1,46 @@
 # PM Product Tracker — Version
 
-**Current Version:** v1.3.0
-**Current Build:** v1.3.0 — Project Detail Command Center (v1.3 Builds 01-09 + Planning Sandbox design lock)
-**Status:** v1.1.0 released; v1.2.0 released; v1.2.1 released; v1.3.0 released
-**Last Updated:** 2026-06-06
+**Current Version:** v1.4.0
+**Current Build:** v1.4.0 — Planning Sandbox Release (v1.4 Builds 01-09)
+**Status:** v1.1.0 released; v1.2.0 released; v1.2.1 released; v1.3.0 released; v1.4.0 released
+**Last Updated:** 2026-06-10
+
+## What's new in v1.4.0
+
+v1.4.0 turns the v1.3 Planning Sandbox design into a real PM planning surface.
+PMs can create a draft workflow canvas from a blank start or a system template,
+add and edit workflow modules, connect dependencies, auto-tidy the graph,
+review server-computed schedule warnings, apply an approved sandbox to the live
+Timeline through an explicit confirmation flow, and save useful workflows as
+private reusable templates.
+
+- **Schema + module library (Build 01)** — adds isolated sandbox graph tables,
+  reusable planning modules, and six seeded system templates. The live project
+  Timeline remains untouched.
+- **Server schedule engine (Build 02)** — computes DAG order, start/end days,
+  total duration, hard errors, and soft PM warnings from sandbox nodes/edges.
+- **Static canvas renderer (Build 03)** — introduces the project-facing
+  Planning Sandbox page with lazy-loaded Cytoscape rendering.
+- **Module palette + node editing (Build 04)** — PM/admin users can add modules,
+  drag nodes, edit node properties, persist positions, and delete draft nodes.
+- **Dependency editing (Build 05)** — PM/admin users can define node
+  prerequisites, with server-side cycle and cross-sandbox protection.
+- **Canvas hardening (Build 06)** — adds Tidy layout, duration bins, warning
+  polish, empty/loading states, and read-only applied snapshots.
+- **Apply to Timeline (Build 07)** — explicitly converts a valid draft sandbox
+  into live project phases, refusing active execution and writing
+  `planning_apply_events` audit rows.
+- **Save Workflow as Template (Build 08)** — saves draft/applied sandbox graphs
+  as private user templates visible to the creator and admins.
+- **Release hardening (Build 09)** — bumps the app to v1.4.0, documents the
+  sandbox AI surface as planned/deferred, and adds a scenario contract runner
+  that exercises all six system templates from creation through Apply.
+
+Migrations 007, 009, and 010 are the v1.4 data changes. Migration 008 remains
+intentionally unused. v1.4 keeps sandbox draft data separate from live
+`project_phases` until a PM/admin explicitly confirms Apply.
+
+i18n bundle reaches 805/805 EN/zh parity at the v1.4.0 lock.
 
 ## What's new in v1.3.0
 

@@ -8,6 +8,6 @@ When bumping the version: update these three constants AND VERSION.md AND
 add a CHANGELOG entry. The canonical mapping lives in VERSION.md.
 """
 
-CURRENT_VERSION = "1.3.0"
-CURRENT_BUILD_NAME = "v1.3.0 — Project Detail Command Center (v1.3 Builds 01-09 + Planning Sandbox design lock)"
-LAST_UPDATED = "2026-06-06"
+CURRENT_VERSION = "1.4.0"
+CURRENT_BUILD_NAME = "v1.4.0 — Planning Sandbox Release (v1.4 Builds 01-09)"
+LAST_UPDATED = "2026-06-10"

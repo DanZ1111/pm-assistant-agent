@@ -77,7 +77,12 @@ The original 16 schemas landed in Build 20. Build 26 added `update_idea`; Build 
 | Tool | Purpose | Permission | Confirmation | Target Build |
 |---|---|---|---|---|
 | `change_project_status(project_id, new_status, reason)` | Dedicated tool for the operationally consequential status flip | auth + `can_edit_project` | YES — mandatory reason + confirm | 21+ (replaces using `update_project_field` for `status`) |
+| `list_timeline_templates` | List visible system/user Planning Sandbox templates | auth; template visibility filtered by system/creator/admin | No — read-only | planned after v1.4 manual UI |
+| `apply_timeline_template` | Create a draft sandbox from a visible template | auth + `can_edit_project` + template visibility | YES | planned after v1.4 manual UI |
+| `apply_sandbox_to_project` | Apply a valid Planning Sandbox to live project phases | auth + `can_edit_project` + active-execution preconditions | YES — explicit Apply confirmation required | planned after v1.4 manual UI |
 | `save_sandbox_as_template` | Save the current planning sandbox graph as a reusable workflow template | auth + `can_edit_project` + visible sandbox relationship | YES — user confirmation required | deferred after v1.4 manual UI |
+| `explain_sandbox_estimate` | Explain schedule duration, warnings, and critical path from sandbox graph | auth + project visibility | No — read-only | deferred |
+| `propose_sandbox_edits` | Suggest node/dependency edits for a Planning Sandbox | auth + `can_edit_project` | YES before any write | deferred |
 | ~~`add_rendering_note(file_id, note)`~~ | Superseded by `update_file_comment` (Build 18) | — | — | ✓ shipped Build 18 |
 | ~~`add_prototype_photo_note(file_id, note)`~~ | Superseded by `update_file_comment` (Build 18) | — | — | ✓ shipped Build 18 |
 

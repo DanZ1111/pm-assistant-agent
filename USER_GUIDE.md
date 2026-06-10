@@ -6,6 +6,26 @@ This is a structured product project tracker for knife and product development. 
 
 ---
 
+## What's new in v1.4.0
+
+v1.4 adds the **Planning Sandbox**: a visual workflow canvas for planning a
+project timeline before it becomes the live Timeline.
+
+- Start from a blank canvas or one of six system workflow templates.
+- Add product-development modules, edit owners/durations/deliverables, and
+  connect dependencies.
+- Use **Tidy** to clean up the graph and review schedule warnings before
+  committing anything.
+- Apply a sandbox to the live Timeline only through an explicit confirmation
+  panel. The app refuses Apply when existing phases already show active
+  execution.
+- Save a useful workflow as a private template and reuse it on future projects.
+
+The key safety rule: sandbox edits do **not** change live project phases until
+you confirm **Apply to Timeline**.
+
+---
+
 ## v1.2.1 速览
 
 v1.2.1 是一个工作流打磨 + 新部门入驻解锁版。重点更新：

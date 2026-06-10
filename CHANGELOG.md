@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- No unreleased changes after v1.4.0 release hardening.
+
+## v1.4.0 — Planning Sandbox Release
+_2026-06-10_
+
+v1.4.0 turns the Planning Sandbox from a design lock into a usable PM planning
+surface. PMs can start from six seeded workflow templates or a blank canvas,
+add/edit workflow modules, connect dependencies, review server-computed schedule
+warnings, tidy the graph, explicitly Apply a valid sandbox into the live
+Timeline, and save useful workflows as private reusable templates. Sandbox draft
+edits stay isolated from `project_phases` until Apply is confirmed. Release
+hardening adds `test_v14_build09.py`, a scenario contract runner that exercises
+all six system templates through create/edit/save/apply/history verification;
+bumps runtime/docs to v1.4.0; preserves v1.2.1 and v1.3.0 release-proof
+markers; and documents the sandbox AI tool surface as planned/deferred.
+
 - **v1.4 Build 08 — Save Workflow as Template.** Adds the reusable template loop for Planning Sandbox without changing live project timelines. PM/admin users can save draft or applied sandbox snapshots as private user templates through a compact Save as Template panel; archived sandboxes cannot be saved. Saved templates copy sandbox nodes and dependency edges into the existing `planning_templates`, `planning_template_nodes`, and `planning_template_edges` tables, generate unique service-owned template keys, and become available immediately in the picker under My Templates. System templates remain immutable; user templates are visible to their creator and admins only; viewers see no dead Save/Create mutation affordances. Template creation from private user templates is permission-filtered, while admins can create from user templates. Adds `list_planning_templates_for_user`, `save_sandbox_as_template`, `POST /projects/{project_id}/sandbox/{sandbox_id}/save-template`, grouped template picker UI, a planned/deferred AI registry row, `test_v14_build08.py`, and 14 EN/zh labels, bringing i18n parity to 805/805. No migration, no template edit/delete UI, no Apply changes, no AI handler, and no `project_phases` mutation.
 - **v1.4 Build 07 — Planning Sandbox Apply to Timeline.** Adds the explicit audited bridge from draft sandbox to live project phases. PM/admin users can apply a valid draft sandbox through a confirmation panel with node count, total days, start/end dates, launch-date toggle, and replacement warning. Apply is refused for invalid graphs, zero-node sandboxes, non-draft snapshots, active phase blockers, actual phase dates, or active statuses including `in_progress`, `done`, and `delayed`; skipped phases without actual dates can be replaced and are shown in the warning. Successful Apply deletes untouched not-started/skipped phases, creates new phases from the server-computed topological schedule, optionally updates the project launch date, marks the sandbox applied/read-only, writes `planning_apply_events`, writes a `plan_applied` project change, and surfaces a plan-applied card in Timeline History. Adds migration 009, `PlanningApplyEvent`, `test_v14_build07.py`, and 16 EN/zh labels, bringing i18n parity to 791/791. No Save Template route, AI tools, multi-draft support, partial active-plan merge, or `phase_plan_changes` rows.
 - **v1.4 Build 06 — Planning Sandbox Canvas Interaction Hardening.** Makes the sandbox canvas feel like a real planning workspace while keeping all mutations sandbox-only. Adds duration-based node sizing, clearer hard/soft warning chips, editable/read-only empty states, snapshot read-only handling, and a Tidy Canvas action that lays out the draft graph and persists node positions through a new bulk position route. Applied snapshots can be inspected through `?sandbox_id=...` but cannot be mutated. The route/service layer still does not add Apply, Save Template, AI behavior, migrations, or live `project_phases` writes. Adds `V14_BUILD06_EXECUTION_PLAN.md`, `test_v14_build06.py`, 9 EN/zh labels, and desktop/mobile sandbox-hardening screenshots; i18n parity is 775/775.
