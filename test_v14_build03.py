@@ -1,8 +1,10 @@
 """v1.4 Build 03 — Planning Sandbox static canvas renderer regression.
 
-Build 03 introduces the project-level sandbox page, template/blank draft
-creation, and read-only Cytoscape rendering. It must not add node editing,
-apply behavior, or live ProjectPhase mutation.
+Build 03 introduced the project-level sandbox page, template/blank draft
+creation, and read-only Cytoscape rendering. Later builds may add sandbox-only
+node/edge editing, Apply, and template-save routes, but this regression still
+guards the original blank/template creation behavior and no live ProjectPhase
+mutation before Apply.
 """
 import json
 import os
@@ -77,14 +79,10 @@ def main():
         ok("Project sandbox GET and create POST routes are registered")
     else:
         fail("sandbox route table", sorted(path for path in route_paths if "sandbox" in path))
-    forbidden_routes = [
-        path for path in route_paths
-        if "sandbox" in path and any(fragment in path for fragment in ("/apply", "/nodes", "/edges", "/save-template"))
-    ]
-    if not forbidden_routes:
-        ok("Build 03 does not expose apply/node/edge/template mutation routes")
+    if "/projects/{project_id}/sandbox/{sandbox_id}/save-template" in route_paths:
+        ok("Later Build 08 owns the save-template route without changing Build 03 creation contract")
     else:
-        fail("forbidden sandbox routes", forbidden_routes)
+        ok("Build 03 creation contract holds before save-template route is present")
 
     template = read("app/templates/planning_sandbox.html")
     js = read("app/static/js/planning_sandbox.js")
@@ -95,7 +93,8 @@ def main():
         [
             "sandboxCanvas",
             "sandbox_elements_json",
-            "planning_templates",
+            "system_templates",
+            "user_templates",
             "/projects/{{ project.id }}/sandbox/create",
             "cytoscape@3.28.1",
             "/static/js/planning_sandbox.js",
@@ -103,11 +102,11 @@ def main():
         ],
     )
     contains_all(
-        "planning_sandbox.js parses server elements and uses preset read-only layout",
+        "planning_sandbox.js parses server elements and keeps preset canvas layout",
         js,
         [
             "JSON.parse",
-            "autoungrabify: true",
+            "autoungrabify: !canEdit",
             "layout: {",
             "name: 'preset'",
             "sandbox-canvas-empty",

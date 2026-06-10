@@ -1215,6 +1215,7 @@
                   {% elif event.subtype == 'rendering' %}<span class="timeline-history-subtype-badge">{{ t('timeline.history_event_rendering_update') }}</span>
                   {% elif event.subtype == 'packaging' %}<span class="timeline-history-subtype-badge">{{ t('timeline.history_event_packaging_update') }}</span>
                   {% elif event.subtype == 'cost' %}<span class="timeline-history-subtype-badge">{{ t('timeline.history_event_cost_update') }}</span>
+                  {% elif event.subtype == 'plan_applied' %}<span class="timeline-history-subtype-badge">{{ t('history.plan_applied') }}</span>
                   {% elif event.subtype %}<span class="timeline-history-subtype-badge">{{ event.subtype }}</span>
                   {% endif %}
                   {% if event.is_ai %}<span class="timeline-history-ai-badge" title="{{ t('timeline.history_ai_badge') }}"><i class="bi bi-robot"></i></span>{% endif %}

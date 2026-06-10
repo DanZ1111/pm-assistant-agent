@@ -54,6 +54,9 @@ class Project(Base):
     planning_sandboxes = relationship("PlanningSandbox", back_populates="project",
                                       cascade="all, delete-orphan",
                                       order_by="PlanningSandbox.updated_at.desc()")
+    apply_events = relationship("PlanningApplyEvent", back_populates="project",
+                                cascade="all, delete-orphan",
+                                order_by="PlanningApplyEvent.applied_at.desc()")
 
     @property
     def target_factory_cost_display(self) -> str | None:
@@ -409,6 +412,9 @@ class PlanningSandbox(Base):
                          order_by="PlanningSandboxNode.sort_order")
     edges = relationship("PlanningSandboxEdge", back_populates="sandbox",
                          cascade="all, delete-orphan")
+    apply_events = relationship("PlanningApplyEvent", back_populates="sandbox",
+                                cascade="all, delete-orphan",
+                                order_by="PlanningApplyEvent.applied_at.desc()")
 
 
 class PlanningSandboxNode(Base):
@@ -462,6 +468,30 @@ class PlanningSandboxEdge(Base):
     to_node = relationship("PlanningSandboxNode",
                            foreign_keys=[to_node_id],
                            back_populates="incoming_edges")
+
+
+class PlanningApplyEvent(Base):
+    """v1.4 Build 07 — audited bridge from sandbox draft to live phases."""
+    __tablename__ = "planning_apply_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    sandbox_id = Column(Integer, ForeignKey("planning_sandboxes.id"), nullable=False)
+    applied_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    applied_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    snapshot_json = Column(JSON, nullable=False)
+    node_count = Column(Integer, nullable=False, default=0)
+    total_days = Column(Integer, nullable=False, default=0)
+    planned_start_date = Column(Date, nullable=False)
+    computed_end_date = Column(Date, nullable=False)
+    updated_project_planned_launch_date = Column(Boolean, nullable=False, default=False)
+    phases_created = Column(Integer, nullable=False, default=0)
+    phases_updated = Column(Integer, nullable=False, default=0)
+    phases_deleted = Column(Integer, nullable=False, default=0)
+
+    project = relationship("Project", back_populates="apply_events")
+    sandbox = relationship("PlanningSandbox", back_populates="apply_events")
+    applied_by = relationship("User", foreign_keys=[applied_by_user_id])
 
 
 class PlanningTemplate(Base):

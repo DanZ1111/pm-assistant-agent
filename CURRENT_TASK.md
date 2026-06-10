@@ -480,3 +480,46 @@ Remaining known state:
   - viewers do not see dead Save/Create buttons,
   - AI registry is updated, but no `app/ai/tools.py` handler is added.
 - Do not implement Build 08 code until the user approves this plan.
+
+## v1.4 Build 08 completed in working tree
+
+- Plan-first commit was created before implementation:
+  - `6ab43bd Plan v1.4 Build 08 save workflow templates`
+- `app/crud.py` — added:
+  - `list_planning_templates_for_user`
+  - `_template_key_slug`
+  - `_unique_template_key`
+  - `save_sandbox_as_template`
+  - `create_sandbox_from_template` now filters private user templates by creator/admin visibility.
+- `app/routes/projects.py` — sandbox GET now uses filtered template visibility and passes grouped template data plus `can_save_template`; added:
+  - `POST /projects/{project_id}/sandbox/{sandbox_id}/save-template`
+- `app/templates/planning_sandbox.html` — template picker now groups System Templates and My Templates; user templates show a badge; editable draft/applied sandboxes show a compact Save as Template panel; viewers do not see Save/Create mutation affordances.
+- `app/static/css/styles.css` — added grouped template-picker and save-template-panel styling.
+- `app/i18n/en.json` / `app/i18n/zh.json` — added exactly 14 Build 08 keys; parity is now 805/805.
+- `AI_TOOLS_REGISTRY.md` — added planned/deferred `save_sandbox_as_template` row; no AI handler was added.
+- `test_v14_build08.py` — new Build 08 regression with service, visibility, route, i18n, and browser smoke coverage.
+- `test_v14_build03.py` / `test_v14_build07.py` — refreshed stale forward-looking assertions so earlier build regressions allow Build 08's legitimate route and later i18n key count while still proving their own invariants.
+- `CHANGELOG.md` — added Build 08 Unreleased note.
+
+Build 08 intentionally does **not** add:
+- migrations,
+- template edit/delete UI,
+- project-scoped templates,
+- Apply behavior changes,
+- live `project_phases` writes,
+- `planning_apply_events` writes,
+- AI chat handler,
+- multiple draft sandbox support.
+
+Build 08 verification:
+- `python3 -m py_compile app/crud.py app/routes/projects.py test_v14_build08.py test_v14_build03.py` — PASS.
+- `git diff --check` — PASS before changelog/handoff update; rerun before commit.
+- `python3 test_v14_build08.py` — 22/22 PASS, run with localhost network access.
+- `python3 test_v14_build07.py` — 26/26 PASS, run with localhost network access.
+- `python3 test_v14_build06.py` — 17/17 PASS, run with localhost network access.
+- `python3 test_v14_build03.py` — 16/16 PASS.
+- `python3 test_build_v121.py` — 19/19 PASS.
+
+Next step:
+- Stop and report Build 08. Do not continue to Build 09 until the user explicitly asks.
+- Likely next sandbox build: v1.4 Build 09 — Release Hardening, version bump to v1.4.0, scenario/PM workflow regression, AI registry roll-up, i18n parity, and full v1.4 regression sweep.

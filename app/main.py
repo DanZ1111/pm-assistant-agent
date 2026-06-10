@@ -91,9 +91,13 @@ def _static_asset_version() -> str:
     """Cache-bust first-party CSS/JS when static files change.
 
     The human app version can stay stable during a rescue patch, but browsers
-    still need a new URL when styles.css or main.js changes.
+    still need a new URL when first-party CSS or JS changes.
     """
-    static_paths = ("app/static/css/styles.css", "app/static/js/main.js")
+    static_paths = (
+        "app/static/css/styles.css",
+        "app/static/js/main.js",
+        "app/static/js/planning_sandbox.js",
+    )
     latest_mtime = 0
     for path in static_paths:
         try:

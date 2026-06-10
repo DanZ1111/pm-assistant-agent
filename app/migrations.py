@@ -143,6 +143,10 @@ MIGRATIONS = [
         lambda eng: _create_planning_sandbox_core(eng),
     ),
     (
+        "009_v1_4_create_planning_apply_events",
+        lambda eng: _create_planning_apply_events(eng),
+    ),
+    (
         "010_v1_4_create_planning_templates",
         lambda eng: _create_planning_templates(eng),
     ),
@@ -544,6 +548,40 @@ def _create_planning_templates(engine):
         ))
 
     _seed_system_planning_templates(engine)
+
+
+def _create_planning_apply_events(engine):
+    """v1.4 Build 07 — structured audit for sandbox Apply operations."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    with engine.begin() as conn:
+        if "planning_apply_events" not in tables:
+            conn.execute(text(
+                "CREATE TABLE planning_apply_events ("
+                "  id INTEGER PRIMARY KEY,"
+                "  project_id INTEGER NOT NULL REFERENCES projects(id),"
+                "  sandbox_id INTEGER NOT NULL REFERENCES planning_sandboxes(id),"
+                "  applied_at TIMESTAMP NOT NULL,"
+                "  applied_by_user_id INTEGER NULL REFERENCES users(id),"
+                "  snapshot_json JSON NOT NULL,"
+                "  node_count INTEGER NOT NULL DEFAULT 0,"
+                "  total_days INTEGER NOT NULL DEFAULT 0,"
+                "  planned_start_date DATE NOT NULL,"
+                "  computed_end_date DATE NOT NULL,"
+                "  updated_project_planned_launch_date BOOLEAN NOT NULL DEFAULT FALSE,"
+                "  phases_created INTEGER NOT NULL DEFAULT 0,"
+                "  phases_updated INTEGER NOT NULL DEFAULT 0,"
+                "  phases_deleted INTEGER NOT NULL DEFAULT 0"
+                ")"
+            ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_planning_apply_events_project "
+            "ON planning_apply_events(project_id, applied_at DESC)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_planning_apply_events_sandbox "
+            "ON planning_apply_events(sandbox_id)"
+        ))
 
 
 def _seed_planning_modules(engine):

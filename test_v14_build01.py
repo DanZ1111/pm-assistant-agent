@@ -100,8 +100,8 @@ def main():
             "010_v1_4_create_planning_templates",
         ],
     )
-    if not any(name.startswith("008_v1_4") or name.startswith("009_v1_4") for name in migration_names):
-        ok("Migrations 008 and 009 remain unclaimed for later v1.4 builds")
+    if not any(name.startswith("008_v1_4") for name in migration_names) and "009_v1_4_create_planning_apply_events" in migration_names:
+        ok("Migration 008 remains unclaimed; 009 is claimed by Build 07 Apply audit")
     else:
         fail("reserved migration names", migration_names)
     if len(PLANNING_MODULE_SEEDS) >= 20:
@@ -132,10 +132,10 @@ def main():
             ok("All 7 planning tables exist on a fresh DB")
         else:
             fail("planning tables", f"missing {missing_tables}")
-        if "planning_apply_events" not in tables:
-            ok("planning_apply_events is not created in Build 01")
+        if "planning_apply_events" in tables:
+            ok("planning_apply_events exists after Build 07 migration")
         else:
-            fail("planning_apply_events scope", "table should wait for v1.4 Build 07")
+            fail("planning_apply_events scope", "table should exist once Build 07 is present")
 
         with engine.connect() as conn:
             active_modules = scalar(conn, "SELECT COUNT(*) FROM planning_module_library WHERE is_active = 1")

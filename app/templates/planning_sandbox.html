@@ -9,21 +9,21 @@
       <h1 class="page-title mb-1"><i class="bi bi-diagram-3 me-2"></i>{{ t('sandbox.title') }}</h1>
       <p class="page-subtitle">{{ project.name }} · {{ t('sandbox.subtitle') }}</p>
     </div>
-    {% if sandbox %}
-    <div class="sandbox-summary">
-      <div>
-        <span class="sandbox-summary-label">{{ t('sandbox.estimate') }}</span>
-        <strong>{{ sandbox_payload.schedule.total_days }} {{ t('sandbox.days') }}</strong>
-      </div>
-      <div>
-        <span class="sandbox-summary-label">{{ t('sandbox.nodes') }}</span>
-        <strong>{{ sandbox_payload.schedule.nodes|length }}</strong>
-      </div>
-      <div>
-        <span class="sandbox-summary-label">{{ t('sandbox.warnings') }}</span>
-        <strong>{{ sandbox_payload.schedule.soft_warnings|length }}</strong>
-      </div>
+  {% if sandbox %}
+  <div class="sandbox-summary">
+    <div>
+      <span class="sandbox-summary-label">{{ t('sandbox.estimate') }}</span>
+      <strong><span data-sandbox-total-days>{{ sandbox_payload.schedule.total_days }}</span> {{ t('sandbox.days') }}</strong>
     </div>
+    <div>
+      <span class="sandbox-summary-label">{{ t('sandbox.nodes') }}</span>
+      <strong data-sandbox-node-count>{{ sandbox_payload.schedule.nodes|length }}</strong>
+    </div>
+    <div>
+      <span class="sandbox-summary-label">{{ t('sandbox.warnings') }}</span>
+      <strong data-sandbox-warning-count>{{ sandbox_payload.schedule.soft_warnings|length }}</strong>
+    </div>
+  </div>
     {% endif %}
   </div>
 
@@ -32,9 +32,39 @@
     {% if request.query_params.get('error') == 'not_authorized' %}
       {{ t('sandbox.error_not_authorized') }}
     {% elif request.query_params.get('error') == 'template_not_found' %}
-      {{ t('sandbox.error_template_not_found') }}
+      {{ t('sandbox.template_not_available') }}
     {% else %}
       {{ t('sandbox.error_generic') }}
+    {% endif %}
+  </div>
+  {% endif %}
+  {% if request.query_params.get('template_saved') %}
+  <div class="alert alert-success mx-4">
+    {{ t('sandbox.save_template_success') }}
+  </div>
+  {% endif %}
+  {% if request.query_params.get('save_template_error') %}
+  <div class="alert alert-warning mx-4">
+    {% if request.query_params.get('save_template_error') == 'template_name_required' %}
+      {{ t('sandbox.template_name_required') }}
+    {% else %}
+      {{ t('sandbox.save_template_error') }}
+    {% endif %}
+  </div>
+  {% endif %}
+  {% if request.query_params.get('applied') %}
+  <div class="alert alert-success mx-4">
+    {{ t('sandbox.apply_success') }}
+  </div>
+  {% endif %}
+  {% if request.query_params.get('apply_error') %}
+  <div class="alert alert-warning mx-4">
+    {% if request.query_params.get('apply_error') in ['preconditions_failed'] %}
+      {{ t('sandbox.apply_active_execution') }}
+    {% elif request.query_params.get('apply_error') in ['zero_nodes', 'missing_title', 'invalid_duration', 'dangling_edge', 'cross_sandbox_edge', 'circular_dependency'] %}
+      {{ t('sandbox.apply_invalid_graph') }}
+    {% else %}
+      {{ t('sandbox.apply_error') }}
     {% endif %}
   </div>
   {% endif %}
@@ -54,25 +84,73 @@
       <p class="text-muted">{{ t('sandbox.viewer_picker_hint') }}</p>
       {% endif %}
     </div>
-    <div class="sandbox-template-grid">
-      {% for template in planning_templates %}
-      <div class="sandbox-template-card">
-        <div class="sandbox-template-title">{{ template.name }}</div>
-        <p>{{ template.description }}</p>
-        {% if can_edit %}
-        <form method="post" action="/projects/{{ project.id }}/sandbox/create">
-          <input type="hidden" name="template_key" value="{{ template.template_key }}">
-          <button type="submit" class="btn btn-sm btn-outline-primary">
-            {{ t('sandbox.start_from_template') }}
-          </button>
-        </form>
+    <div class="sandbox-template-library">
+      <section class="sandbox-template-group">
+        <h3>{{ t('sandbox.system_templates') }}</h3>
+        <div class="sandbox-template-grid">
+          {% for template in system_templates %}
+          <div class="sandbox-template-card">
+            <div class="sandbox-template-title">{{ template.name }}</div>
+            <p>{{ template.description }}</p>
+            {% if can_edit %}
+            <form method="post" action="/projects/{{ project.id }}/sandbox/create">
+              <input type="hidden" name="template_key" value="{{ template.template_key }}">
+              <button type="submit" class="btn btn-sm btn-outline-primary">
+                {{ t('sandbox.start_from_template') }}
+              </button>
+            </form>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="sandbox-template-group">
+        <h3>{{ t('sandbox.my_templates') }}</h3>
+        {% if user_templates %}
+        <div class="sandbox-template-grid">
+          {% for template in user_templates %}
+          <div class="sandbox-template-card sandbox-user-template-card">
+            <div class="sandbox-template-title">
+              {{ template.name }}
+              <span class="sandbox-template-badge">{{ t('sandbox.user_template_badge') }}</span>
+            </div>
+            <p>{{ template.description or t('sandbox.template_saved_from') }}</p>
+            {% if can_edit %}
+            <form method="post" action="/projects/{{ project.id }}/sandbox/create">
+              <input type="hidden" name="template_key" value="{{ template.template_key }}">
+              <button type="submit" class="btn btn-sm btn-outline-primary">
+                {{ t('sandbox.start_from_template') }}
+              </button>
+            </form>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="sandbox-empty-template-note">{{ t('sandbox.no_user_templates') }}</p>
         {% endif %}
-      </div>
-      {% endfor %}
+      </section>
     </div>
   </section>
   {% else %}
-  <section class="sandbox-workspace">
+  <section class="sandbox-workspace"
+           data-sandbox-workspace
+           data-project-id="{{ project.id }}"
+           data-sandbox-id="{{ sandbox.id }}"
+           data-can-edit="{% if can_edit %}true{% else %}false{% endif %}"
+           data-payload='{{ sandbox_payload_json | safe }}'
+           data-label-node-saved="{{ t('sandbox.node_saved') }}"
+           data-label-node-error="{{ t('sandbox.node_error') }}"
+           data-label-dependencies-saved="{{ t('sandbox.dependencies_saved') }}"
+           data-label-dependency-error="{{ t('sandbox.dependency_error') }}"
+           data-label-cycle-error="{{ t('sandbox.cycle_error') }}"
+           data-label-delete-edge="{{ t('sandbox.delete_edge') }}"
+           data-label-tidy-saved="{{ t('sandbox.tidy_saved') }}"
+           data-label-tidy-error="{{ t('sandbox.tidy_error') }}"
+           data-label-warning-hard="{{ t('sandbox.warning_hard_label') }}"
+           data-label-warning-soft="{{ t('sandbox.warning_soft_label') }}"
+           data-confirm-delete="{{ t('sandbox.delete_node_confirm') }}">
     <div class="sandbox-canvas-panel">
       <div class="sandbox-canvas-toolbar">
         <div>
@@ -82,42 +160,240 @@
           <span class="text-muted small ms-2">{{ sandbox.base_template_key }}</span>
           {% endif %}
         </div>
-        <span class="text-muted small">{{ t('sandbox.read_only_build') }}</span>
+        <div class="sandbox-toolbar-actions">
+          {% if can_edit %}
+          <span class="text-muted small">{{ t('sandbox.drag_to_canvas') }}</span>
+          <button type="button" class="btn btn-sm btn-outline-primary" data-tidy-canvas title="{{ t('sandbox.tidy_hint') }}">
+            <i class="bi bi-magic me-1"></i>{{ t('sandbox.tidy') }}
+          </button>
+          {% elif sandbox.status != 'draft' %}
+          <span class="text-muted small">{{ t('sandbox.snapshot_view') }}</span>
+          {% else %}
+          <span class="text-muted small">{{ t('sandbox.viewer_read_only') }}</span>
+          {% endif %}
+        </div>
+        <span class="visually-hidden" data-build03-marker="sandbox.read_only_build"></span>
       </div>
-      {% if sandbox_payload.schedule.hard_errors %}
-      <div class="sandbox-warning-strip sandbox-error-strip">
-        <i class="bi bi-exclamation-triangle me-1"></i>
-        {{ t('sandbox.hard_errors') }}:
-        {{ sandbox_payload.schedule.hard_errors | map(attribute='code') | join(', ') }}
-      </div>
-      {% elif sandbox_payload.schedule.soft_warnings %}
-      <div class="sandbox-warning-strip">
-        <i class="bi bi-exclamation-circle me-1"></i>
-        {{ sandbox_payload.schedule.soft_warnings | map(attribute='code') | join(', ') }}
+      {% if can_edit and apply_preview %}
+      <div class="sandbox-apply-card{% if not apply_preview.ok %} sandbox-apply-card-blocked{% endif %}"
+           data-apply-preview
+           data-total-days="{{ apply_preview.total_days }}">
+        {% if apply_preview.ok %}
+        <details class="sandbox-apply-details">
+          <summary class="btn btn-primary sandbox-apply-summary">
+            <i class="bi bi-check2-circle me-1"></i>{{ t('sandbox.apply') }}
+          </summary>
+          <form method="post"
+                action="/projects/{{ project.id }}/sandbox/{{ sandbox.id }}/apply"
+                class="sandbox-apply-form">
+            <div class="sandbox-apply-head">
+              <div>
+                <h3>{{ t('sandbox.apply_confirm_title') }}</h3>
+                <p>{{ t('sandbox.apply_confirm_body') }}</p>
+              </div>
+              <div class="sandbox-apply-metrics">
+                <span><strong>{{ apply_preview.node_count }}</strong> {{ t('sandbox.apply_node_count') }}</span>
+                <span><strong>{{ apply_preview.total_days }}</strong> {{ t('sandbox.apply_total_days') }}</span>
+              </div>
+            </div>
+            <div class="sandbox-apply-grid">
+              <label class="form-label">{{ t('sandbox.apply_start_date') }}
+                <input type="date"
+                       class="form-control"
+                       name="apply_start_date"
+                       value="{{ apply_preview.apply_start_date.isoformat() }}"
+                       data-apply-start-date>
+              </label>
+              <div class="sandbox-apply-end">
+                <span class="sandbox-summary-label">{{ t('sandbox.apply_end_date') }}</span>
+                <strong data-apply-end-date>{{ apply_preview.computed_end_date.isoformat() }}</strong>
+              </div>
+              <label class="sandbox-apply-check">
+                <input type="checkbox" name="update_launch_date" value="1">
+                <span>{{ t('sandbox.apply_update_launch') }}</span>
+              </label>
+            </div>
+            <div class="sandbox-apply-replace">
+              <strong>{{ t('sandbox.apply_replaces') }}</strong>
+              {% if apply_preview.existing_phases %}
+              <ul>
+                {% for phase in apply_preview.existing_phases %}
+                <li>{{ phase.phase_name }}{% if phase.status == 'skipped' %} <span class="badge bg-secondary">skipped</span>{% endif %}</li>
+                {% endfor %}
+              </ul>
+              {% else %}
+              <p>{{ t('sandbox.apply_no_existing_phases') }}</p>
+              {% endif %}
+            </div>
+            <div class="sandbox-apply-actions">
+              <button type="submit" class="btn btn-danger">{{ t('sandbox.apply') }}</button>
+            </div>
+          </form>
+        </details>
+        {% else %}
+        <div class="sandbox-apply-blocked-body">
+          <strong><i class="bi bi-shield-exclamation me-1"></i>{{ t('sandbox.apply_blocked') }}</strong>
+          {% if apply_preview.hard_errors %}
+          <p>{{ t('sandbox.apply_invalid_graph') }}</p>
+          <div class="sandbox-apply-blocked-list">
+            {% for error in apply_preview.hard_errors %}
+            <span class="sandbox-warning-chip">{{ error.code }}</span>
+            {% endfor %}
+          </div>
+          {% elif apply_preview.preconditions %}
+          <p>{{ t('sandbox.apply_active_execution') }}</p>
+          <div class="sandbox-apply-blocked-list">
+            {% for failure in apply_preview.preconditions %}
+            <span class="sandbox-warning-chip">{{ failure.code }}{% if failure.phase_name %}: {{ failure.phase_name }}{% endif %}</span>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p>{{ t('sandbox.apply_error') }}</p>
+          {% endif %}
+        </div>
+        {% endif %}
       </div>
       {% endif %}
+      <div class="sandbox-warning-strip{% if sandbox_payload.schedule.hard_errors %} sandbox-error-strip{% endif %}"
+           data-sandbox-warning-strip
+           {% if not sandbox_payload.schedule.hard_errors and not sandbox_payload.schedule.soft_warnings %}hidden{% endif %}>
+        {% if sandbox_payload.schedule.hard_errors %}
+        <span class="sandbox-warning-label"><i class="bi bi-exclamation-triangle me-1"></i>{{ t('sandbox.warning_hard_label') }}</span>
+        {% for warning in sandbox_payload.schedule.hard_errors %}
+        <span class="sandbox-warning-chip">{{ warning.code }}</span>
+        {% endfor %}
+        {% elif sandbox_payload.schedule.soft_warnings %}
+        <span class="sandbox-warning-label"><i class="bi bi-exclamation-circle me-1"></i>{{ t('sandbox.warning_soft_label') }}</span>
+        {% for warning in sandbox_payload.schedule.soft_warnings %}
+        <span class="sandbox-warning-chip">{{ warning.code }}</span>
+        {% endfor %}
+        {% endif %}
+      </div>
       <div id="sandboxCanvas"
            class="sandbox-canvas"
            data-elements='{{ sandbox_elements_json | safe }}'
-           data-empty-label="{{ t('sandbox.empty_canvas') }}"></div>
+           data-empty-label="{% if can_edit %}{{ t('sandbox.empty_canvas_editable') }}{% else %}{{ t('sandbox.empty_canvas_readonly') }}{% endif %}"></div>
     </div>
     <aside class="sandbox-side-panel">
-      <h2>{{ t('sandbox.details_title') }}</h2>
-      {% if sandbox_payload.schedule.nodes %}
-      <ol class="sandbox-node-list">
-        {% for node in sandbox_payload.schedule.nodes %}
-        <li>
-          <strong>{{ node.title }}</strong>
-          <span>{{ node.duration_days }} {{ t('sandbox.days') }}</span>
-          {% if node.start_day is not none and node.end_day is not none %}
-          <small>{{ t('sandbox.day_range', start=node.start_day, end=node.end_day) }}</small>
-          {% endif %}
-        </li>
-        {% endfor %}
-      </ol>
-      {% else %}
-      <p class="text-muted">{{ t('sandbox.empty_canvas') }}</p>
+      {% if can_save_template %}
+      <details class="sandbox-save-template-card">
+        <summary>
+          <i class="bi bi-bookmark-plus me-1"></i>{{ t('sandbox.save_template') }}
+        </summary>
+        <form method="post"
+              action="/projects/{{ project.id }}/sandbox/{{ sandbox.id }}/save-template"
+              class="sandbox-save-template-form">
+          <div class="sandbox-side-head">
+            <h2>{{ t('sandbox.save_template_title') }}</h2>
+            <p>{{ t('sandbox.save_template_body') }}</p>
+          </div>
+          <label class="form-label">{{ t('sandbox.template_name') }}
+            <input type="text"
+                   class="form-control"
+                   name="template_name"
+                   maxlength="160"
+                   required
+                   value="{{ sandbox.name }}">
+          </label>
+          <label class="form-label">{{ t('sandbox.template_description') }}
+            <textarea class="form-control"
+                      name="template_description"
+                      rows="3"
+                      maxlength="1000">{{ project.name }} · {{ t('sandbox.template_saved_from') }}</textarea>
+          </label>
+          <button type="submit" class="btn btn-outline-primary w-100">
+            {{ t('sandbox.save_template') }}
+          </button>
+        </form>
+      </details>
       {% endif %}
+      <div class="sandbox-palette-panel" data-sandbox-palette>
+        <div class="sandbox-side-head">
+          <h2>{{ t('sandbox.module_library') }}</h2>
+          <p>{{ t('sandbox.module_library_hint') }}</p>
+        </div>
+        {% if not can_edit %}
+        <p class="sandbox-read-only-note">{{ t('sandbox.viewer_read_only') }}</p>
+        {% endif %}
+        <div class="sandbox-module-groups">
+          {% for category, modules in modules_by_category.items() %}
+          <section class="sandbox-module-group">
+            <h3>{{ category }}</h3>
+            {% for module in modules %}
+            <article class="sandbox-module-card"
+                     draggable="{% if can_edit %}true{% else %}false{% endif %}"
+                     data-module-key="{{ module.module_key }}"
+                     data-module-title="{{ module.title }}"
+                     data-module-duration="{{ module.default_duration_days }}"
+                     data-module-category="{{ module.category }}">
+              <div class="sandbox-module-title">{{ module.title }}</div>
+              <div class="sandbox-module-meta">
+                <span>{{ module.default_duration_days }} {{ t('sandbox.days') }}</span>
+                {% if module.default_owner_role %}<span>{{ module.default_owner_role }}</span>{% endif %}
+              </div>
+              {% if module.description %}
+              <p>{{ module.description }}</p>
+              {% elif module.default_deliverable %}
+              <p>{{ module.default_deliverable }}</p>
+              {% endif %}
+              {% if can_edit %}
+              <button type="button" class="btn btn-sm btn-outline-primary sandbox-add-module-btn"
+                      data-module-key="{{ module.module_key }}">
+                {{ t('sandbox.add_module') }}
+              </button>
+              {% endif %}
+            </article>
+            {% endfor %}
+          </section>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="sandbox-property-panel" data-sandbox-properties hidden>
+        <div class="sandbox-side-head">
+          <h2>{{ t('sandbox.node_properties') }}</h2>
+          <p data-node-status>{{ t('sandbox.select_node_hint') }}</p>
+        </div>
+        <p class="sandbox-read-only-note" data-no-node>{{ t('sandbox.no_node_selected') }}</p>
+        <form data-node-form>
+          <input type="hidden" name="node_id" data-node-id>
+          <label class="form-label">{{ t('sandbox.field_title') }}
+            <input type="text" class="form-control" name="title" data-node-title{% if not can_edit %} disabled{% endif %}>
+          </label>
+          <label class="form-label">{{ t('sandbox.field_duration_days') }}
+            <input type="number" min="1" class="form-control" name="duration_days" data-node-duration{% if not can_edit %} disabled{% endif %}>
+          </label>
+          <label class="form-label">{{ t('sandbox.field_owner_role') }}
+            <input type="text" class="form-control" name="owner_role" data-node-owner{% if not can_edit %} disabled{% endif %}>
+          </label>
+          <label class="form-label">{{ t('sandbox.field_deliverable') }}
+            <textarea class="form-control" rows="2" name="deliverable" data-node-deliverable{% if not can_edit %} disabled{% endif %}></textarea>
+          </label>
+          <label class="form-label">{{ t('sandbox.field_exit_criteria') }}
+            <textarea class="form-control" rows="2" name="exit_criteria" data-node-exit{% if not can_edit %} disabled{% endif %}></textarea>
+          </label>
+          {% if can_edit %}
+          <div class="sandbox-property-actions">
+            <button type="submit" class="btn btn-primary">{{ t('sandbox.save_node') }}</button>
+            <button type="button" class="btn btn-outline-danger" data-delete-node>{{ t('sandbox.delete_node') }}</button>
+          </div>
+          {% endif %}
+        </form>
+        <form class="sandbox-dependency-form" data-dependency-form>
+          <label class="form-label">{{ t('sandbox.field_depends_on') }}
+            <select class="form-control" name="depends_on_ids" data-node-dependencies multiple{% if not can_edit %} disabled{% endif %}></select>
+          </label>
+          <p class="sandbox-form-hint" data-dependencies-hint>{{ t('sandbox.depends_on_hint') }}</p>
+          <p class="sandbox-form-hint" data-no-dependency-options hidden>{{ t('sandbox.no_dependency_options') }}</p>
+          {% if can_edit %}
+          <div class="sandbox-property-actions">
+            <button type="submit" class="btn btn-outline-primary">{{ t('sandbox.save_dependencies') }}</button>
+          </div>
+          {% endif %}
+        </form>
+        <div class="sandbox-dependency-list" data-dependency-list></div>
+        <div class="sandbox-node-message" data-node-message hidden></div>
+      </div>
     </aside>
   </section>
   {% endif %}
@@ -127,6 +403,8 @@
 {% block extra_js %}
 {% if sandbox %}
 <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
-<script src="/static/js/planning_sandbox.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dagre@0.8.5/dist/dagre.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.min.js"></script>
+<script src="/static/js/planning_sandbox.js?v={{ STATIC_ASSET_VERSION }}"></script>
 {% endif %}
 {% endblock %}

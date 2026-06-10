@@ -1,13 +1,16 @@
 import os
 import uuid
+import math
+import re
 from datetime import datetime, date, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import func, or_, update
+from sqlalchemy import func, or_, update, desc
 from app.models import (
     Project, ProjectPhase, ProjectFile, ProjectChange, AIMessage,
     ProjectCreationToken, User,
     PlanningModule, PlanningTemplate, PlanningTemplateNode, PlanningTemplateEdge,
-    PlanningSandbox, PlanningSandboxNode, PlanningSandboxEdge,
+    PlanningSandbox, PlanningSandboxNode, PlanningSandboxEdge, PlanningApplyEvent,
+    ProjectBlocker,
 )
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app", "uploads")
@@ -1024,6 +1027,34 @@ def list_planning_templates(db: Session, active_only: bool = True) -> list[Plann
     return q.order_by(PlanningTemplate.sort_order, PlanningTemplate.name).all()
 
 
+def list_planning_templates_for_user(
+    db: Session,
+    user: User | None,
+    active_only: bool = True,
+) -> list[PlanningTemplate]:
+    """Return system templates plus user templates visible to the caller."""
+    system_q = db.query(PlanningTemplate).filter(PlanningTemplate.is_system.is_(True))
+    if active_only:
+        system_q = system_q.filter(PlanningTemplate.is_active.is_(True))
+    system_templates = system_q.order_by(PlanningTemplate.sort_order, PlanningTemplate.name).all()
+
+    user_q = db.query(PlanningTemplate).filter(PlanningTemplate.is_system.is_(False))
+    if active_only:
+        user_q = user_q.filter(PlanningTemplate.is_active.is_(True))
+    if not user:
+        user_templates = []
+    elif user.role == "admin":
+        user_templates = user_q.order_by(desc(PlanningTemplate.created_at), PlanningTemplate.name).all()
+    else:
+        user_templates = (
+            user_q
+            .filter(PlanningTemplate.created_by_user_id == user.id)
+            .order_by(desc(PlanningTemplate.created_at), PlanningTemplate.name)
+            .all()
+        )
+    return system_templates + user_templates
+
+
 def get_planning_template_counts(db: Session) -> dict[int, dict[str, int]]:
     """Return node/edge counts keyed by template id for the admin modules page."""
     node_rows = (
@@ -1052,6 +1083,124 @@ def get_active_planning_sandbox(db: Session, project_id: int) -> PlanningSandbox
         .order_by(PlanningSandbox.updated_at.desc())
         .first()
     )
+
+
+def _get_project_draft_sandbox(
+    db: Session,
+    project_id: int,
+    sandbox_id: int,
+) -> PlanningSandbox:
+    sandbox = (
+        db.query(PlanningSandbox)
+        .filter(PlanningSandbox.id == sandbox_id, PlanningSandbox.project_id == project_id)
+        .first()
+    )
+    if not sandbox:
+        raise ValueError("sandbox_not_found")
+    if sandbox.status != "draft":
+        raise ValueError("sandbox_not_draft")
+    return sandbox
+
+
+def _get_project_sandbox_node(
+    db: Session,
+    project_id: int,
+    sandbox_id: int,
+    node_id: int,
+) -> PlanningSandboxNode:
+    _get_project_draft_sandbox(db, project_id, sandbox_id)
+    node = (
+        db.query(PlanningSandboxNode)
+        .filter(
+            PlanningSandboxNode.id == node_id,
+            PlanningSandboxNode.sandbox_id == sandbox_id,
+        )
+        .first()
+    )
+    if not node:
+        raise ValueError("node_not_found")
+    return node
+
+
+def _get_project_sandbox_edge(
+    db: Session,
+    project_id: int,
+    sandbox_id: int,
+    edge_id: int,
+) -> PlanningSandboxEdge:
+    _get_project_draft_sandbox(db, project_id, sandbox_id)
+    edge = (
+        db.query(PlanningSandboxEdge)
+        .filter(
+            PlanningSandboxEdge.id == edge_id,
+            PlanningSandboxEdge.sandbox_id == sandbox_id,
+        )
+        .first()
+    )
+    if not edge:
+        raise ValueError("edge_not_found")
+    return edge
+
+
+def _parse_node_id_list(node_ids) -> list[int]:
+    if node_ids is None:
+        return []
+    if isinstance(node_ids, str):
+        raw_values = [part for part in node_ids.replace(",", " ").split(" ") if part]
+    else:
+        raw_values = list(node_ids)
+    parsed = []
+    for raw in raw_values:
+        try:
+            node_id = int(raw)
+        except (TypeError, ValueError):
+            raise ValueError("node_not_found")
+        if node_id not in parsed:
+            parsed.append(node_id)
+    return parsed
+
+
+def _validate_sandbox_node_ids(
+    db: Session,
+    sandbox_id: int,
+    node_ids: list[int],
+) -> dict[int, PlanningSandboxNode]:
+    if not node_ids:
+        return {}
+    nodes = (
+        db.query(PlanningSandboxNode)
+        .filter(PlanningSandboxNode.id.in_(node_ids))
+        .all()
+    )
+    node_by_id = {node.id: node for node in nodes}
+    if set(node_ids) - set(node_by_id):
+        raise ValueError("node_not_found")
+    if any(node.sandbox_id != sandbox_id for node in nodes):
+        raise ValueError("cross_sandbox_edge")
+    return node_by_id
+
+
+def _raise_if_sandbox_has_hard_graph_error(db: Session, sandbox_id: int) -> None:
+    schedule = compute_sandbox_schedule(db, sandbox_id, require_nodes=False)
+    hard_errors = schedule.get("hard_errors") or []
+    if not hard_errors:
+        return
+    first_code = hard_errors[0].get("code") or "sandbox_graph_error"
+    raise ValueError(first_code)
+
+
+def _sandbox_duration_bin(duration_days: int | None) -> tuple[str, int]:
+    try:
+        days = int(duration_days or 0)
+    except (TypeError, ValueError):
+        days = 0
+    if days <= 7:
+        return "S", 66
+    if days <= 21:
+        return "M", 82
+    if days <= 45:
+        return "L", 100
+    return "XL", 122
 
 
 def create_sandbox_blank(db: Session, project_id: int, user_id: int | None = None) -> PlanningSandbox:
@@ -1083,20 +1232,23 @@ def create_sandbox_from_template(
     project_id: int,
     template_key: str,
     user_id: int | None = None,
+    user_role: str | None = None,
 ) -> PlanningSandbox:
     """Clone a PlanningTemplate graph into the project's draft sandbox."""
     existing = get_active_planning_sandbox(db, project_id)
     if existing:
         return existing
 
-    template = (
-        db.query(PlanningTemplate)
-        .filter(
-            PlanningTemplate.template_key == template_key,
-            PlanningTemplate.is_active.is_(True),
-        )
-        .first()
+    template_q = db.query(PlanningTemplate).filter(
+        PlanningTemplate.template_key == template_key,
+        PlanningTemplate.is_active.is_(True),
     )
+    if user_role != "admin":
+        template_q = template_q.filter(or_(
+            PlanningTemplate.is_system.is_(True),
+            PlanningTemplate.created_by_user_id == user_id,
+        ))
+    template = template_q.first()
     if not template:
         raise ValueError("template_not_found")
 
@@ -1154,17 +1306,125 @@ def create_sandbox_from_template(
     return sandbox
 
 
+def _template_key_slug(name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", (name or "").strip().lower()).strip("-")
+    return slug[:42] or "template"
+
+
+def _unique_template_key(db: Session, name: str) -> str:
+    slug = _template_key_slug(name)
+    for _ in range(12):
+        candidate = f"{slug}-{uuid.uuid4().hex[:8]}"
+        exists = (
+            db.query(PlanningTemplate.id)
+            .filter(PlanningTemplate.template_key == candidate)
+            .first()
+        )
+        if not exists:
+            return candidate
+    return f"{slug}-{uuid.uuid4().hex}"
+
+
+def save_sandbox_as_template(
+    db: Session,
+    project_id: int,
+    sandbox_id: int,
+    name: str,
+    description: str | None = None,
+    user_id: int | None = None,
+) -> PlanningTemplate:
+    """v1.4 Build 08 — save a draft/applied sandbox graph as a user template."""
+    sandbox = (
+        db.query(PlanningSandbox)
+        .filter(PlanningSandbox.id == sandbox_id, PlanningSandbox.project_id == project_id)
+        .first()
+    )
+    if not sandbox:
+        raise ValueError("sandbox_not_found")
+    if sandbox.status not in ("draft", "applied"):
+        raise ValueError("sandbox_not_templateable")
+
+    template_name = (name or "").strip()
+    if not template_name:
+        raise ValueError("template_name_required")
+    template_name = template_name[:160]
+    template_description = (description or "").strip()[:1000] or None
+    now = datetime.utcnow()
+    max_order = db.query(func.max(PlanningTemplate.sort_order)).scalar() or 0
+    template = PlanningTemplate(
+        template_key=_unique_template_key(db, template_name),
+        name=template_name,
+        description=template_description,
+        is_system=False,
+        created_by_user_id=user_id,
+        is_active=True,
+        created_at=now,
+        updated_at=now,
+        sort_order=max_order + 1,
+    )
+    db.add(template)
+    db.flush()
+
+    node_map: dict[int, PlanningTemplateNode] = {}
+    for sandbox_node in sorted(sandbox.nodes, key=lambda n: (n.sort_order, n.id)):
+        template_node = PlanningTemplateNode(
+            template_id=template.id,
+            module_key=sandbox_node.module_key,
+            title=sandbox_node.title,
+            duration_days=sandbox_node.duration_days,
+            owner_role=sandbox_node.owner_role,
+            deliverable=sandbox_node.deliverable,
+            exit_criteria=sandbox_node.exit_criteria,
+            x_position=sandbox_node.x_position,
+            y_position=sandbox_node.y_position,
+            sort_order=sandbox_node.sort_order,
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(template_node)
+        db.flush()
+        node_map[sandbox_node.id] = template_node
+
+    for sandbox_edge in sandbox.edges:
+        from_node = node_map.get(sandbox_edge.from_node_id)
+        to_node = node_map.get(sandbox_edge.to_node_id)
+        if not from_node or not to_node:
+            continue
+        db.add(PlanningTemplateEdge(
+            template_id=template.id,
+            from_node_id=from_node.id,
+            to_node_id=to_node.id,
+            dependency_type=sandbox_edge.dependency_type,
+            created_at=now,
+        ))
+
+    db.commit()
+    db.refresh(template)
+    return template
+
+
 def get_sandbox_canvas_payload(db: Session, sandbox_id: int) -> dict:
     """Return Cytoscape-friendly read payload for the static canvas."""
     sandbox = db.query(PlanningSandbox).filter(PlanningSandbox.id == sandbox_id).first()
     if not sandbox:
-        return {"sandbox": None, "elements": [], "schedule": compute_sandbox_schedule(db, sandbox_id)}
+        return {
+            "sandbox": None,
+            "elements": [],
+            "modules": _planning_module_payload(db),
+            "schedule": compute_sandbox_schedule(db, sandbox_id),
+        }
 
     schedule = compute_sandbox_schedule(db, sandbox_id, require_nodes=False)
     scheduled_by_id = {node["id"]: node for node in schedule.get("nodes", [])}
+    incoming_by_id: dict[int, list[int]] = {node.id: [] for node in sandbox.nodes}
+    outgoing_by_id: dict[int, list[int]] = {node.id: [] for node in sandbox.nodes}
+    for edge in sandbox.edges:
+        incoming_by_id.setdefault(edge.to_node_id, []).append(edge.from_node_id)
+        outgoing_by_id.setdefault(edge.from_node_id, []).append(edge.to_node_id)
     elements = []
     for node in sandbox.nodes:
         scheduled = scheduled_by_id.get(node.id, {})
+        duration_bin, node_height = _sandbox_duration_bin(node.duration_days)
         elements.append({
             "data": {
                 "id": f"node-{node.id}",
@@ -1172,7 +1432,13 @@ def get_sandbox_canvas_payload(db: Session, sandbox_id: int) -> dict:
                 "label": node.title,
                 "phase_type": node.phase_type,
                 "duration_days": node.duration_days,
+                "duration_bin": duration_bin,
+                "node_height": node_height,
                 "owner_role": node.owner_role or "",
+                "deliverable": node.deliverable or "",
+                "exit_criteria": node.exit_criteria or "",
+                "depends_on_ids": sorted(incoming_by_id.get(node.id, [])),
+                "dependent_ids": sorted(outgoing_by_id.get(node.id, [])),
                 "start_day": scheduled.get("start_day"),
                 "end_day": scheduled.get("end_day"),
                 "warning_codes": scheduled.get("warning_codes", []),
@@ -1190,7 +1456,590 @@ def get_sandbox_canvas_payload(db: Session, sandbox_id: int) -> dict:
                 "dependency_type": edge.dependency_type,
             }
         })
-    return {"sandbox": sandbox, "elements": elements, "schedule": schedule}
+    return {
+        "sandbox": sandbox,
+        "elements": elements,
+        "modules": _planning_module_payload(db),
+        "schedule": schedule,
+    }
+
+
+def _planning_module_payload(db: Session) -> list[dict]:
+    """Return active module library rows for the sandbox palette."""
+    modules = list_planning_modules(db, active_only=True)
+    return [
+        {
+            "module_key": module.module_key,
+            "title": module.title,
+            "category": module.category,
+            "phase_type": module.phase_type,
+            "default_duration_days": module.default_duration_days,
+            "default_owner_role": module.default_owner_role or "",
+            "default_deliverable": module.default_deliverable or "",
+            "default_exit_criteria": module.default_exit_criteria or "",
+            "description": module.description or "",
+            "sort_order": module.sort_order,
+        }
+        for module in modules
+    ]
+
+
+def create_sandbox_node_from_module(
+    db: Session,
+    project_id: int,
+    sandbox_id: int,
+    module_key: str,
+    x_position: float | int | str | None = None,
+    y_position: float | int | str | None = None,
+) -> PlanningSandboxNode:
+    """v1.4 Build 04 — copy one active module into a draft sandbox node."""
+    sandbox = _get_project_draft_sandbox(db, project_id, sandbox_id)
+    module = (
+        db.query(PlanningModule)
+        .filter(
+            PlanningModule.module_key == (module_key or "").strip(),
+            PlanningModule.is_active.is_(True),
+        )
+        .first()
+    )
+    if not module:
+        raise ValueError("module_not_found")
+    try:
+        x = float(x_position) if x_position not in (None, "") else 80.0
+        y = float(y_position) if y_position not in (None, "") else 80.0
+    except (TypeError, ValueError):
+        x, y = 80.0, 80.0
+    if not math.isfinite(x):
+        x = 80.0
+    if not math.isfinite(y):
+        y = 80.0
+
+    max_order = (
+        db.query(func.max(PlanningSandboxNode.sort_order))
+        .filter(PlanningSandboxNode.sandbox_id == sandbox_id)
+        .scalar()
+    )
+    now = datetime.utcnow()
+    node = PlanningSandboxNode(
+        sandbox_id=sandbox.id,
+        module_key=module.module_key,
+        title=module.title,
+        category=module.category,
+        phase_type=module.phase_type,
+        duration_days=module.default_duration_days,
+        owner_role=module.default_owner_role,
+        deliverable=module.default_deliverable,
+        exit_criteria=module.default_exit_criteria,
+        x_position=x,
+        y_position=y,
+        sort_order=(max_order or 0) + 1,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(node)
+    sandbox.updated_at = now
+    db.commit()
+    db.refresh(node)
+    return node
+
+
+def update_sandbox_node(
+    db: Session,
+    project_id: int,
+    sandbox_id: int,
+    node_id: int,
+    data: dict,
+) -> PlanningSandboxNode:
+    """Update editable node fields in a draft sandbox."""
+    node = _get_project_sandbox_node(db, project_id, sandbox_id, node_id)
+    title = (data.get("title") or "").strip()
+    if not title:
+        raise ValueError("title_required")
+    try:
+        duration_days = int(data.get("duration_days"))
+    except (TypeError, ValueError):
+        raise ValueError("invalid_duration")
+    if duration_days <= 0:
+        raise ValueError("invalid_duration")
+
+    node.title = title
+    node.duration_days = duration_days
+    node.owner_role = (data.get("owner_role") or "").strip() or None
+    node.deliverable = (data.get("deliverable") or "").strip() or None
+    node.exit_criteria = (data.get("exit_criteria") or "").strip() or None
+    node.updated_at = datetime.utcnow()
+    node.sandbox.updated_at = node.updated_at
+    db.commit()
+    db.refresh(node)
+    return node
+
+
+def update_sandbox_node_position(
+    db: Session,
+    project_id: int,
+    sandbox_id: int,
+    node_id: int,
+    x_position: float | int | str,
+    y_position: float | int | str,
+) -> PlanningSandboxNode:
+    """Persist a draft sandbox node's canvas position."""
+    node = _get_project_sandbox_node(db, project_id, sandbox_id, node_id)
+    try:
+        x = float(x_position)
+        y = float(y_position)
+    except (TypeError, ValueError):
+        raise ValueError("invalid_position")
+    if not math.isfinite(x) or not math.isfinite(y):
+        raise ValueError("invalid_position")
+    node.x_position = x
+    node.y_position = y
+    node.updated_at = datetime.utcnow()
+    node.sandbox.updated_at = node.updated_at
+    db.commit()
+    db.refresh(node)
+    return node
+
+
+def delete_sandbox_node(
+    db: Session,
+    project_id: int,
+    sandbox_id: int,
+    node_id: int,
+) -> bool:
+    """Delete a draft sandbox node and any attached sandbox-only edges."""
+    node = _get_project_sandbox_node(db, project_id, sandbox_id, node_id)
+    now = datetime.utcnow()
+    sandbox = node.sandbox
+    db.query(PlanningSandboxEdge).filter(
+        PlanningSandboxEdge.sandbox_id == sandbox_id,
+        or_(
+            PlanningSandboxEdge.from_node_id == node_id,
+            PlanningSandboxEdge.to_node_id == node_id,
+        ),
+    ).delete(synchronize_session=False)
+    db.delete(node)
+    sandbox.updated_at = now
+    db.commit()
+    return True
+
+
+def create_sandbox_edge(
+    db: Session,
+    project_id: int,
+    sandbox_id: int,
+    from_node_id: int,
+    to_node_id: int,
+) -> PlanningSandboxEdge:
+    """Create one finish-to-start dependency edge inside a draft sandbox."""
+    sandbox = _get_project_draft_sandbox(db, project_id, sandbox_id)
+    try:
+        from_id = int(from_node_id)
+        to_id = int(to_node_id)
+    except (TypeError, ValueError):
+        raise ValueError("node_not_found")
+    if from_id == to_id:
+        raise ValueError("self_dependency")
+    _validate_sandbox_node_ids(db, sandbox_id, [from_id, to_id])
+
+    existing = (
+        db.query(PlanningSandboxEdge)
+        .filter(
+            PlanningSandboxEdge.sandbox_id == sandbox_id,
+            PlanningSandboxEdge.from_node_id == from_id,
+            PlanningSandboxEdge.to_node_id == to_id,
+        )
+        .first()
+    )
+    if existing:
+        return existing
+
+    now = datetime.utcnow()
+    edge = PlanningSandboxEdge(
+        sandbox_id=sandbox_id,
+        from_node_id=from_id,
+        to_node_id=to_id,
+        dependency_type="finish_to_start",
+        created_at=now,
+    )
+    db.add(edge)
+    sandbox.updated_at = now
+    db.flush()
+    try:
+        _raise_if_sandbox_has_hard_graph_error(db, sandbox_id)
+    except ValueError:
+        db.rollback()
+        raise
+    db.commit()
+    db.refresh(edge)
+    return edge
+
+
+def delete_sandbox_edge(
+    db: Session,
+    project_id: int,
+    sandbox_id: int,
+    edge_id: int,
+) -> bool:
+    """Delete one dependency edge inside a draft sandbox."""
+    edge = _get_project_sandbox_edge(db, project_id, sandbox_id, edge_id)
+    sandbox = edge.sandbox
+    sandbox.updated_at = datetime.utcnow()
+    db.delete(edge)
+    db.commit()
+    return True
+
+
+def replace_sandbox_node_dependencies(
+    db: Session,
+    project_id: int,
+    sandbox_id: int,
+    node_id: int,
+    depends_on_ids,
+) -> list[PlanningSandboxEdge]:
+    """Replace all incoming dependency edges for one sandbox node."""
+    sandbox = _get_project_draft_sandbox(db, project_id, sandbox_id)
+    target = _get_project_sandbox_node(db, project_id, sandbox_id, node_id)
+    dependency_ids = _parse_node_id_list(depends_on_ids)
+    if target.id in dependency_ids:
+        raise ValueError("self_dependency")
+    _validate_sandbox_node_ids(db, sandbox_id, dependency_ids)
+
+    existing_edges = (
+        db.query(PlanningSandboxEdge)
+        .filter(
+            PlanningSandboxEdge.sandbox_id == sandbox_id,
+            PlanningSandboxEdge.to_node_id == target.id,
+        )
+        .all()
+    )
+    existing_from_ids = {edge.from_node_id for edge in existing_edges}
+    desired_from_ids = set(dependency_ids)
+    now = datetime.utcnow()
+
+    for edge in existing_edges:
+        if edge.from_node_id not in desired_from_ids:
+            db.delete(edge)
+    for from_id in sorted(desired_from_ids - existing_from_ids):
+        db.add(PlanningSandboxEdge(
+            sandbox_id=sandbox_id,
+            from_node_id=from_id,
+            to_node_id=target.id,
+            dependency_type="finish_to_start",
+            created_at=now,
+        ))
+    sandbox.updated_at = now
+    db.flush()
+    try:
+        _raise_if_sandbox_has_hard_graph_error(db, sandbox_id)
+    except ValueError:
+        db.rollback()
+        raise
+    db.commit()
+    return (
+        db.query(PlanningSandboxEdge)
+        .filter(
+            PlanningSandboxEdge.sandbox_id == sandbox_id,
+            PlanningSandboxEdge.to_node_id == target.id,
+        )
+        .order_by(PlanningSandboxEdge.id)
+        .all()
+    )
+
+
+def update_sandbox_node_positions(
+    db: Session,
+    project_id: int,
+    sandbox_id: int,
+    positions: list[dict],
+) -> int:
+    """Persist bulk node positions for the Tidy canvas action."""
+    sandbox = _get_project_draft_sandbox(db, project_id, sandbox_id)
+    if not isinstance(positions, list):
+        raise ValueError("invalid_position")
+    node_ids = []
+    parsed_positions = {}
+    for item in positions:
+        if not isinstance(item, dict):
+            raise ValueError("invalid_position")
+        try:
+            node_id = int(item.get("node_id"))
+            x = float(item.get("x_position"))
+            y = float(item.get("y_position"))
+        except (TypeError, ValueError):
+            raise ValueError("invalid_position")
+        if not math.isfinite(x) or not math.isfinite(y):
+            raise ValueError("invalid_position")
+        node_ids.append(node_id)
+        parsed_positions[node_id] = (x, y)
+    nodes = _validate_sandbox_node_ids(db, sandbox_id, node_ids)
+    now = datetime.utcnow()
+    for node_id, (x, y) in parsed_positions.items():
+        node = nodes[node_id]
+        node.x_position = x
+        node.y_position = y
+        node.updated_at = now
+    sandbox.updated_at = now
+    db.commit()
+    return len(parsed_positions)
+
+
+def _sandbox_apply_preconditions(db: Session, project_id: int) -> list[dict]:
+    phases = (
+        db.query(ProjectPhase)
+        .filter(ProjectPhase.project_id == project_id)
+        .order_by(ProjectPhase.phase_order, ProjectPhase.id)
+        .all()
+    )
+    failures = []
+    for phase in phases:
+        base = {"phase_id": phase.id, "phase_name": phase.phase_name}
+        if phase.actual_start_date:
+            failures.append({**base, "code": "phase_has_actual_start"})
+        if phase.actual_end_date:
+            failures.append({**base, "code": "phase_has_actual_end"})
+        if (phase.status or "not_started") not in ("not_started", "skipped"):
+            failures.append({**base, "code": "phase_active_status", "status": phase.status})
+    active_phase_blockers = (
+        db.query(ProjectBlocker)
+        .filter(
+            ProjectBlocker.project_id == project_id,
+            ProjectBlocker.status == "active",
+            ProjectBlocker.phase_id.isnot(None),
+        )
+        .order_by(ProjectBlocker.created_at.desc())
+        .all()
+    )
+    for blocker in active_phase_blockers:
+        failures.append({
+            "code": "active_blocker_attached",
+            "blocker_id": blocker.id,
+            "blocker_title": blocker.title,
+            "phase_id": blocker.phase_id,
+        })
+    return failures
+
+
+def validate_sandbox_for_apply(db: Session, project_id: int, sandbox_id: int) -> dict:
+    sandbox = (
+        db.query(PlanningSandbox)
+        .filter(PlanningSandbox.id == sandbox_id, PlanningSandbox.project_id == project_id)
+        .first()
+    )
+    if not sandbox:
+        return {
+            "ok": False,
+            "error": "sandbox_not_found",
+            "schedule": compute_sandbox_schedule(db, sandbox_id, require_nodes=True),
+            "preconditions": [],
+        }
+    schedule = compute_sandbox_schedule(db, sandbox_id, require_nodes=True)
+    hard_errors = schedule.get("hard_errors") or []
+    preconditions = _sandbox_apply_preconditions(db, project_id)
+    ok = sandbox.status == "draft" and not hard_errors and not preconditions
+    error = None
+    if sandbox.status != "draft":
+        error = "sandbox_not_draft"
+    elif hard_errors:
+        error = hard_errors[0].get("code") or "invalid_graph"
+    elif preconditions:
+        error = "preconditions_failed"
+    return {
+        "ok": ok,
+        "error": error,
+        "sandbox": sandbox,
+        "schedule": schedule,
+        "preconditions": preconditions,
+        "hard_errors": hard_errors,
+        "soft_warnings": schedule.get("soft_warnings") or [],
+    }
+
+
+def get_sandbox_apply_preview(
+    db: Session,
+    project_id: int,
+    sandbox_id: int,
+    apply_start_date: date | None = None,
+) -> dict:
+    validation = validate_sandbox_for_apply(db, project_id, sandbox_id)
+    schedule = validation.get("schedule") or {}
+    start = apply_start_date or date.today()
+    total_days = int(schedule.get("total_days") or 0)
+    computed_end = start + timedelta(days=total_days)
+    existing_phases = (
+        db.query(ProjectPhase)
+        .filter(ProjectPhase.project_id == project_id)
+        .order_by(ProjectPhase.phase_order, ProjectPhase.id)
+        .all()
+    )
+    return {
+        **validation,
+        "node_count": len(schedule.get("nodes") or []),
+        "total_days": total_days,
+        "apply_start_date": start,
+        "computed_end_date": computed_end,
+        "existing_phases": existing_phases,
+        "replaceable_phase_count": len([
+            phase for phase in existing_phases
+            if not phase.actual_start_date
+            and not phase.actual_end_date
+            and (phase.status or "not_started") in ("not_started", "skipped")
+        ]),
+    }
+
+
+def _sandbox_apply_snapshot(
+    sandbox: PlanningSandbox,
+    schedule: dict,
+) -> dict:
+    return {
+        "sandbox": {
+            "id": sandbox.id,
+            "project_id": sandbox.project_id,
+            "name": sandbox.name,
+            "base_template_key": sandbox.base_template_key,
+            "status": sandbox.status,
+        },
+        "schedule": schedule,
+        "nodes": [
+            {
+                "id": node.id,
+                "module_key": node.module_key,
+                "title": node.title,
+                "category": node.category,
+                "phase_type": node.phase_type,
+                "duration_days": node.duration_days,
+                "owner_role": node.owner_role,
+                "deliverable": node.deliverable,
+                "exit_criteria": node.exit_criteria,
+                "x_position": node.x_position,
+                "y_position": node.y_position,
+                "sort_order": node.sort_order,
+            }
+            for node in sandbox.nodes
+        ],
+        "edges": [
+            {
+                "id": edge.id,
+                "from_node_id": edge.from_node_id,
+                "to_node_id": edge.to_node_id,
+                "dependency_type": edge.dependency_type,
+            }
+            for edge in sandbox.edges
+        ],
+    }
+
+
+def _sandbox_phase_notes(node: PlanningSandboxNode) -> str | None:
+    parts = [
+        part.strip()
+        for part in (node.deliverable, node.exit_criteria)
+        if part and part.strip()
+    ]
+    return " / ".join(parts) if parts else None
+
+
+def apply_sandbox_to_project(
+    db: Session,
+    project_id: int,
+    sandbox_id: int,
+    apply_start_date: date,
+    update_launch_date: bool = False,
+    user_id: int | None = None,
+) -> PlanningApplyEvent:
+    """v1.4 Build 07 — explicit audited Apply bridge into live phases."""
+    if not apply_start_date:
+        raise ValueError("invalid_start_date")
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise ValueError("project_not_found")
+    sandbox = _get_project_draft_sandbox(db, project_id, sandbox_id)
+    validation = validate_sandbox_for_apply(db, project_id, sandbox_id)
+    if not validation["ok"]:
+        raise ValueError(validation.get("error") or "apply_blocked")
+
+    schedule = validation["schedule"]
+    scheduled_nodes = schedule.get("nodes") or []
+    if not scheduled_nodes:
+        raise ValueError("zero_nodes")
+    scheduled_by_id = {node["id"]: node for node in scheduled_nodes}
+    sandbox_nodes_by_id = {node.id: node for node in sandbox.nodes}
+    now = datetime.utcnow()
+
+    existing_phases = (
+        db.query(ProjectPhase)
+        .filter(ProjectPhase.project_id == project_id)
+        .order_by(ProjectPhase.phase_order, ProjectPhase.id)
+        .all()
+    )
+    phases_deleted = len(existing_phases)
+    for phase in existing_phases:
+        db.delete(phase)
+    db.flush()
+
+    created = []
+    for order, scheduled in enumerate(scheduled_nodes, 1):
+        node = sandbox_nodes_by_id[scheduled["id"]]
+        phase = ProjectPhase(
+            project_id=project_id,
+            phase_name=node.title,
+            phase_type=node.phase_type,
+            phase_order=order,
+            status="not_started",
+            planned_start_date=apply_start_date + timedelta(days=int(scheduled.get("start_day") or 0)),
+            planned_end_date=apply_start_date + timedelta(days=int(scheduled.get("end_day") or 0)),
+            owner=node.owner_role or None,
+            notes=_sandbox_phase_notes(node),
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(phase)
+        created.append(phase)
+
+    total_days = int(schedule.get("total_days") or 0)
+    computed_end = apply_start_date + timedelta(days=total_days)
+    if update_launch_date:
+        project.planned_launch_date = computed_end
+    project.current_stage = derive_current_stage(created)
+    delay = calculate_delay(project, created)
+    project.estimated_launch_date = delay["estimated_launch"] if delay else None
+    project.updated_at = now
+
+    sandbox.status = "applied"
+    sandbox.applied_at = now
+    sandbox.applied_by_user_id = user_id
+    sandbox.updated_at = now
+    sandbox.last_computed_total_days = total_days
+
+    event = PlanningApplyEvent(
+        project_id=project_id,
+        sandbox_id=sandbox_id,
+        applied_at=now,
+        applied_by_user_id=user_id,
+        snapshot_json=_sandbox_apply_snapshot(sandbox, schedule),
+        node_count=len(created),
+        total_days=total_days,
+        planned_start_date=apply_start_date,
+        computed_end_date=computed_end,
+        updated_project_planned_launch_date=bool(update_launch_date),
+        phases_created=len(created),
+        phases_updated=0,
+        phases_deleted=phases_deleted,
+    )
+    db.add(event)
+    write_change(
+        db,
+        project_id,
+        "plan_applied",
+        changed_by="user",
+        summary=(
+            f"Plan applied from sandbox: {len(created)} phases over "
+            f"{total_days} days, launching {computed_end.isoformat()}."
+        ),
+        source_type="planning_sandbox",
+    )
+    db.commit()
+    db.refresh(event)
+    return event
 
 
 def compute_sandbox_schedule(db: Session, sandbox_id: int, require_nodes: bool = False) -> dict:
@@ -2666,7 +3515,7 @@ def get_active_phase_blocker_ids(db: Session, project_id: int) -> set:
 # v1.3 Build 08 — Timeline Updates / History (derived view)
 #
 # Pure derivation over project_changes + phase_plan_changes +
-# project_journal_entries. No new schema. Returns up to `limit` normalized
+# project_journal_entries + planning_apply_events. Returns up to `limit` normalized
 # TimelineEvent dicts, newest first. Deterministic tiebreaker on equal
 # timestamps via (source_priority, source_id DESC).
 # ---------------------------------------------------------------------------
@@ -2709,6 +3558,10 @@ def _classify_project_change(pc, phase_lookup: dict, file_lookup: dict) -> tuple
         else:
             link = None
         return (BUCKET_PHASE_CHANGES, subtype, link)
+    if ct == "plan_applied":
+        # Structured PlanningApplyEvent rows provide the user-facing card.
+        # The project_changes row remains the general audit companion.
+        return None
     if ct in ("blocker_opened", "blocker_updated", "blocker_resolved"):
         # subtype = the action verb (opened / updated / resolved) for badge
         verb = ct.split("_", 1)[1]
@@ -2793,12 +3646,12 @@ def get_timeline_events(
         body: str | None      # optional detail
         link_anchor: str | None  # #phase-row-N etc. (Lock 10 — may be None)
         is_ai: bool
-        source_table: str     # 'project_changes' | 'phase_plan_changes' | 'project_journal_entries'
+        source_table: str     # 'project_changes' | 'phase_plan_changes' | 'project_journal_entries' | 'planning_apply_events'
         source_id: int        # row id in source_table (Lock 7 tiebreaker)
     """
     from app.models import (
         Project, ProjectPhase, ProjectFile, ProjectChange,
-        ProjectJournalEntry, PhasePlanChange, User,
+        ProjectJournalEntry, PhasePlanChange, PlanningApplyEvent, User,
     )
 
     # Resolve phase + file lookups once (cheap; typical project < 20 phases / 100 files)
@@ -2933,6 +3786,39 @@ def get_timeline_events(
             .count()
         )
 
+    # ── Source 4: planning_apply_events ──
+    apply_rows = (
+        db.query(PlanningApplyEvent)
+        .filter(PlanningApplyEvent.project_id == project_id)
+        .order_by(PlanningApplyEvent.applied_at.desc())
+        .limit(limit * 2)
+        .all()
+    )
+    for event in apply_rows:
+        title = (
+            f"Plan applied: {event.node_count} phases over "
+            f"{event.total_days} days"
+        )
+        body = (
+            f"Start {event.planned_start_date.isoformat()} · "
+            f"Computed end {event.computed_end_date.isoformat()} · "
+            f"Replaced {event.phases_deleted} phases"
+        )
+        if event.updated_project_planned_launch_date:
+            body += " · Launch date updated"
+        events.append({
+            "occurred_at": event.applied_at,
+            "bucket": BUCKET_PHASE_CHANGES,
+            "subtype": "plan_applied",
+            "actor": _actor(None, event.applied_by_user_id),
+            "title": title,
+            "body": body,
+            "link_anchor": "#timeline-command-center",
+            "is_ai": False,
+            "source_table": "planning_apply_events",
+            "source_id": event.id,
+        })
+
     # ── Lock 7: merge + deterministic sort ──
     # Primary: occurred_at DESC.
     # Tiebreaker: source_priority ASC (project_changes=1, ppc=2, journal=3),
@@ -2941,6 +3827,7 @@ def get_timeline_events(
         "project_changes": 1,
         "phase_plan_changes": 2,
         "project_journal_entries": 3,
+        "planning_apply_events": 4,
     }
     events.sort(
         key=lambda e: (

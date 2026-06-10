@@ -2,13 +2,13 @@ import json
 import os
 import uuid
 from fastapi import APIRouter, Depends, Request, Form, HTTPException, UploadFile, File
-from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from datetime import date, datetime
 
 from app.database import get_db
-from app.models import Project
+from app.models import Project, PlanningSandbox
 import app.crud as crud
 from app.ai.parser import extract_thesis_and_inspirations
 from app.ai.matching import find_best_match, MATCH_THRESHOLD
@@ -560,7 +560,12 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
 
 
 @router.get("/projects/{project_id}/sandbox", response_class=HTMLResponse)
-def planning_sandbox(request: Request, project_id: int, db: Session = Depends(get_db)):
+def planning_sandbox(
+    request: Request,
+    project_id: int,
+    sandbox_id: int | None = None,
+    db: Session = Depends(get_db),
+):
     current_user = get_current_user(request, db)
     try:
         require_auth(current_user)
@@ -570,19 +575,52 @@ def planning_sandbox(request: Request, project_id: int, db: Session = Depends(ge
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    can_edit = can_edit_project(current_user, project)
-    sandbox = crud.get_active_planning_sandbox(db, project_id)
-    templates_rows = crud.list_planning_templates(db)
+    project_can_edit = can_edit_project(current_user, project)
+    if sandbox_id is not None:
+        sandbox = (
+            db.query(PlanningSandbox)
+            .filter(PlanningSandbox.id == sandbox_id, PlanningSandbox.project_id == project_id)
+            .first()
+        )
+        if not sandbox:
+            raise HTTPException(status_code=404, detail="Sandbox not found")
+    else:
+        sandbox = crud.get_active_planning_sandbox(db, project_id)
+    can_edit = project_can_edit and (sandbox is None or sandbox.status == "draft")
+    can_save_template = bool(project_can_edit and sandbox and sandbox.status in ("draft", "applied"))
+    templates_rows = crud.list_planning_templates_for_user(db, current_user)
+    system_templates = [template for template in templates_rows if template.is_system]
+    user_templates = [template for template in templates_rows if not template.is_system]
     payload = crud.get_sandbox_canvas_payload(db, sandbox.id) if sandbox else None
+    sandbox_payload_json = json.dumps({
+        "elements": payload["elements"],
+        "modules": payload["modules"],
+        "schedule": payload["schedule"],
+    }) if payload else "{}"
+    modules_by_category = {}
+    if payload:
+        for module in payload.get("modules", []):
+            modules_by_category.setdefault(module.get("category") or "Other", []).append(module)
+    apply_preview = (
+        crud.get_sandbox_apply_preview(db, project_id, sandbox.id)
+        if sandbox else None
+    )
 
     return templates.TemplateResponse(request, "planning_sandbox.html", {
         "project": project,
         "current_user": current_user,
         "can_edit": can_edit,
+        "can_save_template": can_save_template,
+        "project_can_edit": project_can_edit,
         "planning_templates": templates_rows,
+        "system_templates": system_templates,
+        "user_templates": user_templates,
         "sandbox": sandbox,
         "sandbox_payload": payload,
+        "modules_by_category": modules_by_category,
+        "apply_preview": apply_preview,
         "sandbox_elements_json": json.dumps(payload["elements"] if payload else []),
+        "sandbox_payload_json": sandbox_payload_json,
         **i18n_context(request, current_user),
     })
 
@@ -607,13 +645,359 @@ def create_planning_sandbox(
 
     if template_key:
         try:
-            crud.create_sandbox_from_template(db, project_id, template_key, current_user.id)
+            crud.create_sandbox_from_template(
+                db,
+                project_id,
+                template_key,
+                current_user.id,
+                current_user.role,
+            )
         except ValueError:
             return RedirectResponse(url=f"/projects/{project_id}/sandbox?error=template_not_found", status_code=303)
     else:
         crud.create_sandbox_blank(db, project_id, current_user.id)
 
     return RedirectResponse(url=f"/projects/{project_id}/sandbox", status_code=303)
+
+
+@router.post("/projects/{project_id}/sandbox/{sandbox_id}/save-template")
+def save_planning_sandbox_template(
+    request: Request,
+    project_id: int,
+    sandbox_id: int,
+    template_name: str = Form(""),
+    template_description: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    redirect_base = f"/projects/{project_id}/sandbox?sandbox_id={sandbox_id}"
+    if not can_edit_project(current_user, project):
+        return RedirectResponse(url=f"{redirect_base}&error=not_authorized", status_code=303)
+    try:
+        crud.save_sandbox_as_template(
+            db,
+            project_id,
+            sandbox_id,
+            template_name,
+            template_description,
+            current_user.id,
+        )
+    except ValueError as exc:
+        code = str(exc) or "template_save_failed"
+        if code not in {"template_name_required", "sandbox_not_templateable", "sandbox_not_found"}:
+            code = "template_save_failed"
+        return RedirectResponse(url=f"{redirect_base}&save_template_error={code}", status_code=303)
+    return RedirectResponse(url=f"{redirect_base}&template_saved=1", status_code=303)
+
+
+@router.post("/projects/{project_id}/sandbox/{sandbox_id}/apply")
+def apply_planning_sandbox(
+    request: Request,
+    project_id: int,
+    sandbox_id: int,
+    apply_start_date: str = Form(...),
+    update_launch_date: str | None = Form(None),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if not can_edit_project(current_user, project):
+        return RedirectResponse(url=f"/projects/{project_id}/sandbox?error=not_authorized", status_code=303)
+
+    parsed_start = parse_date(apply_start_date)
+    if not parsed_start:
+        return RedirectResponse(
+            url=f"/projects/{project_id}/sandbox?sandbox_id={sandbox_id}&apply_error=invalid_start_date",
+            status_code=303,
+        )
+    try:
+        crud.apply_sandbox_to_project(
+            db,
+            project_id,
+            sandbox_id,
+            parsed_start,
+            update_launch_date=bool(update_launch_date),
+            user_id=current_user.id,
+        )
+    except ValueError as exc:
+        code = str(exc) or "apply_error"
+        return RedirectResponse(
+            url=f"/projects/{project_id}/sandbox?sandbox_id={sandbox_id}&apply_error={code}",
+            status_code=303,
+        )
+
+    return RedirectResponse(
+        url=f"/projects/{project_id}/sandbox?sandbox_id={sandbox_id}&applied=1",
+        status_code=303,
+    )
+
+
+def _sandbox_json_payload(db: Session, sandbox_id: int) -> dict:
+    payload = crud.get_sandbox_canvas_payload(db, sandbox_id)
+    return {
+        "elements": payload.get("elements", []),
+        "modules": payload.get("modules", []),
+        "schedule": payload.get("schedule", {}),
+    }
+
+
+def _sandbox_mutation_guard(current_user, project) -> JSONResponse | None:
+    if not can_edit_project(current_user, project):
+        return JSONResponse({"ok": False, "error": "not_authorized"}, status_code=403)
+    return None
+
+
+def _sandbox_mutation_error(exc: ValueError) -> JSONResponse:
+    code = str(exc) or "sandbox_error"
+    status = 404 if code in {"sandbox_not_found", "node_not_found", "edge_not_found", "module_not_found"} else 400
+    return JSONResponse({"ok": False, "error": code}, status_code=status)
+
+
+@router.post("/projects/{project_id}/sandbox/{sandbox_id}/nodes/add")
+def add_planning_sandbox_node(
+    request: Request,
+    project_id: int,
+    sandbox_id: int,
+    module_key: str = Form(...),
+    x_position: str = Form(""),
+    y_position: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    guard = _sandbox_mutation_guard(current_user, project)
+    if guard:
+        return guard
+    try:
+        crud.create_sandbox_node_from_module(
+            db, project_id, sandbox_id, module_key, x_position, y_position
+        )
+    except ValueError as exc:
+        return _sandbox_mutation_error(exc)
+    return JSONResponse({"ok": True, "sandbox_payload": _sandbox_json_payload(db, sandbox_id)})
+
+
+@router.post("/projects/{project_id}/sandbox/{sandbox_id}/nodes/{node_id}/update")
+def update_planning_sandbox_node(
+    request: Request,
+    project_id: int,
+    sandbox_id: int,
+    node_id: int,
+    title: str = Form(...),
+    duration_days: str = Form(...),
+    owner_role: str = Form(""),
+    deliverable: str = Form(""),
+    exit_criteria: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    guard = _sandbox_mutation_guard(current_user, project)
+    if guard:
+        return guard
+    try:
+        crud.update_sandbox_node(db, project_id, sandbox_id, node_id, {
+            "title": title,
+            "duration_days": duration_days,
+            "owner_role": owner_role,
+            "deliverable": deliverable,
+            "exit_criteria": exit_criteria,
+        })
+    except ValueError as exc:
+        return _sandbox_mutation_error(exc)
+    return JSONResponse({"ok": True, "sandbox_payload": _sandbox_json_payload(db, sandbox_id)})
+
+
+@router.post("/projects/{project_id}/sandbox/{sandbox_id}/nodes/{node_id}/position")
+def update_planning_sandbox_node_position(
+    request: Request,
+    project_id: int,
+    sandbox_id: int,
+    node_id: int,
+    x_position: str = Form(...),
+    y_position: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    guard = _sandbox_mutation_guard(current_user, project)
+    if guard:
+        return guard
+    try:
+        crud.update_sandbox_node_position(
+            db, project_id, sandbox_id, node_id, x_position, y_position
+        )
+    except ValueError as exc:
+        return _sandbox_mutation_error(exc)
+    return JSONResponse({"ok": True, "sandbox_payload": _sandbox_json_payload(db, sandbox_id)})
+
+
+@router.post("/projects/{project_id}/sandbox/{sandbox_id}/nodes/positions")
+def update_planning_sandbox_node_positions(
+    request: Request,
+    project_id: int,
+    sandbox_id: int,
+    positions_json: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    guard = _sandbox_mutation_guard(current_user, project)
+    if guard:
+        return guard
+    try:
+        positions = json.loads(positions_json)
+        crud.update_sandbox_node_positions(db, project_id, sandbox_id, positions)
+    except json.JSONDecodeError:
+        return _sandbox_mutation_error(ValueError("invalid_position"))
+    except ValueError as exc:
+        return _sandbox_mutation_error(exc)
+    return JSONResponse({"ok": True, "sandbox_payload": _sandbox_json_payload(db, sandbox_id)})
+
+
+@router.post("/projects/{project_id}/sandbox/{sandbox_id}/nodes/{node_id}/delete")
+def delete_planning_sandbox_node(
+    request: Request,
+    project_id: int,
+    sandbox_id: int,
+    node_id: int,
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    guard = _sandbox_mutation_guard(current_user, project)
+    if guard:
+        return guard
+    try:
+        crud.delete_sandbox_node(db, project_id, sandbox_id, node_id)
+    except ValueError as exc:
+        return _sandbox_mutation_error(exc)
+    return JSONResponse({"ok": True, "sandbox_payload": _sandbox_json_payload(db, sandbox_id)})
+
+
+@router.post("/projects/{project_id}/sandbox/{sandbox_id}/edges")
+def create_planning_sandbox_edge(
+    request: Request,
+    project_id: int,
+    sandbox_id: int,
+    from_node_id: str = Form(...),
+    to_node_id: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    guard = _sandbox_mutation_guard(current_user, project)
+    if guard:
+        return guard
+    try:
+        crud.create_sandbox_edge(db, project_id, sandbox_id, from_node_id, to_node_id)
+    except ValueError as exc:
+        return _sandbox_mutation_error(exc)
+    return JSONResponse({"ok": True, "sandbox_payload": _sandbox_json_payload(db, sandbox_id)})
+
+
+@router.post("/projects/{project_id}/sandbox/{sandbox_id}/edges/{edge_id}/delete")
+def delete_planning_sandbox_edge(
+    request: Request,
+    project_id: int,
+    sandbox_id: int,
+    edge_id: int,
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    guard = _sandbox_mutation_guard(current_user, project)
+    if guard:
+        return guard
+    try:
+        crud.delete_sandbox_edge(db, project_id, sandbox_id, edge_id)
+    except ValueError as exc:
+        return _sandbox_mutation_error(exc)
+    return JSONResponse({"ok": True, "sandbox_payload": _sandbox_json_payload(db, sandbox_id)})
+
+
+@router.post("/projects/{project_id}/sandbox/{sandbox_id}/nodes/{node_id}/dependencies")
+def update_planning_sandbox_node_dependencies(
+    request: Request,
+    project_id: int,
+    sandbox_id: int,
+    node_id: int,
+    depends_on_ids: list[str] = Form([]),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    guard = _sandbox_mutation_guard(current_user, project)
+    if guard:
+        return guard
+    try:
+        crud.replace_sandbox_node_dependencies(
+            db, project_id, sandbox_id, node_id, depends_on_ids
+        )
+    except ValueError as exc:
+        return _sandbox_mutation_error(exc)
+    return JSONResponse({"ok": True, "sandbox_payload": _sandbox_json_payload(db, sandbox_id)})
 
 
 # ---------------------------------------------------------------------------
