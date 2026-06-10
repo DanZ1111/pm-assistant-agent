@@ -84,7 +84,11 @@ from app.version import CURRENT_VERSION, CURRENT_BUILD_NAME, LAST_UPDATED  # noq
 from app.routes import projects as _r_projects, admin as _r_admin, files as _r_files  # noqa: E402
 from app.routes import intake as _r_intake, help as _r_help, auth as _r_auth  # noqa: E402
 from app.routes import admin_users as _r_admin_users, calendar as _r_calendar, ideas as _r_ideas  # noqa: E402
-from app.i18n import t as _i18n_t, current_locale as _i18n_current_locale  # noqa: E402  Build 23 — Jinja2 globals
+from app.i18n import (  # noqa: E402  Build 23 — Jinja2 globals
+    t as _i18n_t,
+    current_locale as _i18n_current_locale,
+    phase_name as _i18n_phase_name,
+)
 
 
 def _static_asset_version() -> str:
@@ -114,6 +118,7 @@ _GLOBALS = {
     "STATIC_ASSET_VERSION": _static_asset_version(),
     "t": _i18n_t,  # Build 23 — i18n translation function
     "current_locale": _i18n_current_locale,
+    "phase_name": _i18n_phase_name,
 }
 for _mod in (_r_projects, _r_admin, _r_files, _r_intake, _r_help, _r_auth,
              _r_admin_users, _r_calendar, _r_ideas):

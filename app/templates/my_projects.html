@@ -47,7 +47,7 @@
               {% if p.sku %}<span class="ms-1">· {{ p.sku }}</span>{% endif %}
             </div>
           </td>
-          <td>{% if p.current_stage %}<span class="stage-pill">{{ p.current_stage }}</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+          <td>{% if p.current_stage %}<span class="stage-pill">{{ phase_name(p.current_stage) }}</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
           <td>
             {% if p.planned_launch_date %}
               {{ p.planned_launch_date.strftime('%b %d, %Y') }}

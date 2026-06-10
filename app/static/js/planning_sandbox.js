@@ -174,7 +174,7 @@
             'background-color': '#ffffff',
             'border-width': 2,
             'border-color': '#cbd5e1',
-            'label': 'data(label)',
+            'label': 'data(display_label)',
             'font-size': 13,
             'font-weight': 700,
             'color': '#0f172a',
@@ -297,7 +297,7 @@
 
   function nodeTitle(dbId) {
     var node = findNode(dbId);
-    return node && node.data ? node.data.label : ('Node ' + dbId);
+    return node && node.data ? (node.data.display_label || node.data.label) : ('Node ' + dbId);
   }
 
   function findIncomingEdge(fromNodeId, toNodeId) {
@@ -327,7 +327,7 @@
     options.forEach(function (node) {
       var option = document.createElement('option');
       option.value = node.data.db_id;
-      option.textContent = node.data.label;
+      option.textContent = node.data.display_label || node.data.label;
       option.selected = selectedIds.indexOf(String(node.data.db_id)) !== -1;
       select.appendChild(option);
     });
@@ -338,7 +338,7 @@
       var row = document.createElement('div');
       row.className = 'sandbox-dependency-row';
       var label = document.createElement('span');
-      label.textContent = nodeTitle(fromId) + ' -> ' + data.label;
+      label.textContent = nodeTitle(fromId) + ' -> ' + (data.display_label || data.label);
       row.appendChild(label);
       var edge = findIncomingEdge(fromId, data.db_id);
       if (canEdit && edge) {

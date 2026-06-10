@@ -39,7 +39,7 @@
           {% endif %}
           <div class="project-fact">
             <span>{{ t('table.stage') }}</span>
-            <strong>{% if project.current_stage %}{{ project.current_stage }}{% else %}—{% endif %}</strong>
+            <strong>{% if project.current_stage %}{{ phase_name(project.current_stage) }}{% else %}—{% endif %}</strong>
           </div>
           <div class="project-fact">
             <span>{{ t('form.planned_launch_date') }}</span>
@@ -76,7 +76,7 @@
     {% if delay %}
     <div class="alert-banner alert-delayed">
       <i class="bi bi-alarm-fill me-2"></i>
-      <strong>{{ t('alert.days_late_long', days=delay.days_late) }}</strong> — {{ t('project.phase_overdue', phase=delay.blocking_phase) }}
+      <strong>{{ t('alert.days_late_long', days=delay.days_late) }}</strong> — {{ t('project.phase_overdue', phase=phase_name(delay.blocking_phase)) }}
       {% if delay.estimated_launch %}
       {{ t('project.estimated_launch_moved') }} <strong>{{ delay.estimated_launch.strftime('%b %d, %Y') }}</strong>.
       {% endif %}
@@ -125,7 +125,7 @@
         <div class="pulse-card pulse-status-card">
           <div class="pulse-card-label">{{ t('pulse.current_status') }}</div>
           <div class="pulse-stage-row">
-            <span class="pulse-stage">{{ project.current_stage or t('common.unknown') }}</span>
+            <span class="pulse-stage">{{ phase_name(project.current_stage) if project.current_stage else t('common.unknown') }}</span>
             <span class="status-badge status-{{ project.status }}">{{ t('status.' ~ project.status) }}</span>
           </div>
           <dl class="pulse-facts">
@@ -175,7 +175,7 @@
             </a>
           {% elif delay %}
             <div class="pulse-action-title">{{ t('pulse.delayed_title') }}</div>
-            <p class="pulse-action-copy">{{ t('pulse.delayed_copy', phase=delay.blocking_phase, days=delay.days_late) }}</p>
+            <p class="pulse-action-copy">{{ t('pulse.delayed_copy', phase=phase_name(delay.blocking_phase), days=delay.days_late) }}</p>
             <a href="#timeline" class="pulse-action-link" onclick="setProjectWorkspace('timeline', true)">
               <i class="bi bi-calendar-range me-1"></i>{{ t('pulse.open_timeline') }}
             </a>
@@ -569,7 +569,7 @@
           </div>
           <div class="timeline-command-status">
             <span>{{ t('timeline.current_phase') }}</span>
-            <strong>{{ current_phase.phase_name if current_phase else "—" }}</strong>
+            <strong>{{ phase_name(current_phase.phase_name) if current_phase else "—" }}</strong>
           </div>
         </div>
 
@@ -599,7 +599,7 @@
         <div class="timeline-phase-block{% if has_blocker %} timeline-phase-has-blocker{% endif %}"
              data-status="{{ state }}"
              {% if has_blocker %}data-blocker="active"{% endif %}
-             title="{{ p.phase_name }}{% if has_blocker %} — active blocker{% endif %}">
+             title="{{ phase_name(p.phase_name) }}{% if has_blocker %} — active blocker{% endif %}">
           {% if state == 'done' %}
             <i class="bi bi-check-circle-fill"></i>
           {% elif state == 'current' %}
@@ -611,7 +611,7 @@
           {% else %}
             <i class="bi bi-circle"></i>
           {% endif %}
-          <span class="timeline-phase-name">{{ p.phase_name }}</span>
+          <span class="timeline-phase-name">{{ phase_name(p.phase_name) }}</span>
           {% if has_blocker %}<span class="timeline-phase-blocker-dot" aria-label="active blocker"></span>{% endif %}
         </div>
         {% if not loop.last %}<i class="bi bi-chevron-right timeline-phase-arrow" aria-hidden="true"></i>{% endif %}
@@ -623,7 +623,7 @@
         <div class="timeline-tile timeline-tile-current">
           <div class="timeline-tile-label">{{ t('timeline.current_phase') }}</div>
           {% if current_phase %}
-          <div class="timeline-tile-primary">{{ current_phase.phase_name }}</div>
+          <div class="timeline-tile-primary">{{ phase_name(current_phase.phase_name) }}</div>
           <div class="timeline-tile-meta">
             <span class="timeline-health-badge timeline-health-{{ command_center_state.health_band }}">
               {% if command_center_state.health_band == 'on_track' %}{{ t('timeline.health_on_track') }}
@@ -647,7 +647,7 @@
         <div class="timeline-tile timeline-tile-next-action">
           <div class="timeline-tile-label">{{ t('timeline.next_action') }}</div>
           {% if current_phase %}
-          <div class="timeline-tile-primary">{{ t('timeline.move_phase_forward', phase=current_phase.phase_name) }}</div>
+          <div class="timeline-tile-primary">{{ t('timeline.move_phase_forward', phase=phase_name(current_phase.phase_name)) }}</div>
           <div class="timeline-tile-meta">
             <span class="timeline-tile-sub">
               <i class="bi bi-person me-1"></i>
@@ -723,7 +723,7 @@
               {{ t('timeline.blocker_opened_meta', n=_days_ago, author=(_b.created_by.display_name or _b.created_by.username) if _b.created_by else 'unknown') }}
             {% endif %}
             {% if _b.phase %}
-              · {{ _b.phase.phase_name }}
+              · {{ phase_name(_b.phase.phase_name) }}
             {% endif %}
           </div>
           {% if can_edit %}
@@ -821,7 +821,7 @@
           </div>
           <p class="cc-action-form-help">{{ t('timeline.cc_finish_checklist') }}</p>
           <ul class="cc-finish-preflight">
-            <li>{{ current_phase.phase_name }} → done</li>
+            <li>{{ phase_name(current_phase.phase_name) }} → done</li>
             {% if current_phase.actual_start_date %}
             <li>{{ t('timeline.started') }} {{ current_phase.actual_start_date.strftime('%b %d, %Y') }}</li>
             {% else %}
@@ -913,7 +913,7 @@
           <select id="cc-blocker-phase" name="phase_id" class="cc-action-form-input">
             <option value="">{{ t('timeline.cc_blocker_phase_none') }}</option>
             {% for entry in command_center_state.phase_strip %}
-            <option value="{{ entry.phase.id }}">{{ entry.phase.phase_name }}</option>
+            <option value="{{ entry.phase.id }}">{{ phase_name(entry.phase.phase_name) }}</option>
             {% endfor %}
           </select>
           <div class="cc-action-form-buttons">
@@ -947,7 +947,7 @@
           <select id="cc-edit-blocker-phase" name="phase_id" class="cc-action-form-input" data-cc-edit-blocker-phase>
             <option value="">{{ t('timeline.cc_blocker_phase_none') }}</option>
             {% for entry in command_center_state.phase_strip %}
-            <option value="{{ entry.phase.id }}">{{ entry.phase.phase_name }}</option>
+            <option value="{{ entry.phase.id }}">{{ phase_name(entry.phase.phase_name) }}</option>
             {% endfor %}
           </select>
           <div class="cc-action-form-buttons">
@@ -981,7 +981,7 @@
       {% if delay %}
       <div class="delay-summary">
         <i class="bi bi-alarm-fill me-2 text-danger"></i>
-        <strong>{{ delay.blocking_phase }}</strong> {{ t('timeline.overdue_days', days=delay.days_late) }}
+        <strong>{{ phase_name(delay.blocking_phase) }}</strong> {{ t('timeline.overdue_days', days=delay.days_late) }}
         {% if delay.estimated_launch %}
         {{ t('timeline.estimated_launch') }}: <strong>{{ delay.estimated_launch.strftime('%b %d, %Y') }}</strong>
         ({{ t('timeline.was') }} {{ project.planned_launch_date.strftime('%b %d, %Y') if project.planned_launch_date else '—' }}).
@@ -1023,7 +1023,7 @@
             <tr id="phase-row-{{ phase.id }}" class="phase-row phase-{{ phase.status }}{% if current_phase and current_phase.id == phase.id %} phase-row-current{% endif %}">
               <td class="phase-order">{{ phase.phase_order }}</td>
               <td>
-                <span class="phase-name">{{ phase.phase_name }}</span>
+                <span class="phase-name">{{ phase_name(phase.phase_name) }}</span>
                 {% if phase.owner %}<br><small class="text-muted">{{ phase.owner }}</small>{% endif %}
                 {% if phase.notes %}<br><small class="text-muted fst-italic">{{ phase.notes[:60] }}{% if phase.notes|length > 60 %}…{% endif %}</small>{% endif %}
                 {% if hist %}
@@ -1044,7 +1044,7 @@
               <td class="phase-actions">
                 {% if can_edit and phase.status not in ('done','skipped') %}
                 <form method="post" action="/projects/{{ project.id }}/phases/{{ phase.id }}/finish" class="d-inline"
-                      onsubmit="return confirm('{{ t('timeline.finish_confirm', phase=phase.phase_name|e) }}')">
+                      onsubmit="return confirm('{{ t('timeline.finish_confirm', phase=phase_name(phase.phase_name)|e) }}')">
                   <button class="btn-phase-finish" title="{{ t('btn.finish_phase') }}">
                     <i class="bi bi-check2-circle"></i>
                   </button>
@@ -1068,7 +1068,7 @@
                 </button>
                 {% if current_user.role == 'admin' %}
                 <form method="post" action="/projects/{{ project.id }}/phases/{{ phase.id }}/delete"
-                      class="d-inline" onsubmit="return confirm('{{ t('timeline.delete_confirm', phase=phase.phase_name|e) }}')">
+                      class="d-inline" onsubmit="return confirm('{{ t('timeline.delete_confirm', phase=phase_name(phase.phase_name)|e) }}')">
                   <button class="btn-phase-delete" title="{{ t('timeline.delete_phase') }}">
                     <i class="bi bi-x"></i>
                   </button>

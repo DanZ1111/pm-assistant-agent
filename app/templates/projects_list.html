@@ -38,7 +38,7 @@
         <span class="attention-name">{{ row.project.name }}</span>
         <span class="attention-badges">
           <span class="badge badge-due-soon">
-            <i class="bi bi-clock me-1"></i>{{ t('alert.phase_due', phase=row.phase.phase_name, date=row.phase.planned_end_date.strftime('%b %d')) }}
+            <i class="bi bi-clock me-1"></i>{{ t('alert.phase_due', phase=phase_name(row.phase.phase_name), date=row.phase.planned_end_date.strftime('%b %d')) }}
           </span>
         </span>
       </a>
@@ -142,7 +142,7 @@
           </span>
           {% if p.current_stage %}
           <span class="info-sep">·</span>
-          <span class="stage-pill">{{ p.current_stage }}</span>
+          <span class="stage-pill">{{ phase_name(p.current_stage) }}</span>
           {% endif %}
         </div>
       </div>
@@ -196,7 +196,7 @@
               {% if health.needs_info and not delay %}<br><span class="badge badge-needs-info badge-sm">{{ t('alert.critical_missing', count=health.critical_count) }}</span>{% endif %}
             </td>
             <td>{{ p.brand or "—" }}</td>
-            <td><span class="stage-pill-sm">{{ p.current_stage or "—" }}</span></td>
+            <td><span class="stage-pill-sm">{{ phase_name(p.current_stage) if p.current_stage else "—" }}</span></td>
             <td>{{ p.product_manager or "—" }}</td>
             <td>{{ p.factory or "—" }}</td>
             <td>{{ p.target_factory_cost_display or "—" }}</td>

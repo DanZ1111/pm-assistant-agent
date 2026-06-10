@@ -30,6 +30,32 @@ _BUNDLE_DIR = os.path.dirname(__file__)
 TRANSLATIONS: dict[str, dict[str, str]] = {}
 
 
+PHASE_DISPLAY_NAMES_ZH = {
+    "design": "设计",
+    "engineering review": "工程评审",
+    "mechanical engineering": "工程评审",
+    "mechanism engineering": "机构工程",
+    "prototype sample": "手板样",
+    "factory sample": "手板样",
+    "sample": "手板样",
+    "prototype 1": "手板样",
+    "prototype review": "手板样评审",
+    "prototype 1 review": "手板样评审",
+    "prototype 2": "手板样二轮",
+    "prototype 2 review": "手板样二轮评审",
+    "sample review": "手板样评审",
+    "pre-production sample": "产前样",
+    "pilot run": "小批量试产",
+    "small batch trial": "小批量试产",
+    "trial production": "小批量试产",
+    "mass production": "量产",
+    "launch prep": "上市准备",
+    "launch readiness review": "上市评审",
+    "launch review": "上市评审",
+    "launch": "上市",
+}
+
+
 def _load_bundles() -> None:
     """Read every locale bundle into TRANSLATIONS. Silent on missing files
     (returns empty dict for that locale) so dev environments work even if
@@ -73,6 +99,21 @@ def get_locale(request, current_user) -> str:
 def i18n_context(request, current_user=None) -> dict[str, str]:
     """Small helper for TemplateResponse contexts."""
     return {"locale": get_locale(request, current_user)}
+
+
+def translate_phase_name(name: str | None, locale: str) -> str:
+    """Display known default workflow phase names in the active language.
+
+    Phase names are stored as project data, so this intentionally translates
+    only canonical seeded/default names. Custom user-entered phase names remain
+    untouched.
+    """
+    if not name:
+        return "—"
+    raw = str(name)
+    if locale != "zh":
+        return raw
+    return PHASE_DISPLAY_NAMES_ZH.get(raw.strip().lower(), raw)
 
 
 def _resolve_locale_from_ctx(ctx) -> str:
@@ -143,6 +184,12 @@ def t(ctx, key: str, **kwargs: Any) -> str:
 def current_locale(ctx) -> str:
     """Jinja helper used by shared chrome such as the language switcher."""
     return _resolve_locale_from_ctx(ctx)
+
+
+@pass_context
+def phase_name(ctx, name: str | None) -> str:
+    """Jinja helper for display-only phase-name localization."""
+    return translate_phase_name(name, _resolve_locale_from_ctx(ctx))
 
 
 def reload_bundles() -> None:

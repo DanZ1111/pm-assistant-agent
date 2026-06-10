@@ -82,7 +82,7 @@
           </div>
           <div class="cal-project-meta">
             <span><i class="bi bi-calendar me-1"></i>{{ t('calendar.planned_label') }}: {{ p.planned_launch_date.strftime('%b %d, %Y') }}</span>
-            {% if p.current_stage %}<span class="ms-3"><i class="bi bi-flag me-1"></i>{{ t('table.stage') }}: {{ p.current_stage }}</span>{% endif %}
+            {% if p.current_stage %}<span class="ms-3"><i class="bi bi-flag me-1"></i>{{ t('table.stage') }}: {{ phase_name(p.current_stage) }}</span>{% endif %}
             <span class="ms-3">
               <span class="badge {% if p.status == 'active' %}bg-info text-dark{% elif p.status == 'completed' %}bg-success{% elif p.status == 'paused' %}bg-warning text-dark{% elif p.status == 'cancelled' %}bg-secondary{% else %}bg-secondary{% endif %}">{{ t('status.' ~ p.status) }}</span>
             </span>

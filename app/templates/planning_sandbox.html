@@ -218,7 +218,7 @@
               {% if apply_preview.existing_phases %}
               <ul>
                 {% for phase in apply_preview.existing_phases %}
-                <li>{{ phase.phase_name }}{% if phase.status == 'skipped' %} <span class="badge bg-secondary">skipped</span>{% endif %}</li>
+                <li>{{ phase_name(phase.phase_name) }}{% if phase.status == 'skipped' %} <span class="badge bg-secondary">skipped</span>{% endif %}</li>
                 {% endfor %}
               </ul>
               {% else %}
@@ -244,7 +244,7 @@
           <p>{{ t('sandbox.apply_active_execution') }}</p>
           <div class="sandbox-apply-blocked-list">
             {% for failure in apply_preview.preconditions %}
-            <span class="sandbox-warning-chip">{{ failure.code }}{% if failure.phase_name %}: {{ failure.phase_name }}{% endif %}</span>
+            <span class="sandbox-warning-chip">{{ failure.code }}{% if failure.phase_name %}: {{ phase_name(failure.phase_name) }}{% endif %}</span>
             {% endfor %}
           </div>
           {% else %}
@@ -326,7 +326,7 @@
                      data-module-title="{{ module.title }}"
                      data-module-duration="{{ module.default_duration_days }}"
                      data-module-category="{{ module.category }}">
-              <div class="sandbox-module-title">{{ module.title }}</div>
+              <div class="sandbox-module-title">{{ module.display_title or module.title }}</div>
               <div class="sandbox-module-meta">
                 <span>{{ module.default_duration_days }} {{ t('sandbox.days') }}</span>
                 {% if module.default_owner_role %}<span>{{ module.default_owner_role }}</span>{% endif %}

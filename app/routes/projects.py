@@ -19,7 +19,7 @@ from app.dependencies import (
     can_use_ai_intake,
     _RedirectException
 )
-from app.i18n import i18n_context
+from app.i18n import get_locale, i18n_context, translate_phase_name
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -80,6 +80,23 @@ def _pick_latest_overview_visual(renderings: list, prototype_photos: list):
         key=lambda f: f.uploaded_at or datetime.min,
         reverse=True,
     )[0] if candidates else None
+
+
+def _localize_sandbox_payload(payload: dict | None, locale: str) -> dict | None:
+    """Add display-only localized labels to sandbox payloads.
+
+    Canonical node/module titles remain unchanged so editing/saving a sandbox
+    does not rewrite project data just because the UI is in Chinese.
+    """
+    if not payload:
+        return payload
+    for element in payload.get("elements", []):
+        data = element.get("data") or {}
+        if str(data.get("id", "")).startswith("node-"):
+            data["display_label"] = translate_phase_name(data.get("label"), locale)
+    for module in payload.get("modules", []):
+        module["display_title"] = translate_phase_name(module.get("title"), locale)
+    return payload
 
 
 def _save_uploaded_business_plan(
@@ -591,7 +608,9 @@ def planning_sandbox(
     templates_rows = crud.list_planning_templates_for_user(db, current_user)
     system_templates = [template for template in templates_rows if template.is_system]
     user_templates = [template for template in templates_rows if not template.is_system]
+    locale = get_locale(request, current_user)
     payload = crud.get_sandbox_canvas_payload(db, sandbox.id) if sandbox else None
+    payload = _localize_sandbox_payload(payload, locale)
     sandbox_payload_json = json.dumps({
         "elements": payload["elements"],
         "modules": payload["modules"],
@@ -745,8 +764,9 @@ def apply_planning_sandbox(
     )
 
 
-def _sandbox_json_payload(db: Session, sandbox_id: int) -> dict:
+def _sandbox_json_payload(db: Session, sandbox_id: int, locale: str) -> dict:
     payload = crud.get_sandbox_canvas_payload(db, sandbox_id)
+    payload = _localize_sandbox_payload(payload, locale)
     return {
         "elements": payload.get("elements", []),
         "modules": payload.get("modules", []),
@@ -793,7 +813,7 @@ def add_planning_sandbox_node(
         )
     except ValueError as exc:
         return _sandbox_mutation_error(exc)
-    return JSONResponse({"ok": True, "sandbox_payload": _sandbox_json_payload(db, sandbox_id)})
+    return JSONResponse({"ok": True, "sandbox_payload": _sandbox_json_payload(db, sandbox_id, get_locale(request, current_user))})
 
 
 @router.post("/projects/{project_id}/sandbox/{sandbox_id}/nodes/{node_id}/update")
@@ -830,7 +850,7 @@ def update_planning_sandbox_node(
         })
     except ValueError as exc:
         return _sandbox_mutation_error(exc)
-    return JSONResponse({"ok": True, "sandbox_payload": _sandbox_json_payload(db, sandbox_id)})
+    return JSONResponse({"ok": True, "sandbox_payload": _sandbox_json_payload(db, sandbox_id, get_locale(request, current_user))})
 
 
 @router.post("/projects/{project_id}/sandbox/{sandbox_id}/nodes/{node_id}/position")
@@ -860,7 +880,7 @@ def update_planning_sandbox_node_position(
         )
     except ValueError as exc:
         return _sandbox_mutation_error(exc)
-    return JSONResponse({"ok": True, "sandbox_payload": _sandbox_json_payload(db, sandbox_id)})
+    return JSONResponse({"ok": True, "sandbox_payload": _sandbox_json_payload(db, sandbox_id, get_locale(request, current_user))})
 
 
 @router.post("/projects/{project_id}/sandbox/{sandbox_id}/nodes/positions")
@@ -889,7 +909,7 @@ def update_planning_sandbox_node_positions(
         return _sandbox_mutation_error(ValueError("invalid_position"))
     except ValueError as exc:
         return _sandbox_mutation_error(exc)
-    return JSONResponse({"ok": True, "sandbox_payload": _sandbox_json_payload(db, sandbox_id)})
+    return JSONResponse({"ok": True, "sandbox_payload": _sandbox_json_payload(db, sandbox_id, get_locale(request, current_user))})
 
 
 @router.post("/projects/{project_id}/sandbox/{sandbox_id}/nodes/{node_id}/delete")
@@ -915,7 +935,7 @@ def delete_planning_sandbox_node(
         crud.delete_sandbox_node(db, project_id, sandbox_id, node_id)
     except ValueError as exc:
         return _sandbox_mutation_error(exc)
-    return JSONResponse({"ok": True, "sandbox_payload": _sandbox_json_payload(db, sandbox_id)})
+    return JSONResponse({"ok": True, "sandbox_payload": _sandbox_json_payload(db, sandbox_id, get_locale(request, current_user))})
 
 
 @router.post("/projects/{project_id}/sandbox/{sandbox_id}/edges")
@@ -942,7 +962,7 @@ def create_planning_sandbox_edge(
         crud.create_sandbox_edge(db, project_id, sandbox_id, from_node_id, to_node_id)
     except ValueError as exc:
         return _sandbox_mutation_error(exc)
-    return JSONResponse({"ok": True, "sandbox_payload": _sandbox_json_payload(db, sandbox_id)})
+    return JSONResponse({"ok": True, "sandbox_payload": _sandbox_json_payload(db, sandbox_id, get_locale(request, current_user))})
 
 
 @router.post("/projects/{project_id}/sandbox/{sandbox_id}/edges/{edge_id}/delete")
@@ -968,7 +988,7 @@ def delete_planning_sandbox_edge(
         crud.delete_sandbox_edge(db, project_id, sandbox_id, edge_id)
     except ValueError as exc:
         return _sandbox_mutation_error(exc)
-    return JSONResponse({"ok": True, "sandbox_payload": _sandbox_json_payload(db, sandbox_id)})
+    return JSONResponse({"ok": True, "sandbox_payload": _sandbox_json_payload(db, sandbox_id, get_locale(request, current_user))})
 
 
 @router.post("/projects/{project_id}/sandbox/{sandbox_id}/nodes/{node_id}/dependencies")
@@ -997,7 +1017,7 @@ def update_planning_sandbox_node_dependencies(
         )
     except ValueError as exc:
         return _sandbox_mutation_error(exc)
-    return JSONResponse({"ok": True, "sandbox_payload": _sandbox_json_payload(db, sandbox_id)})
+    return JSONResponse({"ok": True, "sandbox_payload": _sandbox_json_payload(db, sandbox_id, get_locale(request, current_user))})
 
 
 # ---------------------------------------------------------------------------
