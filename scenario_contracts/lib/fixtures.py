@@ -55,14 +55,25 @@ def create_user(db, username="scenario_pm", role="pm", display_name=None):
 
 
 def create_project(db, name="Scenario Project", pm_name="scenario_pm",
-                   status="active"):
+                   status="active", **fields):
     from app.models import Project
 
-    project = Project(name=name, status=status, product_manager=pm_name)
+    project = Project(name=name, status=status, product_manager=pm_name, **fields)
     db.add(project)
     db.commit()
     db.refresh(project)
     return project
+
+
+def create_project_with_costs(db, name, pm_name, target_factory_cost=None,
+                              target_msrp=None, status="active"):
+    """Create a project with optional initial cost fields seeded."""
+    fields = {}
+    if target_factory_cost is not None:
+        fields["target_factory_cost"] = target_factory_cost
+    if target_msrp is not None:
+        fields["target_msrp"] = target_msrp
+    return create_project(db, name=name, pm_name=pm_name, status=status, **fields)
 
 
 def seed_phases(db, project_id, names, start_date=None, duration_days=10):

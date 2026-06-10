@@ -49,6 +49,13 @@ def run_runner(scenario_path):
     return result.returncode, result.stdout + result.stderr
 
 
+def _line_contains_both(text_value, *needles):
+    for line in text_value.splitlines():
+        if all(needle in line for needle in needles):
+            return True
+    return False
+
+
 def main():
     print("\n── 1. QA Build 01 execution plan exists and locks user locks ──")
     plan = read("QA_BUILD01_EXECUTION_PLAN.md")
@@ -140,19 +147,28 @@ def main():
     else:
         fail("golden_missing_metadata behavior", f"exit={code}; out: {out[-300:]}")
 
-    print("\n── 6. Directory mode runs all 5 goldens and aggregates ──")
+    print("\n── 6. Directory mode runs all goldens with correct outcomes ──")
+    # Directory mode discovers all scenarios in contracts/. The 5 goldens
+    # must each appear with their designed outcome. QA-02 added 5 more
+    # PASS scenarios but the QA-01 contract is about the goldens.
     code, out = run_runner("scenario_contracts/contracts/")
-    # Directory mode: 1 PASS, 1 FAIL, 2 INVALID, 1 SKIP — exit code 2 (invalid > fail > pass)
-    if (
-        code == 2
-        and "PASS: 1" in out
-        and "FAIL: 1" in out
-        and "INVALID: 2" in out
-        and "SKIP: 1" in out
-    ):
-        ok("directory mode — PASS:1 FAIL:1 INVALID:2 SKIP:1, exit 2")
+    expected_lines = [
+        ("PASS", "golden_pass_001"),
+        ("FAIL", "golden_db_fail_001"),
+        ("INVALID", "golden_invalid_shape_001"),
+        ("INVALID", "golden_missing_metadata_001"),
+        ("SKIP", "golden_ui_fail_001"),
+    ]
+    missing = [
+        f"{outcome} {sid}"
+        for outcome, sid in expected_lines
+        if not _line_contains_both(out, outcome, sid)
+    ]
+    if code == 2 and not missing:
+        ok("directory mode — all 5 goldens behave as designed; exit 2 (invalid > fail > pass)")
     else:
-        fail("directory mode aggregation", f"exit={code}; out: {out[-400:]}")
+        fail("directory mode aggregation",
+             f"exit={code}; missing={missing}; tail: {out[-300:]}")
 
     print("\n── 7. Reports directory exists and is gitignored ──")
     reports_dir = ROOT / "scenario_contracts" / "reports"

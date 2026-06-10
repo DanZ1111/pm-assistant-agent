@@ -115,3 +115,112 @@ def assert_row_count(db, table_name, expected, where=None, label=None):
     actual = db.execute(text(sql), params).scalar()
     if actual != expected:
         raise AssertionFailure(label or f"count({table_name})", expected, actual)
+
+
+def assert_no_rows(db, table_name, where=None, label=None):
+    """Assert that no rows in `table_name` match `where`."""
+    assert_row_count(db, table_name, 0, where=where,
+                     label=label or f"no rows in {table_name}")
+
+
+def assert_equal(actual, expected, label=None):
+    """General equality assertion for values captured in `world`.
+
+    Used when check() needs to compare a pre-run snapshot (captured by an
+    actions.* read) against an expected value. Keeps the discipline
+    boundary: check() never imports app.* or runs SQL directly.
+    """
+    if actual != expected:
+        raise AssertionFailure(label or "assert_equal", expected, actual)
+
+
+def assert_project_visible_to_user(db, user, project_id, label=None):
+    """Assert that get_projects_for_user(user) contains the given project."""
+    from app import crud
+
+    projects = crud.get_projects_for_user(db, user)
+    project_ids = {p.id for p in projects}
+    if project_id not in project_ids:
+        raise AssertionFailure(
+            label or f"project {project_id} visible to {user.username}",
+            "in list",
+            f"not in list (visible: {sorted(project_ids)})",
+        )
+
+
+def assert_project_not_visible_to_user(db, user, project_id, label=None):
+    """Assert that get_projects_for_user(user) does NOT contain the project."""
+    from app import crud
+
+    projects = crud.get_projects_for_user(db, user)
+    project_ids = {p.id for p in projects}
+    if project_id in project_ids:
+        raise AssertionFailure(
+            label or f"project {project_id} hidden from {user.username}",
+            "absent",
+            f"present (visible: {sorted(project_ids)})",
+        )
+
+
+def assert_permission(user, permission_name, expected, project=None, label=None):
+    """Assert that a permission helper returns `expected` for `user`.
+
+    `permission_name` is a function name in app.dependencies, e.g.
+    "can_edit_project", "can_view_costs", "can_view_journal",
+    "can_view_sensitive_fields".
+
+    Some helpers take just (user); others take (user, project). We
+    introspect and call appropriately.
+    """
+    from app import dependencies
+    import inspect
+
+    func = getattr(dependencies, permission_name, None)
+    if func is None or not callable(func):
+        raise AssertionFailure(
+            label or f"permission {permission_name}",
+            "callable in app.dependencies",
+            f"missing or non-callable",
+        )
+    sig = inspect.signature(func)
+    if "project" in sig.parameters and project is not None:
+        actual = func(user, project)
+    else:
+        actual = func(user)
+    if bool(actual) != bool(expected):
+        raise AssertionFailure(
+            label or f"{permission_name}({user.username})",
+            expected,
+            actual,
+        )
+
+
+def assert_phase_field(db, phase_id, field, expected, label=None):
+    """Assert a field on a project_phases row by phase_id."""
+    assert_db_field(
+        db, "project_phases", where={"id": phase_id},
+        field=field, expected=expected, label=label,
+    )
+
+
+def assert_phase_plan_change_recorded(db, phase_id, reason_needle, label=None):
+    """Assert a phase_plan_changes row exists for phase_id whose reason
+    contains the needle."""
+    from sqlalchemy import text
+
+    rows = db.execute(
+        text("""
+            SELECT field_changed, reason, old_date, new_date
+            FROM phase_plan_changes
+            WHERE phase_id = :pid
+        """),
+        {"pid": phase_id},
+    ).fetchall()
+    for row in rows:
+        if row[1] and reason_needle in row[1]:
+            return
+    raise AssertionFailure(
+        label or f"phase_plan_changes reason for phase {phase_id}",
+        f"contains {reason_needle!r}",
+        f"{len(rows)} rows; reasons: {[r[1] for r in rows]}",
+    )
