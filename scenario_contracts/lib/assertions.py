@@ -134,6 +134,74 @@ def assert_equal(actual, expected, label=None):
         raise AssertionFailure(label or "assert_equal", expected, actual)
 
 
+# ── Browser assertions (QA-03) ──────────────────────────────────────────
+
+
+def assert_ui_shows(page, selector, label=None):
+    """Assert an element exists and is visible on the current page."""
+    try:
+        locator = page.locator(selector).first
+        # is_visible has a default timeout; expose nothing too long.
+        visible = locator.is_visible(timeout=2000)
+    except Exception as exc:
+        raise AssertionFailure(
+            label or f"ui shows {selector}",
+            "visible element",
+            f"locator error: {exc!r}",
+        )
+    if not visible:
+        raise AssertionFailure(
+            label or f"ui shows {selector}",
+            "visible",
+            "not visible (or not present)",
+        )
+
+
+def assert_ui_does_not_show(page, selector, label=None):
+    """Assert an element is absent or hidden."""
+    try:
+        count = page.locator(selector).count()
+    except Exception as exc:
+        raise AssertionFailure(
+            label or f"ui does not show {selector}",
+            "absent",
+            f"locator error: {exc!r}",
+        )
+    if count > 0:
+        # Element exists; assert it's not visible.
+        locator = page.locator(selector).first
+        if locator.is_visible(timeout=1000):
+            raise AssertionFailure(
+                label or f"ui does not show {selector}",
+                "absent or hidden",
+                "visible",
+            )
+
+
+def assert_url_path(page, expected_path, label=None):
+    """Assert the current URL ends with `expected_path` (ignoring query/hash)."""
+    from urllib.parse import urlparse
+
+    actual_path = urlparse(page.url).path
+    if actual_path != expected_path:
+        raise AssertionFailure(
+            label or "url path",
+            expected_path,
+            actual_path,
+        )
+
+
+def assert_page_contains(page, needle, label=None):
+    """Assert the rendered HTML contains `needle` somewhere."""
+    html = page.content()
+    if needle not in html:
+        raise AssertionFailure(
+            label or "page contains",
+            f"contains {needle!r}",
+            f"absent (page length {len(html)})",
+        )
+
+
 def assert_project_visible_to_user(db, user, project_id, label=None):
     """Assert that get_projects_for_user(user) contains the given project."""
     from app import crud

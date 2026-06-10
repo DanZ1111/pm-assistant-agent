@@ -126,10 +126,14 @@ def main():
     else:
         fail("golden_db_fail behavior", f"exit={code}; out: {out[-300:]}")
 
-    # 5c — golden_ui_fail is SKIPped cleanly, exit 0
+    # 5c — golden_ui_fail behavior moved to QA-03. QA-01's contract for
+    # this scenario is just "the runner doesn't crash on a ui-tagged file".
+    # The runner either SKIPs (Playwright/server unavailable) or FAILs
+    # intentionally (QA-03 flipped it to a real UI failure). Either is
+    # acceptable for QA-01's purposes.
     code, out = run_runner("scenario_contracts/contracts/golden_ui_fail.py")
-    if code == 0 and "SKIP: 1" in out and "Playwright path lands in QA-03" in out:
-        ok("golden_ui_fail — exit 0, SKIP with QA-03 deferral note")
+    if code in (0, 1) and ("SKIP: 1" in out or "FAIL: 1" in out):
+        ok("golden_ui_fail — runner handled ui scenario without crashing (SKIP or FAIL)")
     else:
         fail("golden_ui_fail behavior", f"exit={code}; out: {out[-300:]}")
 
@@ -148,16 +152,15 @@ def main():
         fail("golden_missing_metadata behavior", f"exit={code}; out: {out[-300:]}")
 
     print("\n── 6. Directory mode runs all goldens with correct outcomes ──")
-    # Directory mode discovers all scenarios in contracts/. The 5 goldens
-    # must each appear with their designed outcome. QA-02 added 5 more
-    # PASS scenarios but the QA-01 contract is about the goldens.
+    # Directory mode discovers all scenarios in contracts/. QA-01's
+    # contract covers the 4 non-UI goldens — their outcomes are
+    # environment-independent. The ui golden moved to QA-03's contract.
     code, out = run_runner("scenario_contracts/contracts/")
     expected_lines = [
         ("PASS", "golden_pass_001"),
         ("FAIL", "golden_db_fail_001"),
         ("INVALID", "golden_invalid_shape_001"),
         ("INVALID", "golden_missing_metadata_001"),
-        ("SKIP", "golden_ui_fail_001"),
     ]
     missing = [
         f"{outcome} {sid}"
@@ -165,7 +168,7 @@ def main():
         if not _line_contains_both(out, outcome, sid)
     ]
     if code == 2 and not missing:
-        ok("directory mode — all 5 goldens behave as designed; exit 2 (invalid > fail > pass)")
+        ok("directory mode — 4 QA-01 goldens behave as designed; exit 2 (invalid > fail > pass)")
     else:
         fail("directory mode aggregation",
              f"exit={code}; missing={missing}; tail: {out[-300:]}")

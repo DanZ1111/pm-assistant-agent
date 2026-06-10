@@ -109,3 +109,53 @@ def snapshot_table_count(db, table_name, where=None):
         sql += f" WHERE {clause}"
         params = where
     return db.execute(text(sql), params).scalar()
+
+
+# ── Browser actions (QA-03) ────────────────────────────────────────────
+#
+# These take a Playwright `page` object — passed to UI-tagged scenarios
+# by the runner via signature inspection. DB-only scenarios never see
+# these; UI scenarios call them inside run().
+
+
+def open_url(page, path):
+    """Navigate the browser to base_url + path; wait for network idle."""
+    from scenario_contracts.lib.browser import base_url
+
+    if path.startswith("http://") or path.startswith("https://"):
+        target = path
+    else:
+        if not path.startswith("/"):
+            path = "/" + path
+        target = base_url() + path
+    page.goto(target)
+    page.wait_for_load_state("networkidle")
+
+
+def click(page, selector):
+    """Click an element selected by CSS selector."""
+    page.click(selector)
+    page.wait_for_load_state("networkidle")
+
+
+def fill_input(page, selector, value):
+    """Fill an input element by CSS selector."""
+    page.fill(selector, value)
+
+
+def wait_for_load(page):
+    """Wait for the network to go idle."""
+    page.wait_for_load_state("networkidle")
+
+
+def discover_first_project_id(page):
+    """Discover any project id from the /projects index for read-only smoke.
+
+    Returns the integer id or None if no project link is found.
+    """
+    import re
+
+    open_url(page, "/projects")
+    html = page.content()
+    match = re.search(r'href="/projects/(\d+)"', html)
+    return int(match.group(1)) if match else None

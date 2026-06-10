@@ -78,20 +78,31 @@ def execute_scenario(module):
         "tags": list(module.TAGS),
         "maturity": module.MATURITY,
     }
-    # Skip UI-tagged scenarios in QA-01 — no Playwright path yet.
     if "ui" in module.TAGS:
-        result["outcome"] = "skip"
-        result["detail"] = "ui scenario skipped (Playwright path lands in QA-03)"
-        return result
+        return _execute_ui_scenario(module, result)
+    return _execute_db_scenario(module, result)
 
+
+def _call_with_optional_page(func, *args, page=None, **kwargs):
+    """Call `func(*args, **kwargs)` plus `page=page` if the signature accepts it."""
+    import inspect
+
+    sig = inspect.signature(func)
+    if "page" in sig.parameters:
+        kwargs["page"] = page
+    return func(*args, **kwargs)
+
+
+def _execute_db_scenario(module, result):
+    """In-memory DB only — no Playwright."""
     tmp = engine = Session = None
     try:
         tmp, engine, Session = fixtures.build_db()
         db = Session()
         try:
             world = module.setup(db)
-            module.run(world, db=db, http=None)
-            module.check(db, world)
+            _call_with_optional_page(module.run, world, db=db, http=None, page=None)
+            _call_with_optional_page(module.check, db, world, page=None)
         finally:
             db.close()
             engine.dispose()
@@ -100,9 +111,66 @@ def execute_scenario(module):
     except AssertionFailure as exc:
         result["outcome"] = "fail"
         result["detail"] = str(exc)
-    except Exception as exc:  # noqa: BLE001 — capture any runtime error as fail
+    except Exception as exc:  # noqa: BLE001
         result["outcome"] = "fail"
         result["detail"] = f"{type(exc).__name__}: {exc}"
+    finally:
+        if tmp is not None:
+            tmp.cleanup()
+    return result
+
+
+def _execute_ui_scenario(module, result):
+    """UI scenario — requires Playwright and a reachable dev server."""
+    from scenario_contracts.lib import browser
+
+    if not browser.is_playwright_available():
+        result["outcome"] = "skip"
+        result["detail"] = "playwright_not_installed"
+        return result
+    if not browser.is_dev_server_reachable():
+        result["outcome"] = "skip"
+        result["detail"] = f"dev_server_unreachable ({browser.base_url()})"
+        return result
+
+    # UI scenarios still get an in-memory DB for setup of test-only
+    # fixtures. Browser flows hit the live dev server which has its own
+    # DB; scenarios that need to interact with dev-DB state should
+    # discover it via actions.* rather than seed it here.
+    tmp = engine = Session = None
+    try:
+        tmp, engine, Session = fixtures.build_db()
+        db = Session()
+        try:
+            world = module.setup(db)
+            with browser.BrowserContext(role="admin") as page:
+                # Capture failures while the page is still alive so we
+                # can drop a screenshot before BrowserContext.__exit__
+                # closes the browser.
+                try:
+                    _call_with_optional_page(
+                        module.run, world, db=db, http=None, page=page)
+                    _call_with_optional_page(
+                        module.check, db, world, page=page)
+                except AssertionFailure as exc:
+                    result["outcome"] = "fail"
+                    result["detail"] = str(exc)
+                    result["screenshot"] = browser.capture_failure_artifacts(
+                        page, module.ID)
+                except Exception as exc:  # noqa: BLE001
+                    result["outcome"] = "fail"
+                    result["detail"] = f"{type(exc).__name__}: {exc}"
+                    result["screenshot"] = browser.capture_failure_artifacts(
+                        page, module.ID)
+                else:
+                    result["outcome"] = "pass"
+                    result["detail"] = ""
+        finally:
+            db.close()
+            engine.dispose()
+    except Exception as exc:  # noqa: BLE001  — pre-browser setup error
+        result["outcome"] = "fail"
+        result["detail"] = f"setup_error: {type(exc).__name__}: {exc}"
     finally:
         if tmp is not None:
             tmp.cleanup()
