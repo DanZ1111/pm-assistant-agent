@@ -58,6 +58,13 @@ def run_runner(scenario_path, extra_args=None):
     return result.returncode, result.stdout + result.stderr
 
 
+def _line_contains_both(text_value, *needles):
+    for line in text_value.splitlines():
+        if all(needle in line for needle in needles):
+            return True
+    return False
+
+
 def main():
     print("\n── 1. QA Build 05 plan exists and locks the dispatch-level decision ──")
     plan = read("QA_BUILD05_EXECUTION_PLAN.md")
@@ -156,17 +163,20 @@ def main():
         else:
             fail(f"{name} live", f"exit={code}; out: {out[-400:]}")
 
-    print("\n── 8. --tag release_gate aggregates 10 PASS ──")
+    print("\n── 8. --tag release_gate aggregates QA-05's 4 contracts ──")
+    # The 4 QA-05 scenarios must show as PASS regardless of how many
+    # release_gate scenarios exist overall. Other QA builds add more
+    # release_gate scenarios over time — don't pin the exact total here.
     code, out = run_runner("scenario_contracts/contracts/",
                            extra_args=["--tag", "release_gate"])
-    # Filter to release_gate-tagged scenarios:
-    # golden_pass + 5 QA-02 + 4 QA-05 = 10 PASS.
-    # The 2 INVALID goldens still show because they fail validation
-    # before the tag filter applies — exit code is 2 (invalid > pass).
-    if "PASS: 10" in out:
-        ok("--tag release_gate shows 10 PASS (5 QA-02 + 4 QA-05 + golden_pass)")
+    qa05_ok = all(
+        _line_contains_both(out, "PASS", f"{name}_001")
+        for name in QA05_SCENARIOS
+    )
+    if qa05_ok:
+        ok("--tag release_gate shows all 4 QA-05 AI contracts as PASS")
     else:
-        fail("PASS: 10 aggregation under --tag release_gate",
+        fail("QA-05 contracts under --tag release_gate",
              f"exit={code}; tail: {out[-400:]}")
 
     print("\n── 9. Discipline boundary holds for each scenario ──")

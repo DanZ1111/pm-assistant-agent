@@ -136,6 +136,49 @@ def create_journal_entry(db, project_id, entry_text, entry_type="general",
     )
 
 
+def delete_project(db, project_id):
+    """Hard-delete a project via the real service helper.
+
+    Wraps crud.delete_project, which explicitly cleans
+    ai_conversations + project_creation_tokens before the ORM cascade
+    to avoid the Marine-bug FK violation under FK enforcement.
+    """
+    from app import crud
+
+    return crud.delete_project(db, project_id)
+
+
+def create_project_with_idempotency(db, data, token, user_id,
+                                    prototype_rounds="single"):
+    """Atomic token-claim + project insert (Build 30A)."""
+    from app import crud
+
+    return crud.create_project_with_idempotency(
+        db, data, prototype_rounds, token, user_id,
+    )
+
+
+def mint_creation_token(db, user_id):
+    """Mint a single-use idempotency token for a user."""
+    from app import crud
+
+    return crud.mint_creation_token(db, user_id)
+
+
+def update_blocker(db, blocker_id, data, user_id=None, changed_by="user"):
+    """Update an existing project blocker via the real service helper.
+
+    The crud.update_blocker function enforces an allowlist on the
+    fields it accepts; non-allowlisted keys are silently ignored.
+    """
+    from app import crud
+
+    return crud.update_blocker(
+        db, blocker_id=blocker_id, data=data,
+        changed_by=changed_by, changed_by_user_id=user_id,
+    )
+
+
 def ai_dispatch(db, tool_name, args, user, confirmed=False):
     """Invoke the real AI tool dispatcher.
 

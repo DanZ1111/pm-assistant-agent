@@ -76,6 +76,57 @@ def create_project_with_costs(db, name, pm_name, target_factory_cost=None,
     return create_project(db, name=name, pm_name=pm_name, status=status, **fields)
 
 
+def seed_ai_conversation(db, project_id, user_id,
+                         title="AI intake conversation"):
+    """Seed one AIConversation row + one AIMessage row for the project.
+
+    Mirrors what the AI intake flow produces. Used by
+    project_delete_ai_intake_cleanup to reconstruct the Marine-bug
+    surface: project + AI rows under SQLite FK enforcement.
+
+    `user_id` is required because AIConversation.user_id is non-nullable
+    (every conversation has an owning user).
+    """
+    from app.models import AIConversation, AIMessage
+
+    conversation = AIConversation(
+        project_id=project_id, title=title, user_id=user_id,
+    )
+    db.add(conversation)
+    db.commit()
+    db.refresh(conversation)
+
+    message = AIMessage(
+        project_id=project_id, conversation_id=conversation.id,
+        role="assistant",
+        message="(seeded for QA scenario)",
+    )
+    db.add(message)
+    db.commit()
+    db.refresh(message)
+    return conversation, message
+
+
+def seed_creation_token(db, user_id, project_id=None, claimed=False):
+    """Seed one project_creation_tokens row to simulate an unclaimed
+    or claimed token."""
+    import uuid
+    from datetime import datetime
+    from app.models import ProjectCreationToken
+
+    token_row = ProjectCreationToken(
+        token=uuid.uuid4().hex,
+        user_id=user_id,
+        created_at=datetime.utcnow(),
+        claimed_at=datetime.utcnow() if claimed else None,
+        project_id=project_id if claimed else None,
+    )
+    db.add(token_row)
+    db.commit()
+    db.refresh(token_row)
+    return token_row
+
+
 def seed_phases(db, project_id, names, start_date=None, duration_days=10):
     """Create a sequential set of not-started phases for a project."""
     from app.models import ProjectPhase

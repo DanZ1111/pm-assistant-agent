@@ -54,14 +54,15 @@ contributor working linearly.
 | **QA-02** | First 5 hard contract scenarios (ownership / viewer / variants / timeline delay / sandbox apply) | ✓ `8501894` |
 | **QA-03** | Playwright UI layer + 2 UI smokes + intentional UI failure proof | ✓ `79cce10` |
 | **QA-04** | Journey runner skeleton + first mini-journey (6 steps, deterministic, no AI) | ✓ `a273f74` |
-| **QA-05** | Mocked AI library + 4 confirmation-required contracts (idea / journal / due_date_shift / blocker) at dispatch level | ✓ this build |
+| **QA-05** | Mocked AI library + 4 confirmation-required contracts (idea / journal / due_date_shift / blocker) at dispatch level | ✓ `d24cfec` |
+| **QA-06** | Tier 1 contract gaps — Marine-bug regression + delete permission boundary + create idempotency + finish_phase advancement + blocker lifecycle | ✓ this build |
 
 ### Path A — ambition (planned)
 
 | Build | Scope | Why this slice | Effort |
 |---|---|---|---|
 | **QA-05b** | **HTTP-level AI scenarios.** Add FastAPI TestClient + auth-override scaffolding to the QA stack. Exercise `POST /ai/chat` end-to-end: AI proposal flow surfaces a `proposal_id` in the response; `POST /ai/chat/{cid}/proposals/{pid}/confirm` writes; `cancel` does not. Cover the `/ai/intake/extract` panel surface. Test the `_merge_reviewed_args` edit-then-confirm flow. | Layered on QA-05's dispatch-level proof. Picks up the serialization + route surface QA-05 explicitly deferred. | ~3h |
-| **QA-06** | **Tier 1 contract gaps**. Add scenarios for the bug classes we've actually shipped: project delete (admin + PM-if-not-started + FK cascade — the Marine bug), project creation paths (admin / PM / AI intake / Excel batch with idempotency), finish_phase + stage advancement, blocker create/edit/resolve, derive_current_stage, calculate_delay. | Closes the bug-class safety net. Most of these scenarios are short (~30-50 LOC). | ~3h |
+| **QA-06b** | **Excel batch intake idempotency.** Cover `create_projects_batch_with_idempotency`: review table with per-row create/skip/update semantics, idempotency token reuse, partial-failure rollback. QA-06 deferred this since the basic single-create idempotency contract already locks the atomic-claim mechanism. | Picks up the batch surface introduced in Build 30B. | ~2h |
 | **QA-07** | **Sandbox UI mutation flows**. Browser-driven scenarios that drag a module from palette to canvas, edit a node's properties, connect two nodes, attempt to create a cycle (must reject), click Tidy, click Apply through the confirmation modal. Builds out the dev-DB cleanup story deferred from QA-03. | Directly answers the "Codex Timeline planner" UI deep-dive concern. | ~3h |
 | **QA-08** | **Disruption library + medium journey**. New `lib/disruptions.py` with composable helpers: `factory_raises_cost(pct)`, `supplier_delays(days)`, `prototype_round_added()`, `geopolitical_event()`, `variant_color_only_added()`. Medium journey: 10-12 steps including 2 disruptions and 2 AI intake interactions. | First taste of "AI PM reacts to a real-world disruption." | ~3h |
 | **QA-09** | **Full Marine Knife journey**. 20+ steps. Ideas → link → sandbox → apply → 6 phases → 3 disruptions (factory mistake forcing R2 prototype, supplier delay, color variant added) → multiple AI intake interactions across all 3 surfaces → final state validation. Tags: `journey`, `marathon`. MATURITY starts as `candidate`; promoted to `stable` after 10 consecutive green runs. | The actual thing the user asked for. End-to-end integration proof. | ~4h |
