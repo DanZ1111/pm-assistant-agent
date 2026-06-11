@@ -136,6 +136,39 @@ def create_journal_entry(db, project_id, entry_text, entry_type="general",
     )
 
 
+def ai_dispatch(db, tool_name, args, user, confirmed=False):
+    """Invoke the real AI tool dispatcher.
+
+    Returns the dispatch result dict (shape: `{"ok": True, ...}` on
+    success, `{"ok": False, "error": "<code>", ...}` on failure). This
+    is the canonical entry point the HTTP route also uses, so we are
+    testing the actual service-layer contract.
+    """
+    from app.ai.tools import dispatch
+
+    return dispatch(tool_name, args, db, user, confirmed=confirmed)
+
+
+def snapshot_field(db, table_name, where, field):
+    """Read-only snapshot of one field on one row for use inside run().
+
+    Returns the raw value. Dates are returned as ISO strings to match
+    how assert_db_field normalizes them.
+    """
+    from datetime import date as _date
+    from sqlalchemy import text
+
+    clause = " AND ".join(f"{c} = :{c}" for c in where)
+    sql = f"SELECT {field} FROM {table_name} WHERE {clause} LIMIT 1"
+    row = db.execute(text(sql), where).fetchone()
+    if row is None:
+        return None
+    value = row[0]
+    if isinstance(value, _date):
+        return value.isoformat()
+    return value
+
+
 def snapshot_table_count(db, table_name, where=None):
     """Read-only COUNT snapshot for use inside run().
 

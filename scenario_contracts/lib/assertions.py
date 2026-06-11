@@ -123,6 +123,72 @@ def assert_no_rows(db, table_name, where=None, label=None):
                      label=label or f"no rows in {table_name}")
 
 
+def assert_dispatch_required_confirmation(result, tool_name, label=None):
+    """Assert dispatch returned a confirmation_required error for `tool_name`."""
+    if not isinstance(result, dict):
+        raise AssertionFailure(
+            label or "dispatch result shape",
+            "dict",
+            type(result).__name__,
+        )
+    if result.get("ok") is not False:
+        raise AssertionFailure(
+            label or "dispatch confirmation_required",
+            "ok=False",
+            f"ok={result.get('ok')!r}",
+        )
+    if result.get("error") != "confirmation_required":
+        raise AssertionFailure(
+            label or "dispatch confirmation_required error code",
+            "confirmation_required",
+            result.get("error"),
+        )
+    if result.get("tool") != tool_name:
+        raise AssertionFailure(
+            label or "dispatch confirmation_required tool name",
+            tool_name,
+            result.get("tool"),
+        )
+
+
+def assert_dispatch_succeeded(result, label=None):
+    """Assert dispatch returned a success result (ok=True, no error)."""
+    if not isinstance(result, dict):
+        raise AssertionFailure(
+            label or "dispatch result shape",
+            "dict",
+            type(result).__name__,
+        )
+    if result.get("ok") is not True:
+        raise AssertionFailure(
+            label or "dispatch succeeded",
+            "ok=True",
+            f"ok={result.get('ok')!r}, error={result.get('error')!r}",
+        )
+
+
+def assert_dispatch_blocked(result, expected_error, label=None):
+    """Assert dispatch refused with the expected error code (e.g. 'forbidden')."""
+    if not isinstance(result, dict):
+        raise AssertionFailure(
+            label or "dispatch result shape",
+            "dict",
+            type(result).__name__,
+        )
+    if result.get("ok") is not False:
+        raise AssertionFailure(
+            label or f"dispatch blocked ({expected_error})",
+            "ok=False",
+            f"ok={result.get('ok')!r}",
+        )
+    if result.get("error") != expected_error:
+        raise AssertionFailure(
+            label or f"dispatch blocked error code",
+            expected_error,
+            result.get("error"),
+        )
+
+
 def assert_active_blocker_count(db, project_id, expected, label=None):
     """Assert N project_blockers rows with status='active' for the project."""
     assert_row_count(
