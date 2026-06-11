@@ -63,6 +63,13 @@ def run_runner(scenario_path, extra_args=None):
     return result.returncode, result.stdout + result.stderr
 
 
+def _line_contains_both(text_value, *needles):
+    for line in text_value.splitlines():
+        if all(needle in line for needle in needles):
+            return True
+    return False
+
+
 def main():
     print("\n── 1. QA Build 06 plan exists and locks the 5 scenarios ──")
     plan = read("QA_BUILD06_EXECUTION_PLAN.md")
@@ -131,13 +138,19 @@ def main():
         else:
             fail(f"{name} live", f"exit={code}; out: {out[-400:]}")
 
-    print("\n── 6. --tag release_gate aggregates 15 PASS ──")
+    print("\n── 6. --tag release_gate includes all 5 QA-06 contracts ──")
     code, out = run_runner("scenario_contracts/contracts/",
                            extra_args=["--tag", "release_gate"])
-    if "PASS: 15" in out:
-        ok("--tag release_gate shows 15 PASS (5 QA-02 + 4 QA-05 + 5 QA-06 + golden_pass)")
+    # Scope to QA-06's own scenarios so this assertion survives future
+    # QA builds adding more release_gate scenarios.
+    qa06_ok = all(
+        _line_contains_both(out, "PASS", f"{name}_001")
+        for name in QA06_SCENARIOS
+    )
+    if qa06_ok:
+        ok("--tag release_gate shows all 5 QA-06 contracts as PASS")
     else:
-        fail("PASS: 15 aggregation",
+        fail("QA-06 contracts under --tag release_gate",
              f"exit={code}; tail: {out[-400:]}")
 
     print("\n── 7. Discipline boundary holds for each scenario ──")

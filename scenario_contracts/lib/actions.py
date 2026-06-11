@@ -278,3 +278,90 @@ def discover_first_project_id(page):
     html = page.content()
     match = re.search(r'href="/projects/(\d+)"', html)
     return int(match.group(1)) if match else None
+
+
+def ensure_sandbox_exists(page, project_id, template_key="simple_oem_knife"):
+    """Navigate to the sandbox page; if no draft exists, create one from
+    the given system template by submitting the picker form.
+
+    Idempotent: re-runs against a project that already has a draft just
+    navigate to the canvas view and return.
+    """
+    open_url(page, f"/projects/{project_id}/sandbox")
+    # If picker is visible, no draft exists yet — create from template.
+    if page.locator(".sandbox-picker").count() > 0:
+        # Pick the specific template-card form whose hidden input
+        # matches `template_key`. The picker also renders a
+        # "start blank" form (no template_key input) which we skip.
+        forms = page.locator(
+            f"form[action='/projects/{project_id}/sandbox/create']"
+        )
+        target_form = None
+        for i in range(forms.count()):
+            f = forms.nth(i)
+            hidden_inputs = f.locator("input[name='template_key']")
+            if hidden_inputs.count() == 0:
+                continue  # this is the "start blank" form; skip
+            hidden_value = hidden_inputs.first.input_value()
+            if hidden_value == template_key:
+                target_form = f
+                break
+        if target_form is None:
+            # No matching template — fall back to the first form that
+            # HAS a template_key input (any system template).
+            for i in range(forms.count()):
+                f = forms.nth(i)
+                if f.locator("input[name='template_key']").count() > 0:
+                    target_form = f
+                    break
+        if target_form is None:
+            raise RuntimeError(
+                "no usable picker form found for project "
+                f"{project_id}; expected a system template form"
+            )
+        target_form.locator("button[type='submit']").first.click()
+        page.wait_for_load_state("networkidle")
+
+
+def click_add_first_module(page):
+    """Click the first `.sandbox-add-module-btn`.
+
+    Triggers the JS `addModule()` function which POSTs to the
+    `/sandbox/{sid}/nodes/add` route and refreshes the canvas via
+    `refreshFromPayload`.
+    """
+    button = page.locator(".sandbox-add-module-btn").first
+    button.click()
+
+
+def read_sandbox_node_count(page):
+    """Read the current sandbox node count from the DOM.
+
+    Reads `[data-sandbox-node-count]` which the JS updates after every
+    sandbox mutation via `updateSummary()`. Returns an int.
+    """
+    text = page.locator("[data-sandbox-node-count]").first.text_content()
+    if text is None:
+        return None
+    text = text.strip()
+    try:
+        return int(text)
+    except ValueError:
+        return None
+
+
+def wait_for_node_count(page, expected, timeout_ms=5000):
+    """Wait until `[data-sandbox-node-count]` equals `expected`.
+
+    Used after click_add_first_module to wait for the JS-driven
+    canvas refresh to complete.
+    """
+    page.wait_for_function(
+        """({selector, expected}) => {
+            const el = document.querySelector(selector);
+            if (!el) return false;
+            return el.textContent.trim() === String(expected);
+        }""",
+        arg={"selector": "[data-sandbox-node-count]", "expected": expected},
+        timeout=timeout_ms,
+    )

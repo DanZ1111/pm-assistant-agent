@@ -266,6 +266,19 @@ def assert_url_path(page, expected_path, label=None):
         )
 
 
+def assert_canvas_node_count_equals(page, expected, label=None):
+    """Assert the sandbox canvas node count matches `expected`."""
+    from scenario_contracts.lib.actions import read_sandbox_node_count
+
+    actual = read_sandbox_node_count(page)
+    if actual != expected:
+        raise AssertionFailure(
+            label or "sandbox canvas node count",
+            expected,
+            actual,
+        )
+
+
 def assert_page_contains(page, needle, label=None):
     """Assert the rendered HTML contains `needle` somewhere."""
     html = page.content()
