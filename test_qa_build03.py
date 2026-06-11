@@ -98,10 +98,15 @@ def main():
                   "def assert_url_path", "def assert_page_contains"])
 
     print("\n── 4. Runner has UI scenario execution path ──")
+    # QA-04 extracted the executors into a helper module. Symbols may
+    # live in runner.py OR executors.py.
     runner_src = read("scenario_contracts/lib/runner.py")
-    contains_all("runner exposes UI scenario branch", runner_src,
-                 ["_execute_ui_scenario", "_execute_db_scenario",
-                  "_call_with_optional_page",
+    executors_path = ROOT / "scenario_contracts" / "lib" / "executors.py"
+    executors_src = executors_path.read_text() if executors_path.exists() else ""
+    combined = runner_src + "\n" + executors_src
+    contains_all("runner exposes UI scenario branch", combined,
+                 ["execute_ui_scenario", "execute_db_scenario",
+                  "call_with_optional_page",
                   "is_playwright_available", "is_dev_server_reachable",
                   "BrowserContext", "capture_failure_artifacts"])
 

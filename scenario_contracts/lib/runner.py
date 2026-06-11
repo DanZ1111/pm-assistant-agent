@@ -22,12 +22,18 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from scenario_contracts.lib import fixtures, reporter
-from scenario_contracts.lib.assertions import AssertionFailure
+from scenario_contracts.lib import executors, reporter
+from scenario_contracts.lib.assertions import AssertionFailure  # noqa: F401 — re-export
 
 REQUIRED_METADATA = ("ID", "TITLE", "TAGS", "MATURITY", "WHY_IT_MATTERS")
-REQUIRED_FUNCTIONS = ("setup", "run", "check")
+REQUIRED_CONTRACT_FUNCTIONS = ("setup", "run", "check")  # contract shape
+REQUIRED_JOURNEY_FUNCTIONS = ("setup",)                  # journey shape
 VALID_MATURITY = {"stable", "candidate", "experimental"}
+
+
+def is_journey(module):
+    """Journey shape: has `setup` and `STEPS=[Step, ...]`. No `run`/`check`."""
+    return hasattr(module, "STEPS") and callable(getattr(module, "setup", None))
 
 
 class ScenarioConfigError(Exception):
@@ -55,9 +61,22 @@ def validate_scenario(module):
     for field in REQUIRED_METADATA:
         if not hasattr(module, field):
             raise ScenarioConfigError(f"missing {field}")
-    for func in REQUIRED_FUNCTIONS:
+    if is_journey(module):
+        required = REQUIRED_JOURNEY_FUNCTIONS
+    else:
+        required = REQUIRED_CONTRACT_FUNCTIONS
+    for func in required:
         if not hasattr(module, func) or not callable(getattr(module, func)):
             raise ScenarioConfigError(f"missing {func}()")
+    if is_journey(module):
+        from scenario_contracts.lib.journey import Step
+        if not isinstance(module.STEPS, list) or not module.STEPS:
+            raise ScenarioConfigError("STEPS must be a non-empty list")
+        for i, step in enumerate(module.STEPS):
+            if not isinstance(step, Step):
+                raise ScenarioConfigError(
+                    f"STEPS[{i}] must be a journey.Step, got {type(step).__name__}"
+                )
     if module.MATURITY not in VALID_MATURITY:
         raise ScenarioConfigError(
             f"MATURITY must be one of {sorted(VALID_MATURITY)}; got {module.MATURITY!r}"
@@ -71,110 +90,18 @@ def validate_scenario(module):
 
 
 def execute_scenario(module):
-    """Run setup → run → check. Return a result dict."""
+    """Dispatch to the right executor based on scenario shape + tags."""
     result = {
         "id": module.ID,
         "title": module.TITLE,
         "tags": list(module.TAGS),
         "maturity": module.MATURITY,
     }
+    if is_journey(module):
+        return executors.execute_journey_scenario(module, result)
     if "ui" in module.TAGS:
-        return _execute_ui_scenario(module, result)
-    return _execute_db_scenario(module, result)
-
-
-def _call_with_optional_page(func, *args, page=None, **kwargs):
-    """Call `func(*args, **kwargs)` plus `page=page` if the signature accepts it."""
-    import inspect
-
-    sig = inspect.signature(func)
-    if "page" in sig.parameters:
-        kwargs["page"] = page
-    return func(*args, **kwargs)
-
-
-def _execute_db_scenario(module, result):
-    """In-memory DB only — no Playwright."""
-    tmp = engine = Session = None
-    try:
-        tmp, engine, Session = fixtures.build_db()
-        db = Session()
-        try:
-            world = module.setup(db)
-            _call_with_optional_page(module.run, world, db=db, http=None, page=None)
-            _call_with_optional_page(module.check, db, world, page=None)
-        finally:
-            db.close()
-            engine.dispose()
-        result["outcome"] = "pass"
-        result["detail"] = ""
-    except AssertionFailure as exc:
-        result["outcome"] = "fail"
-        result["detail"] = str(exc)
-    except Exception as exc:  # noqa: BLE001
-        result["outcome"] = "fail"
-        result["detail"] = f"{type(exc).__name__}: {exc}"
-    finally:
-        if tmp is not None:
-            tmp.cleanup()
-    return result
-
-
-def _execute_ui_scenario(module, result):
-    """UI scenario — requires Playwright and a reachable dev server."""
-    from scenario_contracts.lib import browser
-
-    if not browser.is_playwright_available():
-        result["outcome"] = "skip"
-        result["detail"] = "playwright_not_installed"
-        return result
-    if not browser.is_dev_server_reachable():
-        result["outcome"] = "skip"
-        result["detail"] = f"dev_server_unreachable ({browser.base_url()})"
-        return result
-
-    # UI scenarios still get an in-memory DB for setup of test-only
-    # fixtures. Browser flows hit the live dev server which has its own
-    # DB; scenarios that need to interact with dev-DB state should
-    # discover it via actions.* rather than seed it here.
-    tmp = engine = Session = None
-    try:
-        tmp, engine, Session = fixtures.build_db()
-        db = Session()
-        try:
-            world = module.setup(db)
-            with browser.BrowserContext(role="admin") as page:
-                # Capture failures while the page is still alive so we
-                # can drop a screenshot before BrowserContext.__exit__
-                # closes the browser.
-                try:
-                    _call_with_optional_page(
-                        module.run, world, db=db, http=None, page=page)
-                    _call_with_optional_page(
-                        module.check, db, world, page=page)
-                except AssertionFailure as exc:
-                    result["outcome"] = "fail"
-                    result["detail"] = str(exc)
-                    result["screenshot"] = browser.capture_failure_artifacts(
-                        page, module.ID)
-                except Exception as exc:  # noqa: BLE001
-                    result["outcome"] = "fail"
-                    result["detail"] = f"{type(exc).__name__}: {exc}"
-                    result["screenshot"] = browser.capture_failure_artifacts(
-                        page, module.ID)
-                else:
-                    result["outcome"] = "pass"
-                    result["detail"] = ""
-        finally:
-            db.close()
-            engine.dispose()
-    except Exception as exc:  # noqa: BLE001  — pre-browser setup error
-        result["outcome"] = "fail"
-        result["detail"] = f"setup_error: {type(exc).__name__}: {exc}"
-    finally:
-        if tmp is not None:
-            tmp.cleanup()
-    return result
+        return executors.execute_ui_scenario(module, result)
+    return executors.execute_db_scenario(module, result)
 
 
 def run_path(path, tag_filter=None):

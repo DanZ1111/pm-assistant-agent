@@ -93,6 +93,49 @@ def apply_sandbox(db, project_id, sandbox_id, apply_start_date, user_id,
     )
 
 
+def finish_phase(db, phase_id, changed_by="user", user_id=None):
+    """Mark a phase done; auto-advance the next phase to in_progress."""
+    from app import crud
+
+    return crud.finish_phase(
+        db, phase_id=phase_id,
+        changed_by=changed_by, changed_by_user_id=user_id,
+    )
+
+
+def create_blocker(db, project_id, title, description=None, severity="medium",
+                   phase_id=None, user_id=None, changed_by="user"):
+    """Open a project blocker via the real service helper."""
+    from app import crud
+
+    return crud.create_blocker(
+        db, project_id=project_id, title=title, description=description,
+        severity=severity, phase_id=phase_id,
+        created_by_user_id=user_id, changed_by=changed_by,
+    )
+
+
+def resolve_blocker(db, blocker_id, user_id=None, changed_by="user"):
+    """Resolve a blocker via the real service helper."""
+    from app import crud
+
+    return crud.resolve_blocker(
+        db, blocker_id=blocker_id,
+        resolved_by_user_id=user_id, changed_by=changed_by,
+    )
+
+
+def create_journal_entry(db, project_id, entry_text, entry_type="general",
+                         user_id=None, changed_by="user"):
+    """Add a project journal entry via the real service helper."""
+    from app import crud
+
+    return crud.create_journal_entry(
+        db, project_id=project_id, entry_text=entry_text,
+        entry_type=entry_type, author_user_id=user_id, changed_by=changed_by,
+    )
+
+
 def snapshot_table_count(db, table_name, where=None):
     """Read-only COUNT snapshot for use inside run().
 

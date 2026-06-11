@@ -123,6 +123,15 @@ def assert_no_rows(db, table_name, where=None, label=None):
                      label=label or f"no rows in {table_name}")
 
 
+def assert_active_blocker_count(db, project_id, expected, label=None):
+    """Assert N project_blockers rows with status='active' for the project."""
+    assert_row_count(
+        db, "project_blockers", expected=expected,
+        where={"project_id": project_id, "status": "active"},
+        label=label or f"active blockers on project {project_id}",
+    )
+
+
 def assert_equal(actual, expected, label=None):
     """General equality assertion for values captured in `world`.
 
