@@ -49,7 +49,7 @@ step.**
 
 ---
 
-## The 5 hard rules
+## The 6 hard rules
 
 ### Rule 1: No DB-only acceptance journeys
 
@@ -120,6 +120,62 @@ load-bearing semantic class like `.timeline-tile-current
    outcome. The user lock 9 success criterion is "catches at least
    one class of bug per-build `test.py` would miss," not "asserts
    every imaginable thing."
+
+### Rule 6: Test navigation, not just routes
+
+**Discovered the hard way: 2026-06-13.** The user reported they
+couldn't find the Planning Sandbox anywhere in the UI. The route
+worked. The page rendered. Every UI test we'd written passed because
+every UI test navigated **directly to `/projects/{id}/sandbox`** via
+`actions.open_url`. No test asked "could a PM click their way to
+this feature?" The answer was no — there was no `<a>` element on the
+project detail page or anywhere else that linked to the sandbox.
+The feature was unreachable; QA was blind to it because every
+scenario bypassed the navigation question.
+
+**The rule:** every UI scenario that asserts a feature works must
+include at least one step that **reaches the feature through the
+navigation a real PM would use** — clicking a link from `/projects`,
+from a project detail page, or from a home page. `actions.open_url`
+is permitted for setup/teardown but cannot be the only path to the
+feature under test.
+
+✗ Bad (URL-driven only — invisible to discoverability bugs):
+```python
+def do_open_sandbox(world, db, http, page):
+    actions.open_url(page, f"/projects/{world['project_id']}/sandbox")
+```
+
+✓ Good (clicks the way a PM would):
+```python
+def do_navigate_to_sandbox(world, db, http, page):
+    actions.open_url(page, f"/projects/{world['project_id']}")
+    # The PM looks for a link to the sandbox and follows it.
+    page.locator(
+        f'a[href*="/projects/{world["project_id"]}/sandbox"]'
+    ).first.click()
+    page.wait_for_load_state("networkidle")
+
+def check_after_navigate(db, world, page):
+    # Asserts both that a link existed AND that following it landed
+    # on the sandbox.
+    assertions.assert_url_path(
+        page, f"/projects/{world['project_id']}/sandbox",
+        label="clicking the project's sandbox link lands on the sandbox",
+    )
+```
+
+A scenario that ONLY navigates by URL is testing the **route**, not
+the **feature**. Most regressions PMs hit are navigation-class:
+"the route still works but the link is gone." A test that doesn't
+click is blind to that class.
+
+The canonical example of this rule in practice is
+[scenario_contracts/acceptance/sandbox_is_discoverable_from_project.py](scenario_contracts/acceptance/sandbox_is_discoverable_from_project.py)
+— a scenario that exists specifically to fail until the navigation
+link gets added back to the project detail page. When the bug fix
+lands, the scenario turns green; if anyone ever removes the link
+again, it goes red.
 
 ---
 

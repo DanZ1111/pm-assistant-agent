@@ -84,6 +84,13 @@ run_scenario_runner "release_gate scenarios" \
     "python3 -m scenario_contracts.lib.runner scenario_contracts/contracts/ --tag release_gate"
 run_scenario_runner "journeys" \
     "python3 -m scenario_contracts.lib.runner scenario_contracts/journeys/"
+# QA-11 (2026-06-13): acceptance/ tier shipped — must run as part of the
+# suite. Each acceptance scenario asserts 4 kinds of PM truth (DB + UI +
+# history + comprehension). A failing acceptance scenario reflects a real
+# PM-visible bug (e.g. sandbox_is_discoverable_from_project.py guards
+# against navigation regressions Codex's domain).
+run_scenario_runner "acceptance" \
+    "python3 -m scenario_contracts.lib.runner scenario_contracts/acceptance/"
 
 echo
 echo "── summary ──"
