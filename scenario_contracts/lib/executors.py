@@ -56,38 +56,39 @@ def execute_db_scenario(module, result):
 
 
 def execute_journey_scenario(module, result):
-    """Walk module.STEPS one at a time. Report failures with step name."""
+    """Walk module.STEPS one at a time. Report failures with step name.
+
+    QA-11: when the journey is tagged `acceptance` or `ui`, the
+    executor wraps the step walk in a Playwright BrowserContext and
+    passes the live `page` to each step (via signature inspection).
+    Non-UI journeys behave unchanged (page=None, no browser).
+    """
+    needs_browser = ("acceptance" in module.TAGS) or ("ui" in module.TAGS)
+    if needs_browser:
+        from scenario_contracts.lib import browser
+        if not browser.is_playwright_available():
+            result["outcome"] = "skip"
+            result["detail"] = "playwright_not_installed"
+            return result
+        if not browser.is_dev_server_reachable():
+            result["outcome"] = "skip"
+            result["detail"] = f"dev_server_unreachable ({browser.base_url()})"
+            return result
+
     tmp = engine = Session = None
     try:
         tmp, engine, Session = fixtures.build_db()
         db = Session()
         try:
             world = module.setup(db)
-            for i, step in enumerate(module.STEPS, 1):
-                try:
-                    step.do(world, db=db, http=None)
-                except Exception as exc:  # noqa: BLE001
-                    result["outcome"] = "fail"
-                    result["detail"] = (
-                        f"step {i} ({step.name}) do() raised: "
-                        f"{type(exc).__name__}: {exc}"
-                    )
-                    return result
-                try:
-                    step.check(db, world)
-                except AssertionFailure as exc:
-                    result["outcome"] = "fail"
-                    result["detail"] = f"step {i} ({step.name}) check: {exc}"
-                    return result
-                except Exception as exc:  # noqa: BLE001
-                    result["outcome"] = "fail"
-                    result["detail"] = (
-                        f"step {i} ({step.name}) check raised: "
-                        f"{type(exc).__name__}: {exc}"
-                    )
-                    return result
-            result["outcome"] = "pass"
-            result["detail"] = f"{len(module.STEPS)} steps OK"
+            if needs_browser:
+                from scenario_contracts.lib import browser
+                with browser.BrowserContext(role="admin") as page:
+                    _walk_steps(module, world, db, result, page=page,
+                                browser_mod=browser)
+            else:
+                _walk_steps(module, world, db, result, page=None,
+                            browser_mod=None)
         finally:
             db.close()
             engine.dispose()
@@ -98,6 +99,59 @@ def execute_journey_scenario(module, result):
         if tmp is not None:
             tmp.cleanup()
     return result
+
+
+def _walk_steps(module, world, db, result, page, browser_mod):
+    """Inner step walker shared by DB-only and acceptance journeys.
+
+    Calls each step's do() then check() via call_with_optional_page so
+    steps that don't declare `page` still work. On failure, sets the
+    result + (if `page` is alive) captures a screenshot.
+    """
+    for i, step in enumerate(module.STEPS, 1):
+        try:
+            call_with_optional_page(step.do, world, db=db, http=None,
+                                    page=page)
+        except Exception as exc:  # noqa: BLE001
+            result["outcome"] = "fail"
+            result["detail"] = (
+                f"step {i} ({step.name}) do() raised: "
+                f"{type(exc).__name__}: {exc}"
+            )
+            if page is not None and browser_mod is not None:
+                try:
+                    result["screenshot"] = browser_mod.capture_failure_artifacts(
+                        page, f"{module.ID}_step{i}")
+                except Exception:
+                    pass
+            return
+        try:
+            call_with_optional_page(step.check, db, world, page=page)
+        except AssertionFailure as exc:
+            result["outcome"] = "fail"
+            result["detail"] = f"step {i} ({step.name}) check: {exc}"
+            if page is not None and browser_mod is not None:
+                try:
+                    result["screenshot"] = browser_mod.capture_failure_artifacts(
+                        page, f"{module.ID}_step{i}")
+                except Exception:
+                    pass
+            return
+        except Exception as exc:  # noqa: BLE001
+            result["outcome"] = "fail"
+            result["detail"] = (
+                f"step {i} ({step.name}) check raised: "
+                f"{type(exc).__name__}: {exc}"
+            )
+            if page is not None and browser_mod is not None:
+                try:
+                    result["screenshot"] = browser_mod.capture_failure_artifacts(
+                        page, f"{module.ID}_step{i}")
+                except Exception:
+                    pass
+            return
+    result["outcome"] = "pass"
+    result["detail"] = f"{len(module.STEPS)} steps OK"
 
 
 def execute_ui_scenario(module, result):

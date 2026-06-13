@@ -322,6 +322,185 @@ def wait_for_load(page):
     page.wait_for_load_state("networkidle")
 
 
+def create_project_via_form(page, name, product_manager="",
+                            target_factory_cost="", target_msrp="",
+                            brand="", project_thesis="",
+                            prototype_rounds="single"):
+    """Submit the manual `/projects/new` form via Playwright.
+
+    Navigates to the form, fills the visible inputs, submits, and
+    returns the project_id parsed from the redirect URL.
+
+    The hidden `submission_token` field comes pre-populated by the
+    GET handler so the form-submit just works.
+    """
+    open_url(page, "/projects/new")
+    page.fill("input[name='name']", name)
+    if product_manager:
+        page.fill("input[name='product_manager']", product_manager)
+    if target_factory_cost:
+        page.fill("input[name='target_factory_cost']", target_factory_cost)
+    if target_msrp:
+        page.fill("input[name='target_msrp']", target_msrp)
+    if brand:
+        page.fill("input[name='brand']", brand)
+    if project_thesis:
+        page.fill("textarea[name='project_thesis']", project_thesis)
+    # `prototype_rounds` is a radio group; "single" is checked by default.
+    if prototype_rounds == "double":
+        page.click("input[name='prototype_rounds'][value='double']")
+    # Target the project-create form specifically — the AI intake panel
+    # adds several other forms to the same page.
+    page.click("form[action='/projects/new'] button[type='submit']")
+    page.wait_for_load_state("networkidle")
+    # After successful create, URL is /projects/{id}.
+    import re
+    match = re.search(r"/projects/(\d+)$", page.url)
+    if not match:
+        raise RuntimeError(
+            f"create_project_via_form: expected redirect to /projects/<id>; "
+            f"got {page.url!r}"
+        )
+    return int(match.group(1))
+
+
+def create_variant_via_form(page, project_id, variant_name,
+                            target_factory_cost="", target_msrp="",
+                            packaging_summary="", sales_format=""):
+    """POST /projects/{id}/variants via the in-page variant-add form.
+
+    Returns the new variant_id parsed from `#variant-N` after the
+    page reloads.
+    """
+    open_url(page, f"/projects/{project_id}")
+    # The variant add form is hidden until "Add" is clicked.
+    # Use the top-of-section Add button, not any per-variant cancel button.
+    page.locator(
+        "button[onclick='toggleVariantAddForm()']"
+    ).first.click()
+    # Scope all inputs to #variantAddForm — once another variant exists,
+    # the per-variant edit cards also have name="variant_name" /
+    # name="packaging_summary" inputs that Playwright would race against.
+    form = page.locator("#variantAddForm")
+    form.locator("input[name='variant_name']").first.fill(variant_name)
+    if target_factory_cost:
+        form.locator(
+            "input[name='target_factory_cost']"
+        ).first.fill(target_factory_cost)
+    if target_msrp:
+        form.locator("input[name='target_msrp']").first.fill(target_msrp)
+    if packaging_summary:
+        loc = form.locator(
+            "textarea[name='packaging_summary'], input[name='packaging_summary']"
+        ).first
+        if loc.count() > 0:
+            loc.fill(packaging_summary)
+    if sales_format:
+        sf = form.locator("select[name='sales_format']").first
+        if sf.count() > 0:
+            sf.select_option(value=sales_format)
+    form.locator("button[type='submit']").first.click()
+    page.wait_for_load_state("networkidle")
+    # The new variant card has id="variant-{N}"; find the highest id
+    # for this run by scraping the page.
+    import re
+    html = page.content()
+    ids = [int(m) for m in re.findall(r'id="variant-(\d+)"', html)]
+    if not ids:
+        raise RuntimeError("create_variant_via_form: no variant card on page after submit")
+    return max(ids)
+
+
+def discover_phase_id(page, project_id, phase_name):
+    """Look up a phase's ID from the project detail page by matching
+    its visible `data-phase-name` attribute.
+
+    Uses the existing `data-phase-id` + `data-phase-name` attributes
+    on the phase-edit buttons in the Detailed Table.
+    """
+    open_url(page, f"/projects/{project_id}")
+    loc = page.locator(f'[data-phase-id][data-phase-name="{phase_name}"]').first
+    if loc.count() == 0:
+        return None
+    pid = loc.get_attribute("data-phase-id")
+    return int(pid) if pid else None
+
+
+def adjust_due_date_via_cc(page, project_id, phase_id,
+                            new_planned_end_date, reason):
+    """POST the Timeline Command Center's adjust-due-date form."""
+    import requests
+    cookies = {c["name"]: c["value"] for c in page.context.cookies()}
+    from scenario_contracts.lib.browser import base_url
+    resp = requests.post(
+        f"{base_url()}/projects/{project_id}/command/adjust-due-date",
+        data={
+            "phase_id": phase_id,
+            "new_planned_end_date": new_planned_end_date,
+            "reason": reason,
+        },
+        cookies=cookies, allow_redirects=False, timeout=15,
+    )
+    if resp.status_code not in (302, 303):
+        raise RuntimeError(
+            f"adjust_due_date_via_cc: expected redirect, got {resp.status_code}: "
+            f"{resp.text[:200]}"
+        )
+
+
+def add_blocker_via_cc(page, project_id, phase_id, title,
+                       description="", severity="medium"):
+    """POST the Timeline Command Center's add-blocker form."""
+    import requests
+    cookies = {c["name"]: c["value"] for c in page.context.cookies()}
+    from scenario_contracts.lib.browser import base_url
+    resp = requests.post(
+        f"{base_url()}/projects/{project_id}/command/add-blocker",
+        data={
+            "title": title, "description": description,
+            "severity": severity, "phase_id": str(phase_id),
+        },
+        cookies=cookies, allow_redirects=False, timeout=15,
+    )
+    if resp.status_code not in (302, 303):
+        raise RuntimeError(
+            f"add_blocker_via_cc: expected redirect, got {resp.status_code}: "
+            f"{resp.text[:200]}"
+        )
+
+
+def archive_project_via_http(page, project_id):
+    """Soft-archive a project. The acceptance journey calls this as its
+    final step to keep the dev DB tidy.
+
+    Uses the existing /projects/{id}/archive route if available; falls
+    back to a direct status update via /projects/{id}/edit form
+    submission.
+    """
+    import requests
+    cookies = {c["name"]: c["value"] for c in page.context.cookies()}
+    from scenario_contracts.lib.browser import base_url
+    # Try the dedicated archive route first.
+    resp = requests.post(
+        f"{base_url()}/projects/{project_id}/archive",
+        cookies=cookies, allow_redirects=False, timeout=15,
+    )
+    if resp.status_code in (200, 302, 303):
+        return
+    # Fall back: status update via the edit form.
+    resp = requests.post(
+        f"{base_url()}/projects/{project_id}/edit",
+        data={"status": "archived"},
+        cookies=cookies, allow_redirects=False, timeout=15,
+    )
+    # Either redirect or 200 is acceptable for the soft cleanup.
+    if resp.status_code not in (200, 302, 303):
+        raise RuntimeError(
+            f"archive_project_via_http: got {resp.status_code}: "
+            f"{resp.text[:200]}"
+        )
+
+
 def discover_first_project_id(page):
     """Discover any project id from the /projects index for read-only smoke.
 

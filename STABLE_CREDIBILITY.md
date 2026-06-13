@@ -1,5 +1,15 @@
 # Stable Credibility — Promotion Rule for QA Scenarios
 
+> **QA-11 addition (2026-06-13):** the acceptance tier is now
+> recognized alongside contracts and journeys. Acceptance scenarios
+> follow the same 3-tier maturity model (experimental → candidate →
+> stable) and the same 10-consecutive-runs threshold. The structural
+> linter in test_qa_build10 applies to acceptance scenarios too. See
+> [SCENARIO_AUTHORING_GUIDE.md](SCENARIO_AUTHORING_GUIDE.md) for the
+> rules every acceptance scenario must follow.
+
+
+
 This document locks the **maturity contract** for every scenario in
 `scenario_contracts/`. Promotion from one tier to the next is a
 **manual** action (a human edits the `MATURITY` field of a scenario
@@ -37,8 +47,8 @@ or the QA-10 regression fails.
 
 ### `candidate`
 
-- **Where it lives:** `scenario_contracts/contracts/` or
-  `scenario_contracts/journeys/`.
+- **Where it lives:** `scenario_contracts/contracts/`,
+  `scenario_contracts/journeys/`, or `scenario_contracts/acceptance/`.
 - **Origin:** promoted from `experimental` after human review.
 - **Promotion to stable requires:** all of the following:
   1. **10 consecutive green runs** in `run_qa_loop.sh 10`. The
@@ -59,10 +69,14 @@ or the QA-10 regression fails.
 
 ### `stable`
 
-- **Where it lives:** `scenario_contracts/contracts/` or
-  `scenario_contracts/journeys/`.
+- **Where it lives:** `scenario_contracts/contracts/`,
+  `scenario_contracts/journeys/`, or `scenario_contracts/acceptance/`.
 - **Origin:** promoted from `candidate` after the 4-condition rule
-  above.
+  above. **Acceptance journeys carry an additional requirement
+  per [SCENARIO_AUTHORING_GUIDE.md](SCENARIO_AUTHORING_GUIDE.md):
+  the reviewer for promotion must have PM context, not just
+  engineering review** — the 4 truth-tier checks rest on judging
+  what a real PM would notice.
 - **Demotion:** if a stable scenario starts flickering in
   `run_qa_loop.sh`, the human action is to **demote** it back to
   `candidate` (edit MATURITY) and investigate. Stable scenarios

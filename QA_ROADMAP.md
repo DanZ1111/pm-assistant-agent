@@ -59,7 +59,8 @@ contributor working linearly.
 | **QA-07** | Sandbox UI mutation — clicking the palette Add button creates a node and the canvas updates end-to-end | ✓ `162501b` |
 | **QA-08** | Disruption library (5 composable helpers) + medium journey (10 steps mixing manual actions + mocked AI + 2 disruptions) | ✓ `d0e491c` |
 | **QA-09** | Full Marine Knife journey — 20 steps. Ideas → link → sandbox apply → 6+ phases → all 5 disruption types → multiple AI proposals → 2 color variants → blocker lifecycle → cumulative final state. End-state integration proof of the QA system itself. | ✓ `2d1d58e` |
-| **QA-10** | Coverage assistant (offline gap analyzer) + run_qa_suite.sh + run_qa_loop.sh with flakiness tracking + STABLE_CREDIBILITY.md promotion rule + candidates/ scaffolding. **Closes the QA series.** | ✓ this build |
+| **QA-10** | Coverage assistant (offline gap analyzer) + run_qa_suite.sh + run_qa_loop.sh with flakiness tracking + STABLE_CREDIBILITY.md promotion rule + candidates/ scaffolding. | ✓ `53ac9c4` |
+| **QA-11** | PM Acceptance Journey Layer — `acceptance/` tier + `lib/pm_views.py` (6 PM-facing assertions) + first acceptance journey (football_knife_asd_lifecycle) + SCENARIO_AUTHORING_GUIDE.md (5 hard rules) + UI_TESTABILITY_GAPS.md (3 proposed app/* patches). Reframes the QA scenario library from engineering coverage to PM-truth coverage: DB + UI + history + comprehension. | ✓ this build |
 
 ### Path A — ambition (planned)
 
