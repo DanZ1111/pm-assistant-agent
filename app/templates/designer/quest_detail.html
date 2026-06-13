@@ -80,11 +80,35 @@
       <div class="designer-alert success">{{ t('designer.submission_uploaded') }}</div>
       {% endif %}
 
+      {% if open_revision_request %}
+      <div class="designer-revision-request" data-designer-revision-request>
+        <div class="designer-revision-head">
+          <i class="bi bi-arrow-repeat"></i>
+          <div>
+            <h3>{{ t('designer.revision_requested_title') }}</h3>
+            {% if open_revision_request.general_comment %}
+            <p>{{ open_revision_request.general_comment }}</p>
+            {% endif %}
+          </div>
+        </div>
+        {% if open_revision_request['items'] %}
+        <ul>
+          {% for item in open_revision_request['items'] %}
+          <li>{{ item.text }}</li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </div>
+      {% endif %}
+
       {% if safe_quest.status in ('open', 'reviewing', 'revision_needed') %}
       <form method="post"
             action="/designer/quests/{{ safe_quest.id }}/submissions/upload"
             enctype="multipart/form-data"
             class="designer-submission-form">
+        {% if open_revision_request %}
+        <input type="hidden" name="revision_request_id" value="{{ open_revision_request.id }}">
+        {% endif %}
         <div>
           <label class="form-label">{{ t('designer.submission_title_label') }}</label>
           <input name="title" class="form-control" placeholder="{{ t('designer.submission_title_placeholder') }}">

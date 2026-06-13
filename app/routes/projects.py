@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from datetime import date, datetime
 
 from app.database import get_db
-from app.models import Project, PlanningSandbox, DesignQuest
+from app.models import Project, PlanningSandbox, DesignQuest, DesignSubmission
 import app.crud as crud
 from app.ai.parser import extract_thesis_and_inspirations
 from app.ai.matching import find_best_match, MATCH_THRESHOLD
@@ -761,6 +761,105 @@ def design_submission_version_download(
     if not os.path.exists(disk_path):
         raise HTTPException(status_code=404, detail="Submission file missing")
     return FileResponse(disk_path, filename=version.original_filename or version.filename)
+
+
+@router.post("/projects/{project_id}/design-quests/{quest_id}/submissions/{submission_id}/shortlist")
+def design_submission_shortlist(
+    request: Request,
+    project_id: int,
+    quest_id: int,
+    submission_id: int,
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+    project = crud.get_project(db, project_id)
+    if not project or not can_edit_project(current_user, project):
+        return _design_quest_redirect(project_id, "forbidden")
+    submission_row = db.query(DesignSubmission).filter(
+        DesignSubmission.id == submission_id,
+        DesignSubmission.project_id == project_id,
+        DesignSubmission.quest_id == quest_id,
+    ).first()
+    if not submission_row:
+        return _design_quest_redirect(project_id, "submission_not_found")
+    try:
+        crud.shortlist_design_submission(db, submission_id, current_user.id)
+    except (PermissionError, ValueError) as exc:
+        return _design_quest_redirect(project_id, str(exc))
+    return _design_quest_redirect(project_id)
+
+
+@router.post("/projects/{project_id}/design-quests/{quest_id}/submissions/{submission_id}/reject")
+def design_submission_reject(
+    request: Request,
+    project_id: int,
+    quest_id: int,
+    submission_id: int,
+    reason: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+    project = crud.get_project(db, project_id)
+    if not project or not can_edit_project(current_user, project):
+        return _design_quest_redirect(project_id, "forbidden")
+    submission_row = db.query(DesignSubmission).filter(
+        DesignSubmission.id == submission_id,
+        DesignSubmission.project_id == project_id,
+        DesignSubmission.quest_id == quest_id,
+    ).first()
+    if not submission_row:
+        return _design_quest_redirect(project_id, "submission_not_found")
+    try:
+        crud.reject_design_submission(db, submission_id, current_user.id, reason=reason.strip() or None)
+    except (PermissionError, ValueError) as exc:
+        return _design_quest_redirect(project_id, str(exc))
+    return _design_quest_redirect(project_id)
+
+
+@router.post("/projects/{project_id}/design-quests/{quest_id}/submissions/{submission_id}/request-revision")
+def design_submission_request_revision(
+    request: Request,
+    project_id: int,
+    quest_id: int,
+    submission_id: int,
+    general_comment: str = Form(""),
+    checklist_text: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+    project = crud.get_project(db, project_id)
+    if not project or not can_edit_project(current_user, project):
+        return _design_quest_redirect(project_id, "forbidden")
+    submission_row = db.query(DesignSubmission).filter(
+        DesignSubmission.id == submission_id,
+        DesignSubmission.project_id == project_id,
+        DesignSubmission.quest_id == quest_id,
+    ).first()
+    if not submission_row:
+        return _design_quest_redirect(project_id, "submission_not_found")
+    try:
+        revision_request = crud.request_design_revision(
+            db,
+            submission_id,
+            current_user.id,
+            general_comment=general_comment,
+            checklist_text=checklist_text,
+        )
+    except (PermissionError, ValueError) as exc:
+        return _design_quest_redirect(project_id, str(exc))
+    return _design_quest_redirect(project_id)
 
 
 @router.get("/projects/{project_id}/sandbox", response_class=HTMLResponse)

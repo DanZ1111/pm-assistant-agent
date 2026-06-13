@@ -12,37 +12,38 @@ Codex implemented and committed:
 - `a94229c` — v1.5 Build 04 plan.
 - `949c0a6` — v1.5 Build 04 Designer Portal quest view.
 - `2bf440c` — v1.5 Build 05 plan.
+- `6420fa1` — v1.5 Build 05 submissions and versions.
+- `4bd19e2` — v1.5 Build 06 plan.
 
-Codex is committing v1.5 Build 05 now:
+Codex is committing v1.5 Build 06 now:
 
-- Added `DesignSubmission` and `DesignSubmissionVersion` models.
-- Added migration `012_v1_5_create_design_submissions`.
-- Designers can upload allowed files to open quests from `/designer/quests/{id}`.
-- Each upload is preserved as an immutable version under one active
-  designer/quest submission.
-- Designers see only their own submission history; designer managers can inspect
-  portal submissions.
-- PM/admin project editors see incoming submissions in Renderings & Design.
-- Designer and PM downloads use guarded routes, with no raw `/uploads` links.
-- No revision loop, final selection, promotion, Timeline integration, or AI
-  handlers were added.
+- Added `DesignRevisionRequest` and `DesignRevisionItem` models.
+- Added migration `013_v1_5_create_design_revision_requests`.
+- Added nullable `revision_request_id` on submission versions.
+- PM/admin project editors can shortlist, reject, and request structured
+  revisions from incoming submission cards.
+- Designers see only their own open revision request/checklist and can upload a
+  revised version linked to that request.
+- Revised upload resolves the request/items and preserves earlier versions.
+- PM cards show version history and identify revision-response versions.
+- No final selection, promotion to project renderings, Timeline integration, or
+  AI handlers were added.
 
-Build 05 verification:
+Build 06 verification:
 
-- `python3 -m py_compile app/models.py app/migrations.py app/crud.py app/routes/designer.py app/routes/projects.py test_v15_build02.py test_v15_build04.py test_v15_build05.py` — PASS.
+- `python3 -m py_compile app/models.py app/migrations.py app/crud.py app/routes/designer.py app/routes/projects.py test_v15_build05.py test_v15_build06.py` — PASS.
+- `python3 test_v15_build06.py` — 13/13 PASS.
 - `python3 test_v15_build05.py` — 14/14 PASS.
 - `python3 test_v15_build04.py` — 13/13 PASS.
-- `python3 test_v15_build03.py` — 15/15 PASS.
-- `python3 test_v15_build02.py` — 19/19 PASS.
 - `python3 test_build_v121.py` — 19/19 PASS.
 - `python3 test_v14_build09.py` — 15/15 PASS.
 - `git diff --check` — PASS.
 
 Next v1.5 step:
 
-1. Commit Build 05 as `Implement v1.5 Build 05 submissions and versions`.
-2. Write and commit `V15_BUILD06_REVISION_LOOP_PLAN.md`.
-3. Implement Build 06 only after the plan checkpoint.
+1. Commit Build 06 as `Implement v1.5 Build 06 revision loop`.
+2. Write and commit `V15_BUILD07_SELECT_FINAL_PROMOTE_PLAN.md`.
+3. Implement Build 07 only after the plan checkpoint.
 
 ## Task
 v1.4 Builds 01-03 and the v1.3 UI Rescue fixes UI-R1 through UI-R4 are implemented in the working tree and are ready to be checkpointed. User asked to commit/push these fixes and then return to building the sandbox app. After the checkpoint commit/push, resume v1.4 with Build 04 planning/implementation discipline.

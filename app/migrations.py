@@ -158,6 +158,10 @@ MIGRATIONS = [
         "012_v1_5_create_design_submissions",
         lambda eng: _create_design_submissions(eng),
     ),
+    (
+        "013_v1_5_create_design_revision_requests",
+        lambda eng: _create_design_revision_requests(eng),
+    ),
 ]
 
 
@@ -742,6 +746,67 @@ def _create_design_submissions(engine):
         conn.execute(text(
             "CREATE INDEX IF NOT EXISTS ix_design_submission_versions_quest "
             "ON design_submission_versions(quest_id, created_at)"
+        ))
+
+
+def _create_design_revision_requests(engine):
+    """v1.5 Build 06 — PM revision requests and checklist items."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    columns_by_table = {
+        table: {col["name"] for col in inspector.get_columns(table)}
+        for table in tables
+    }
+    with engine.begin() as conn:
+        if "design_revision_requests" not in tables:
+            conn.execute(text(
+                "CREATE TABLE design_revision_requests ("
+                "  id INTEGER PRIMARY KEY,"
+                "  submission_id INTEGER NOT NULL REFERENCES design_submissions(id),"
+                "  quest_id INTEGER NOT NULL REFERENCES design_quests(id),"
+                "  project_id INTEGER NOT NULL REFERENCES projects(id),"
+                "  requested_by_user_id INTEGER NULL REFERENCES users(id),"
+                "  status VARCHAR NOT NULL DEFAULT 'open',"
+                "  general_comment TEXT NULL,"
+                "  created_at TIMESTAMP NOT NULL,"
+                "  resolved_at TIMESTAMP NULL"
+                ")"
+            ))
+        if "design_revision_items" not in tables:
+            conn.execute(text(
+                "CREATE TABLE design_revision_items ("
+                "  id INTEGER PRIMARY KEY,"
+                "  revision_request_id INTEGER NOT NULL REFERENCES design_revision_requests(id),"
+                "  text TEXT NOT NULL,"
+                "  status VARCHAR NOT NULL DEFAULT 'open',"
+                "  sort_order INTEGER NOT NULL DEFAULT 0,"
+                "  created_at TIMESTAMP NOT NULL"
+                ")"
+            ))
+        if (
+            "design_submission_versions" in tables
+            and "revision_request_id" not in columns_by_table.get("design_submission_versions", set())
+        ):
+            conn.execute(text(
+                "ALTER TABLE design_submission_versions "
+                "ADD COLUMN revision_request_id INTEGER NULL REFERENCES design_revision_requests(id)"
+            ))
+
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_design_revision_requests_submission_status "
+            "ON design_revision_requests(submission_id, status)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_design_revision_requests_quest_status "
+            "ON design_revision_requests(quest_id, status)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_design_revision_items_request "
+            "ON design_revision_items(revision_request_id, sort_order)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_design_submission_versions_revision_request "
+            "ON design_submission_versions(revision_request_id)"
         ))
 
 

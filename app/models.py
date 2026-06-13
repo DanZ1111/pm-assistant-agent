@@ -709,6 +709,9 @@ class DesignSubmission(Base):
     versions = relationship("DesignSubmissionVersion", back_populates="submission",
                             cascade="all, delete-orphan",
                             order_by="DesignSubmissionVersion.version_number")
+    revision_requests = relationship("DesignRevisionRequest", back_populates="submission",
+                                     cascade="all, delete-orphan",
+                                     order_by="DesignRevisionRequest.created_at.desc()")
 
 
 class DesignSubmissionVersion(Base):
@@ -717,6 +720,7 @@ class DesignSubmissionVersion(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     submission_id = Column(Integer, ForeignKey("design_submissions.id"), nullable=False)
+    revision_request_id = Column(Integer, ForeignKey("design_revision_requests.id"), nullable=True)
     quest_id = Column(Integer, ForeignKey("design_quests.id"), nullable=False)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     version_number = Column(Integer, nullable=False)
@@ -729,9 +733,49 @@ class DesignSubmissionVersion(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     submission = relationship("DesignSubmission", back_populates="versions")
+    revision_request = relationship("DesignRevisionRequest", foreign_keys=[revision_request_id],
+                                    back_populates="response_versions")
     quest = relationship("DesignQuest")
     project = relationship("Project")
     uploaded_by = relationship("User", foreign_keys=[uploaded_by_user_id])
+
+
+class DesignRevisionRequest(Base):
+    """PM request for a designer to revise a specific submission."""
+    __tablename__ = "design_revision_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    submission_id = Column(Integer, ForeignKey("design_submissions.id"), nullable=False)
+    quest_id = Column(Integer, ForeignKey("design_quests.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    requested_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    status = Column(String, nullable=False, default="open")
+    general_comment = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    resolved_at = Column(DateTime, nullable=True)
+
+    submission = relationship("DesignSubmission", back_populates="revision_requests")
+    quest = relationship("DesignQuest")
+    project = relationship("Project")
+    requested_by = relationship("User", foreign_keys=[requested_by_user_id])
+    items = relationship("DesignRevisionItem", back_populates="revision_request",
+                         cascade="all, delete-orphan",
+                         order_by="DesignRevisionItem.sort_order")
+    response_versions = relationship("DesignSubmissionVersion", back_populates="revision_request")
+
+
+class DesignRevisionItem(Base):
+    """Checklist item inside a design revision request."""
+    __tablename__ = "design_revision_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    revision_request_id = Column(Integer, ForeignKey("design_revision_requests.id"), nullable=False)
+    text = Column(Text, nullable=False)
+    status = Column(String, nullable=False, default="open")
+    sort_order = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    revision_request = relationship("DesignRevisionRequest", back_populates="items")
 
 
 class ProjectVariant(Base):

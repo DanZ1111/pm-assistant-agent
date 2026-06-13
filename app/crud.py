@@ -12,6 +12,7 @@ from app.models import (
     PlanningSandbox, PlanningSandboxNode, PlanningSandboxEdge, PlanningApplyEvent,
     ProjectBlocker, DesignQuest, DesignQuestAssignment, DesignQuestReference,
     DesignQuestEvent, DesignSubmission, DesignSubmissionVersion,
+    DesignRevisionRequest, DesignRevisionItem,
 )
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app", "uploads")
@@ -347,6 +348,7 @@ DESIGN_QUEST_SUBMISSION_OPEN_STATUSES = ("open", "reviewing", "revision_needed")
 DESIGN_SUBMISSION_ACTIVE_STATUSES = ("submitted", "shortlisted", "revision_requested", "revised", "selected", "rejected")
 DESIGN_SUBMISSION_ALLOWED_EXTENSIONS = ("jpg", "jpeg", "png", "webp", "pdf")
 DESIGN_SUBMISSION_MAX_BYTES = 20 * 1024 * 1024
+DESIGN_REVISION_OPEN_STATUSES = ("open", "partially_resolved")
 
 
 def _can_edit_project_for_design_quest(user: User | None, project: Project | None) -> bool:
@@ -733,6 +735,18 @@ def can_access_design_submission(user: User | None, submission: DesignSubmission
     return False
 
 
+def _require_design_submission_reviewer(
+    db: Session,
+    submission_id: int,
+    user_id: int,
+) -> tuple[DesignSubmission, User]:
+    submission = db.query(DesignSubmission).filter(DesignSubmission.id == submission_id).first()
+    if not submission:
+        raise ValueError("design_submission_not_found")
+    reviewer = _require_design_quest_editor(db, submission.project, user_id)
+    return submission, reviewer
+
+
 def list_design_submissions_for_quest(db: Session, quest_id: int) -> list[DesignSubmission]:
     return (
         db.query(DesignSubmission)
@@ -762,6 +776,18 @@ def list_design_submissions_for_designer(
     return [submission for submission in submissions if can_access_design_submission(user, submission)]
 
 
+def list_open_revision_requests_for_submission(db: Session, submission_id: int) -> list[DesignRevisionRequest]:
+    return (
+        db.query(DesignRevisionRequest)
+        .filter(
+            DesignRevisionRequest.submission_id == submission_id,
+            DesignRevisionRequest.status.in_(DESIGN_REVISION_OPEN_STATUSES),
+        )
+        .order_by(DesignRevisionRequest.created_at.desc())
+        .all()
+    )
+
+
 def _shape_design_submission_version(version: DesignSubmissionVersion) -> dict:
     return {
         "id": version.id,
@@ -770,6 +796,7 @@ def _shape_design_submission_version(version: DesignSubmissionVersion) -> dict:
         "file_type": version.file_type,
         "file_size": version.file_size,
         "designer_note": version.designer_note,
+        "revision_request_id": version.revision_request_id,
         "created_at": version.created_at.isoformat() if version.created_at else None,
     }
 
@@ -779,6 +806,11 @@ def shape_design_submission_for_designer(submission: DesignSubmission, user: Use
         raise PermissionError("designer_cannot_view_submission")
     versions = [_shape_design_submission_version(version) for version in submission.versions]
     latest_version = versions[-1] if versions else None
+    open_revisions = [
+        shape_design_revision_request_for_designer(revision_request, user)
+        for revision_request in submission.revision_requests
+        if revision_request.status in DESIGN_REVISION_OPEN_STATUSES
+    ]
     return {
         "id": submission.id,
         "quest_id": submission.quest_id,
@@ -789,6 +821,7 @@ def shape_design_submission_for_designer(submission: DesignSubmission, user: Use
         "updated_at": submission.updated_at.isoformat() if submission.updated_at else None,
         "versions": versions,
         "latest_version": latest_version,
+        "open_revision_requests": open_revisions,
     }
 
 
@@ -796,6 +829,11 @@ def shape_design_submission_for_pm(submission: DesignSubmission) -> dict:
     versions = [_shape_design_submission_version(version) for version in submission.versions]
     latest_version = versions[-1] if versions else None
     designer = submission.designer
+    open_revisions = [
+        shape_design_revision_request_for_pm(revision_request)
+        for revision_request in submission.revision_requests
+        if revision_request.status in DESIGN_REVISION_OPEN_STATUSES
+    ]
     return {
         "id": submission.id,
         "quest_id": submission.quest_id,
@@ -811,7 +849,146 @@ def shape_design_submission_for_pm(submission: DesignSubmission) -> dict:
         "versions": versions,
         "latest_version": latest_version,
         "version_count": len(versions),
+        "open_revision_requests": open_revisions,
     }
+
+
+def _shape_design_revision_item(item: DesignRevisionItem) -> dict:
+    return {
+        "id": item.id,
+        "text": item.text,
+        "status": item.status,
+        "sort_order": item.sort_order,
+    }
+
+
+def shape_design_revision_request_for_designer(revision_request: DesignRevisionRequest, user: User) -> dict:
+    if not can_access_design_submission(user, revision_request.submission):
+        raise PermissionError("designer_cannot_view_revision_request")
+    return {
+        "id": revision_request.id,
+        "submission_id": revision_request.submission_id,
+        "status": revision_request.status,
+        "general_comment": revision_request.general_comment,
+        "created_at": revision_request.created_at.isoformat() if revision_request.created_at else None,
+        "items": [_shape_design_revision_item(item) for item in revision_request.items],
+    }
+
+
+def shape_design_revision_request_for_pm(revision_request: DesignRevisionRequest) -> dict:
+    return {
+        "id": revision_request.id,
+        "submission_id": revision_request.submission_id,
+        "status": revision_request.status,
+        "general_comment": revision_request.general_comment,
+        "created_at": revision_request.created_at.isoformat() if revision_request.created_at else None,
+        "items": [_shape_design_revision_item(item) for item in revision_request.items],
+    }
+
+
+def shortlist_design_submission(db: Session, submission_id: int, user_id: int) -> DesignSubmission:
+    submission, reviewer = _require_design_submission_reviewer(db, submission_id, user_id)
+    if submission.status == "rejected":
+        raise ValueError("cannot_shortlist_rejected_submission")
+    submission.status = "shortlisted"
+    submission.updated_at = datetime.utcnow()
+    if submission.quest.status == "open":
+        submission.quest.status = "reviewing"
+    submission.quest.updated_at = submission.updated_at
+    _write_design_quest_event(
+        db,
+        submission.quest,
+        "submission_shortlisted",
+        reviewer.id,
+        f"Submission from {submission.designer.display_name or submission.designer.username} shortlisted.",
+        {"submission_id": submission.id},
+    )
+    db.commit()
+    db.refresh(submission)
+    return submission
+
+
+def reject_design_submission(
+    db: Session,
+    submission_id: int,
+    user_id: int,
+    reason: str | None = None,
+) -> DesignSubmission:
+    submission, reviewer = _require_design_submission_reviewer(db, submission_id, user_id)
+    submission.status = "rejected"
+    submission.updated_at = datetime.utcnow()
+    if submission.quest.status == "open":
+        submission.quest.status = "reviewing"
+    submission.quest.updated_at = submission.updated_at
+    _write_design_quest_event(
+        db,
+        submission.quest,
+        "submission_rejected",
+        reviewer.id,
+        f"Submission from {submission.designer.display_name or submission.designer.username} rejected.",
+        {"submission_id": submission.id, "reason": reason},
+    )
+    db.commit()
+    db.refresh(submission)
+    return submission
+
+
+def request_design_revision(
+    db: Session,
+    submission_id: int,
+    user_id: int,
+    general_comment: str | None,
+    checklist_text: str | None,
+) -> DesignRevisionRequest:
+    submission, reviewer = _require_design_submission_reviewer(db, submission_id, user_id)
+    if submission.status in ("rejected", "selected", "archived"):
+        raise ValueError("submission_not_revisionable")
+    checklist_items = [
+        line.strip("-• \t")
+        for line in (checklist_text or "").splitlines()
+        if line.strip("-• \t")
+    ]
+    if not (general_comment or "").strip() and not checklist_items:
+        raise ValueError("revision_request_requires_content")
+    now = datetime.utcnow()
+    revision_request = DesignRevisionRequest(
+        submission_id=submission.id,
+        quest_id=submission.quest_id,
+        project_id=submission.project_id,
+        requested_by_user_id=reviewer.id,
+        status="open",
+        general_comment=(general_comment or "").strip() or None,
+        created_at=now,
+    )
+    db.add(revision_request)
+    db.flush()
+    for index, item_text in enumerate(checklist_items, start=1):
+        db.add(DesignRevisionItem(
+            revision_request_id=revision_request.id,
+            text=item_text,
+            status="open",
+            sort_order=index * 10,
+            created_at=now,
+        ))
+    submission.status = "revision_requested"
+    submission.updated_at = now
+    submission.quest.status = "revision_needed"
+    submission.quest.updated_at = now
+    _write_design_quest_event(
+        db,
+        submission.quest,
+        "revision_requested",
+        reviewer.id,
+        f"Revision requested for submission from {submission.designer.display_name or submission.designer.username}.",
+        {
+            "submission_id": submission.id,
+            "revision_request_id": revision_request.id,
+            "item_count": len(checklist_items),
+        },
+    )
+    db.commit()
+    db.refresh(revision_request)
+    return revision_request
 
 
 def create_or_append_design_submission_version(
@@ -822,6 +999,7 @@ def create_or_append_design_submission_version(
     content: bytes,
     designer_note: str | None = None,
     title: str | None = None,
+    revision_request_id: int | None = None,
 ) -> DesignSubmission:
     designer = db.query(User).filter(User.id == designer_user_id).first()
     quest = db.query(DesignQuest).filter(DesignQuest.id == quest_id).first()
@@ -834,6 +1012,7 @@ def create_or_append_design_submission_version(
 
     ext, file_type = _validate_design_submission_file(original_filename, content)
     now = datetime.utcnow()
+    revision_request = None
     submission = (
         db.query(DesignSubmission)
         .filter(
@@ -841,9 +1020,21 @@ def create_or_append_design_submission_version(
             DesignSubmission.designer_user_id == designer.id,
             DesignSubmission.status != "archived",
         )
-        .first()
+            .first()
     )
+    if revision_request_id is not None:
+        revision_request = db.query(DesignRevisionRequest).filter(
+            DesignRevisionRequest.id == revision_request_id,
+            DesignRevisionRequest.quest_id == quest_id,
+            DesignRevisionRequest.status.in_(DESIGN_REVISION_OPEN_STATUSES),
+        ).first()
+        if not revision_request:
+            raise ValueError("revision_request_not_found")
+        if not submission or revision_request.submission_id != submission.id:
+            raise PermissionError("revision_request_not_for_designer_submission")
     if submission is None:
+        if revision_request_id is not None:
+            raise ValueError("revision_request_requires_existing_submission")
         submission = DesignSubmission(
             quest_id=quest.id,
             project_id=quest.project_id,
@@ -877,6 +1068,7 @@ def create_or_append_design_submission_version(
 
     version = DesignSubmissionVersion(
         submission_id=submission.id,
+        revision_request_id=revision_request.id if revision_request else None,
         quest_id=quest.id,
         project_id=quest.project_id,
         version_number=version_number,
@@ -889,17 +1081,26 @@ def create_or_append_design_submission_version(
         created_at=now,
     )
     db.add(version)
+    if revision_request is not None:
+        revision_request.status = "resolved"
+        revision_request.resolved_at = now
+        for item in revision_request.items:
+            item.status = "resolved"
+        submission.status = "revised"
+    elif submission.status == "revision_requested":
+        submission.status = "revised"
     quest.updated_at = now
     _write_design_quest_event(
         db,
         quest,
-        "submission_uploaded",
+        "revision_uploaded" if revision_request else "submission_uploaded",
         designer.id,
         f"{designer.display_name or designer.username} uploaded design submission v{version_number}.",
         {
             "submission_id": submission.id,
             "version_number": version_number,
             "original_filename": original_filename,
+            "revision_request_id": revision_request.id if revision_request else None,
         },
     )
     db.commit()

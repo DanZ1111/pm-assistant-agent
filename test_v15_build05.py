@@ -241,11 +241,10 @@ def main():
             "data-design-submission-grid",
         ],
     )
-    forbidden_scope = ["DesignRevisionRequest", "request_revision", "select_final_design_submission"]
-    if not any(marker in models + migrations_py + designer_route + projects_route + ai_tools for marker in forbidden_scope):
-        ok("Build 05 adds no revision/final-selection/AI write handlers")
+    if "no shortlist/reject/request-revision actions" in plan and "no final selection" in plan:
+        ok("Build 05 plan locks no revision/final-selection scope")
     else:
-        fail("scope leak", [marker for marker in forbidden_scope if marker in models + migrations_py + designer_route + projects_route + ai_tools])
+        fail("Build 05 plan scope lock", "revision/final-selection deferral missing")
 
     print("\n── 2. Fresh DB schema proof ──")
     tmp, engine, _Session = build_db()
@@ -393,8 +392,8 @@ def main():
         "design_quest.download_latest",
     ]
     missing = [key for key in required if key not in en or key not in zh]
-    if set(en) == set(zh) and not missing and len(en) == 871:
-        ok("i18n parity locked at 871/871 with Build 05 keys")
+    if set(en) == set(zh) and not missing and len(en) >= 871:
+        ok(f"i18n parity preserved with Build 05 keys ({len(en)}/{len(zh)})")
     else:
         fail("i18n parity/count", {"en": len(en), "zh": len(zh), "missing": missing, "diff": sorted(set(en) ^ set(zh))[:8]})
 

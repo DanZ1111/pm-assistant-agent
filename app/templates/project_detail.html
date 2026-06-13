@@ -460,6 +460,55 @@
               </span>
             </a>
             {% endif %}
+            {% if submission.versions %}
+            <div class="design-submission-version-history" data-design-submission-version-history>
+              {% for version in submission.versions %}
+              <a href="/projects/{{ project.id }}/design-quests/{{ active_design_quest.id }}/submissions/{{ submission.id }}/versions/{{ version.id }}/download">
+                <span>v{{ version.version_number }} · {{ version.original_filename }}</span>
+                {% if version.revision_request_id %}
+                <em>{{ t('design_quest.revision_response_label') }} #{{ version.revision_request_id }}</em>
+                {% endif %}
+              </a>
+              {% endfor %}
+            </div>
+            {% endif %}
+            {% if submission.open_revision_requests %}
+            <div class="design-revision-open">
+              <strong>{{ t('design_quest.open_revision_request') }}</strong>
+              {% for revision_request in submission.open_revision_requests %}
+              {% if revision_request.general_comment %}
+              <p>{{ revision_request.general_comment }}</p>
+              {% endif %}
+              {% if revision_request['items'] %}
+              <ul>
+                {% for item in revision_request['items'] %}
+                <li>{{ item.text }}</li>
+                {% endfor %}
+              </ul>
+              {% endif %}
+              {% endfor %}
+            </div>
+            {% endif %}
+            {% if can_edit %}
+            <div class="design-submission-actions">
+              <form method="post" action="/projects/{{ project.id }}/design-quests/{{ active_design_quest.id }}/submissions/{{ submission.id }}/shortlist">
+                <button class="btn btn-sm btn-outline-primary">{{ t('design_quest.shortlist_button') }}</button>
+              </form>
+              <form method="post" action="/projects/{{ project.id }}/design-quests/{{ active_design_quest.id }}/submissions/{{ submission.id }}/reject">
+                <button class="btn btn-sm btn-outline-secondary">{{ t('design_quest.reject_button') }}</button>
+              </form>
+            </div>
+            <details class="design-revision-form">
+              <summary>{{ t('design_quest.request_revision_button') }}</summary>
+              <form method="post" action="/projects/{{ project.id }}/design-quests/{{ active_design_quest.id }}/submissions/{{ submission.id }}/request-revision">
+                <label class="form-label">{{ t('design_quest.revision_comment_label') }}</label>
+                <textarea name="general_comment" class="form-control" rows="2"></textarea>
+                <label class="form-label">{{ t('design_quest.revision_checklist_label') }}</label>
+                <textarea name="checklist_text" class="form-control" rows="3" placeholder="{{ t('design_quest.revision_checklist_placeholder') }}"></textarea>
+                <button class="btn btn-sm btn-primary">{{ t('design_quest.send_revision_button') }}</button>
+              </form>
+            </details>
+            {% endif %}
           </article>
           {% endfor %}
         </div>

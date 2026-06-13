@@ -52,11 +52,20 @@ def designer_quest_detail(request: Request, quest_id: int, db: Session = Depends
         crud.shape_design_submission_for_designer(submission, current_user)
         for submission in crud.list_design_submissions_for_designer(db, current_user.id, quest_id=quest_id)
     ]
+    open_revision_request = next(
+        (
+            revision_request
+            for submission in submissions
+            for revision_request in submission.get("open_revision_requests", [])
+        ),
+        None,
+    )
 
     return templates.TemplateResponse(request, "designer/quest_detail.html", {
         "current_user": current_user,
         "safe_quest": safe_quest,
         "submissions": submissions,
+        "open_revision_request": open_revision_request,
         "submission_error": request.query_params.get("submission_error"),
         "submission_uploaded": request.query_params.get("submission_uploaded"),
         **i18n_context(request, current_user),
@@ -69,6 +78,7 @@ async def designer_submission_upload(
     quest_id: int,
     title: str = Form(""),
     designer_note: str = Form(""),
+    revision_request_id: int | None = Form(None),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
@@ -88,6 +98,7 @@ async def designer_submission_upload(
             content=content,
             designer_note=designer_note,
             title=title,
+            revision_request_id=revision_request_id,
         )
     except (PermissionError, ValueError) as exc:
         return RedirectResponse(
