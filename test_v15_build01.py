@@ -188,8 +188,8 @@ def main():
         "admin.role_designer_manager",
     ]
     missing = [key for key in required_keys if key not in en or key not in zh]
-    if set(en) == set(zh) and not missing and len(en) == 817:
-        ok("i18n parity locked at 817/817 with v1.5 Build 01 keys")
+    if set(en) == set(zh) and not missing and len(en) >= 817:
+        ok(f"i18n parity preserved with v1.5 Build 01 keys ({len(en)}/{len(zh)})")
     else:
         fail("i18n parity/count", {
             "en": len(en),

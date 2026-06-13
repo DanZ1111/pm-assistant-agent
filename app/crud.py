@@ -652,6 +652,20 @@ def list_design_quests_for_designer(db: Session, designer_user_id: int) -> list[
 def shape_design_quest_for_designer(quest: DesignQuest, user: User) -> dict:
     if not can_designer_view_quest(user, quest):
         raise PermissionError("designer_cannot_view_quest")
+    return _shape_design_quest_safe_payload(quest)
+
+
+def shape_design_quest_for_pm_preview(quest: DesignQuest) -> dict:
+    """PM-side preview of the future designer-safe payload.
+
+    No permission decision lives here; callers must already have project access.
+    The important lock is output shape: never include Project internals or raw
+    file paths that designers should not receive.
+    """
+    return _shape_design_quest_safe_payload(quest)
+
+
+def _shape_design_quest_safe_payload(quest: DesignQuest) -> dict:
     references = []
     for ref in quest.references:
         if ref.visibility != "designer_visible":

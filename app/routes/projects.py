@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from datetime import date, datetime
 
 from app.database import get_db
-from app.models import Project, PlanningSandbox
+from app.models import Project, PlanningSandbox, DesignQuest
 import app.crud as crud
 from app.ai.parser import extract_thesis_and_inspirations
 from app.ai.matching import find_best_match, MATCH_THRESHOLD
@@ -131,6 +131,11 @@ def _save_uploaded_business_plan(
         file_size=len(content),
     )
     return pf, _resolve_business_plan_type(upload.filename)
+
+
+def _design_quest_redirect(project_id: int, error: str | None = None) -> RedirectResponse:
+    suffix = f"?design_quest_error={error}" if error else ""
+    return RedirectResponse(url=f"/projects/{project_id}{suffix}#renderings-overview", status_code=303)
 
 
 # ---------------------------------------------------------------------------
@@ -436,6 +441,17 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
     renderings = crud.get_files_by_category(db, project_id, "rendering")
     prototype_photos = crud.get_files_by_category(db, project_id, "prototype_photo")
     latest_overview_visual = _pick_latest_overview_visual(renderings, prototype_photos)
+    active_design_quest = crud.get_active_design_quest(db, project_id)
+    design_quest_preview = (
+        crud.shape_design_quest_for_pm_preview(active_design_quest)
+        if active_design_quest else None
+    )
+    design_reference_candidates = [
+        f for f in files
+        if active_design_quest is None
+        or f.id not in {ref.project_file_id for ref in active_design_quest.references}
+    ]
+    design_quest_error = request.query_params.get("design_quest_error")
 
     # Build 17 — Timeline 2.0: plan-change history per phase + error flash
     plan_changes_by_phase = crud.get_plan_changes_by_project(db, project_id)
@@ -569,11 +585,140 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
         "renderings": renderings,
         "prototype_photos": prototype_photos,
         "latest_overview_visual": latest_overview_visual,
+        "active_design_quest": active_design_quest,
+        "design_quest_preview": design_quest_preview,
+        "design_reference_candidates": design_reference_candidates,
+        "design_quest_error": design_quest_error,
         # Build 21 — for bottom chat scope toggle
         "current_project_id": project.id,
         "current_project_name": project.name,
         **i18n_context(request, current_user),
     })
+
+
+@router.post("/projects/{project_id}/design-quest/create")
+def design_quest_create(
+    request: Request,
+    project_id: int,
+    title: str = Form(...),
+    brief: str = Form(...),
+    must_keep: str = Form(""),
+    must_avoid: str = Form(""),
+    soft_deadline: str = Form(""),
+    visibility: str = Form("all_active_designers"),
+    is_timeline_blocking: bool = Form(False),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+    project = crud.get_project(db, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if not can_edit_project(current_user, project):
+        return _design_quest_redirect(project_id, "forbidden")
+    try:
+        crud.create_design_quest_draft(
+            db,
+            project_id=project_id,
+            user_id=current_user.id,
+            title=title,
+            brief=brief,
+            must_keep=must_keep,
+            must_avoid=must_avoid,
+            soft_deadline=parse_date(soft_deadline),
+            visibility=visibility,
+            is_timeline_blocking=is_timeline_blocking,
+        )
+    except (PermissionError, ValueError) as exc:
+        return _design_quest_redirect(project_id, str(exc))
+    return _design_quest_redirect(project_id)
+
+
+@router.post("/projects/{project_id}/design-quest/{quest_id}/publish")
+def design_quest_publish(
+    request: Request,
+    project_id: int,
+    quest_id: int,
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+    quest = db.query(DesignQuest).filter(DesignQuest.id == quest_id).first()
+    project = crud.get_project(db, project_id)
+    if not project or not quest or quest.project_id != project_id:
+        raise HTTPException(status_code=404, detail="Design quest not found")
+    if not can_edit_project(current_user, project):
+        return _design_quest_redirect(project_id, "forbidden")
+    try:
+        crud.publish_design_quest(db, quest_id, current_user.id)
+    except (PermissionError, ValueError) as exc:
+        return _design_quest_redirect(project_id, str(exc))
+    return _design_quest_redirect(project_id)
+
+
+@router.post("/projects/{project_id}/design-quest/{quest_id}/close")
+def design_quest_close(
+    request: Request,
+    project_id: int,
+    quest_id: int,
+    reason: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+    quest = db.query(DesignQuest).filter(DesignQuest.id == quest_id).first()
+    project = crud.get_project(db, project_id)
+    if not project or not quest or quest.project_id != project_id:
+        raise HTTPException(status_code=404, detail="Design quest not found")
+    if not can_edit_project(current_user, project):
+        return _design_quest_redirect(project_id, "forbidden")
+    try:
+        crud.close_design_quest(db, quest_id, current_user.id, reason=reason.strip() or None)
+    except (PermissionError, ValueError) as exc:
+        return _design_quest_redirect(project_id, str(exc))
+    return _design_quest_redirect(project_id)
+
+
+@router.post("/projects/{project_id}/design-quest/{quest_id}/references")
+def design_quest_reference_add(
+    request: Request,
+    project_id: int,
+    quest_id: int,
+    project_file_id: int = Form(...),
+    label: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+    quest = db.query(DesignQuest).filter(DesignQuest.id == quest_id).first()
+    project = crud.get_project(db, project_id)
+    if not project or not quest or quest.project_id != project_id:
+        raise HTTPException(status_code=404, detail="Design quest not found")
+    if not can_edit_project(current_user, project):
+        return _design_quest_redirect(project_id, "forbidden")
+    try:
+        crud.link_design_quest_reference(
+            db,
+            quest_id=quest_id,
+            project_file_id=project_file_id,
+            added_by_user_id=current_user.id,
+            label=label,
+        )
+    except (PermissionError, ValueError) as exc:
+        return _design_quest_redirect(project_id, str(exc))
+    return _design_quest_redirect(project_id)
 
 
 @router.get("/projects/{project_id}/sandbox", response_class=HTMLResponse)

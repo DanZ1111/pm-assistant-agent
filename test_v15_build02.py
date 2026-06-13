@@ -344,8 +344,8 @@ def main():
     print("\n── 5. i18n parity unchanged ──")
     en = json.loads(read("app/i18n/en.json"))
     zh = json.loads(read("app/i18n/zh.json"))
-    if set(en) == set(zh) and len(en) == 817:
-        ok("i18n parity remains exact at 817/817")
+    if set(en) == set(zh) and len(en) >= 817:
+        ok(f"i18n parity remains exact with Build 02 baseline keys ({len(en)}/{len(zh)})")
     else:
         fail("i18n parity", {"en": len(en), "zh": len(zh), "diff": sorted(set(en) ^ set(zh))[:8]})
 

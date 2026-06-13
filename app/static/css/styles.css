@@ -991,12 +991,12 @@ body {
 .renderings-overview-card,
 .renderings-overview-empty {
   display: grid;
-  grid-template-columns: minmax(280px, 0.95fr) minmax(260px, 1fr) minmax(220px, 0.55fr);
+  grid-template-columns: minmax(280px, 0.75fr) minmax(260px, 1fr);
   gap: 18px;
   align-items: stretch;
 }
 .renderings-overview-empty {
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.35fr);
+  grid-template-columns: minmax(0, 1fr);
   padding: 18px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
@@ -1117,6 +1117,142 @@ body {
   line-height: 1.55;
 }
 
+/* v1.5 Build 03 — PM-side Renderings & Design quest panel */
+.design-quest-panel {
+  margin-bottom: 18px;
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+.design-quest-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.design-quest-eyebrow,
+.design-quest-label {
+  margin-bottom: 6px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.design-quest-panel h3 {
+  margin: 0 0 6px;
+  color: var(--color-text);
+  font-size: 20px;
+  font-weight: 850;
+}
+.design-quest-panel p {
+  color: var(--color-text-muted);
+}
+.design-quest-meta-row,
+.design-quest-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.design-quest-status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 3px 9px;
+  background: #eef2ff;
+  color: #2f4fb8;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+.design-quest-status-draft {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+.design-quest-status-open {
+  background: #dcfce7;
+  color: #166534;
+}
+.design-quest-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+  gap: 14px;
+}
+.design-quest-brief,
+.design-quest-reference-box,
+.design-quest-preview {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: #f8fafc;
+}
+.design-quest-brief p:last-child,
+.design-quest-reference-box p:last-child {
+  margin-bottom: 0;
+}
+.design-quest-reference-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 8px 0;
+}
+.design-quest-reference-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid #dbe4ef;
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 750;
+}
+.design-quest-reference-pill span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.design-quest-reference-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+.design-quest-preview {
+  margin-top: 14px;
+}
+.design-quest-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 6px;
+}
+.design-quest-preview-grid div {
+  display: grid;
+  gap: 2px;
+}
+.design-quest-preview-grid strong {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+.design-quest-preview-grid span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+  font-weight: 750;
+}
+.design-quest-create-form {
+  border-top: 1px solid var(--color-border);
+  padding-top: 14px;
+}
+
 @media (max-width: 900px) {
   .renderings-overview-card,
   .renderings-overview-empty {
@@ -1127,6 +1263,20 @@ body {
   }
   .renderings-overview-preview img {
     max-height: 300px;
+  }
+  .design-quest-panel-head,
+  .design-quest-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .design-quest-preview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .design-quest-preview-grid {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -328,9 +328,150 @@
     <section class="detail-section renderings-overview-section" id="renderings-overview">
       <div class="section-header">
         <h2 class="section-title">
-          <i class="bi bi-image me-2"></i>{{ t('section.renderings_overview') }}
+          <i class="bi bi-image me-2"></i>{{ t('section.renderings_design') }}
         </h2>
         <span class="text-muted small">{{ t('renderings.latest_visual') }}</span>
+      </div>
+
+      <div class="design-quest-panel">
+        <div class="design-quest-panel-head">
+          <div>
+            <div class="design-quest-eyebrow">{{ t('design_quest.active_title') }}</div>
+            {% if active_design_quest %}
+            <h3>{{ active_design_quest.title }}</h3>
+            <div class="design-quest-meta-row">
+              <span class="design-quest-status design-quest-status-{{ active_design_quest.status }}">{{ active_design_quest.status }}</span>
+              {% if active_design_quest.soft_deadline %}
+              <span><i class="bi bi-calendar-event me-1"></i>{{ active_design_quest.soft_deadline.strftime('%b %d, %Y') }}</span>
+              {% endif %}
+              <span>{{ t('design_quest.visibility_' ~ active_design_quest.visibility) }}</span>
+            </div>
+            {% else %}
+            <h3>{{ t('design_quest.no_active_title') }}</h3>
+            <p>{{ t('design_quest.no_active_body') }}</p>
+            {% endif %}
+          </div>
+          {% if active_design_quest and can_edit %}
+          <div class="design-quest-actions">
+            {% if active_design_quest.status == 'draft' %}
+            <form method="post" action="/projects/{{ project.id }}/design-quest/{{ active_design_quest.id }}/publish">
+              <button class="btn btn-sm btn-primary"><i class="bi bi-send me-1"></i>{{ t('design_quest.publish_button') }}</button>
+            </form>
+            {% endif %}
+            {% if active_design_quest.status not in ('closed', 'cancelled') %}
+            <form method="post" action="/projects/{{ project.id }}/design-quest/{{ active_design_quest.id }}/close">
+              <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-x-circle me-1"></i>{{ t('design_quest.close_button') }}</button>
+            </form>
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+
+        {% if design_quest_error %}
+        <div class="alert alert-warning py-2 mb-3">{{ t('design_quest.error_prefix') }} {{ design_quest_error }}</div>
+        {% endif %}
+
+        {% if active_design_quest %}
+        <div class="design-quest-grid">
+          <div class="design-quest-brief">
+            <div class="design-quest-label">{{ t('design_quest.brief_label') }}</div>
+            <p>{{ active_design_quest.brief }}</p>
+            {% if active_design_quest.must_keep %}
+            <div class="design-quest-label">{{ t('design_quest.must_keep_label') }}</div>
+            <p>{{ active_design_quest.must_keep }}</p>
+            {% endif %}
+            {% if active_design_quest.must_avoid %}
+            <div class="design-quest-label">{{ t('design_quest.must_avoid_label') }}</div>
+            <p>{{ active_design_quest.must_avoid }}</p>
+            {% endif %}
+          </div>
+
+          <div class="design-quest-reference-box">
+            <div class="design-quest-label">{{ t('design_quest.references_title') }}</div>
+            {% if active_design_quest.references %}
+            <div class="design-quest-reference-list">
+              {% for ref in active_design_quest.references %}
+              <div class="design-quest-reference-pill">
+                <i class="bi bi-paperclip"></i>
+                <span>{{ ref.label or ref.project_file.original_filename }}</span>
+              </div>
+              {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-muted mb-2">{{ t('design_quest.no_references') }}</p>
+            {% endif %}
+
+            {% if can_edit %}
+            {% if design_reference_candidates %}
+            <form method="post" action="/projects/{{ project.id }}/design-quest/{{ active_design_quest.id }}/references" class="design-quest-reference-form">
+              <label class="form-label small fw-semibold">{{ t('design_quest.reference_select_label') }}</label>
+              <select name="project_file_id" class="form-select form-select-sm" required>
+                {% for f in design_reference_candidates %}
+                <option value="{{ f.id }}">{{ f.original_filename or f.filename }}</option>
+                {% endfor %}
+              </select>
+              <input name="label" class="form-control form-control-sm" placeholder="{{ t('design_quest.reference_label_placeholder') }}">
+              <button class="btn btn-sm btn-outline-primary"><i class="bi bi-plus-lg me-1"></i>{{ t('design_quest.add_reference_button') }}</button>
+            </form>
+            {% else %}
+            <p class="text-muted small mb-0">{{ t('design_quest.upload_files_first') }}</p>
+            {% endif %}
+            {% endif %}
+          </div>
+        </div>
+
+        {% if design_quest_preview %}
+        <div class="design-quest-preview">
+          <div class="design-quest-label">{{ t('design_quest.preview_title') }}</div>
+          <div class="design-quest-preview-grid">
+            <div><strong>{{ t('design_quest.title_label') }}</strong><span>{{ design_quest_preview.title }}</span></div>
+            <div><strong>{{ t('design_quest.visibility_label') }}</strong><span>{{ t('design_quest.visibility_' ~ design_quest_preview.visibility) }}</span></div>
+            <div><strong>{{ t('design_quest.soft_deadline_label') }}</strong><span>{{ design_quest_preview.soft_deadline or '—' }}</span></div>
+            <div><strong>{{ t('design_quest.references_title') }}</strong><span>{{ design_quest_preview.references|length }}</span></div>
+          </div>
+        </div>
+        {% endif %}
+        {% elif can_edit %}
+        <form method="post" action="/projects/{{ project.id }}/design-quest/create" class="design-quest-create-form">
+          <div class="design-quest-label">{{ t('design_quest.create_title') }}</div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">{{ t('design_quest.title_label') }}</label>
+              <input name="title" class="form-control" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">{{ t('design_quest.soft_deadline_label') }}</label>
+              <input name="soft_deadline" type="date" class="form-control">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">{{ t('design_quest.visibility_label') }}</label>
+              <select name="visibility" class="form-select">
+                <option value="all_active_designers">{{ t('design_quest.visibility_all_active_designers') }}</option>
+                <option value="assigned_designers_only">{{ t('design_quest.visibility_assigned_designers_only') }}</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">{{ t('design_quest.brief_label') }}</label>
+              <textarea name="brief" class="form-control" rows="3" required></textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">{{ t('design_quest.must_keep_label') }}</label>
+              <textarea name="must_keep" class="form-control" rows="2"></textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">{{ t('design_quest.must_avoid_label') }}</label>
+              <textarea name="must_avoid" class="form-control" rows="2"></textarea>
+            </div>
+            <div class="col-12 d-flex align-items-center justify-content-between gap-3 flex-wrap">
+              <label class="form-check mb-0">
+                <input type="checkbox" name="is_timeline_blocking" value="true" class="form-check-input">
+                <span class="form-check-label">{{ t('design_quest.timeline_blocking_label') }}</span>
+              </label>
+              <button class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>{{ t('design_quest.create_button') }}</button>
+            </div>
+          </div>
+        </form>
+        {% endif %}
       </div>
 
       {% if latest_overview_visual %}
@@ -386,12 +527,6 @@
             {% endif %}
           </div>
         </div>
-        <div class="renderings-designer-placeholder" aria-disabled="true">
-          <div class="renderings-designer-title">
-            <i class="bi bi-palette me-1"></i>{{ t('renderings.designer_portal') }}
-          </div>
-          <p>{{ t('renderings.designer_portal_future') }}</p>
-        </div>
       </div>
       {% else %}
       <div class="renderings-overview-empty">
@@ -403,12 +538,6 @@
             <i class="bi bi-upload me-1"></i>{{ t('files.upload_in_files') }}
           </a>
           {% endif %}
-        </div>
-        <div class="renderings-designer-placeholder" aria-disabled="true">
-          <div class="renderings-designer-title">
-            <i class="bi bi-palette me-1"></i>{{ t('renderings.designer_portal') }}
-          </div>
-          <p>{{ t('renderings.designer_portal_future') }}</p>
         </div>
       </div>
       {% endif %}
