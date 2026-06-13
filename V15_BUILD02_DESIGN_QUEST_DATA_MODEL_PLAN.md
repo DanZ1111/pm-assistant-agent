@@ -51,6 +51,7 @@ Out:
 
 - no PM quest creation UI,
 - no Designer Portal quest list/detail UI,
+- no designer submission upload,
 - no submission upload,
 - no revision workflow,
 - no final selection,

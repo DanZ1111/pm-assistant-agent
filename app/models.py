@@ -57,6 +57,10 @@ class Project(Base):
     apply_events = relationship("PlanningApplyEvent", back_populates="project",
                                 cascade="all, delete-orphan",
                                 order_by="PlanningApplyEvent.applied_at.desc()")
+    # v1.5 Build 02 — Designer Portal design quest source of truth.
+    design_quests = relationship("DesignQuest", back_populates="project",
+                                 cascade="all, delete-orphan",
+                                 order_by="DesignQuest.updated_at.desc()")
 
     @property
     def target_factory_cost_display(self) -> str | None:
@@ -180,6 +184,12 @@ class User(Base):
     created_pins = relationship("InvitePin", foreign_keys="InvitePin.created_by_user_id", back_populates="created_by")
     used_pins = relationship("InvitePin", foreign_keys="InvitePin.used_by_user_id", back_populates="used_by")
     ai_conversations = relationship("AIConversation", back_populates="user", cascade="all, delete-orphan")
+    design_quest_assignments = relationship("DesignQuestAssignment",
+                                            foreign_keys="DesignQuestAssignment.designer_user_id",
+                                            back_populates="designer")
+    created_design_quests = relationship("DesignQuest",
+                                         foreign_keys="DesignQuest.created_by_user_id",
+                                         back_populates="created_by")
 
 
 class InvitePin(Base):
@@ -565,6 +575,104 @@ class PlanningTemplateEdge(Base):
     to_node = relationship("PlanningTemplateNode",
                            foreign_keys=[to_node_id],
                            back_populates="incoming_edges")
+
+
+# ---------------------------------------------------------------------------
+# v1.5 — Designer Portal design quest model
+# ---------------------------------------------------------------------------
+
+class DesignQuest(Base):
+    """PM-created brief for restricted designer work.
+
+    Build 02 stores the source of truth only. PM/designer UI, guarded file
+    serving, submissions, revisions, and final rendering promotion arrive in
+    later v1.5 builds.
+    """
+    __tablename__ = "design_quests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    title = Column(String, nullable=False)
+    brief = Column(Text, nullable=False)
+    must_keep = Column(Text, nullable=True)
+    must_avoid = Column(Text, nullable=True)
+    status = Column(String, nullable=False, default="draft")
+    visibility = Column(String, nullable=False, default="all_active_designers")
+    soft_deadline = Column(Date, nullable=True)
+    is_timeline_blocking = Column(Boolean, nullable=False, default=False)
+    linked_phase_id = Column(Integer, ForeignKey("project_phases.id"), nullable=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    published_at = Column(DateTime, nullable=True)
+    closed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    project = relationship("Project", back_populates="design_quests")
+    linked_phase = relationship("ProjectPhase", foreign_keys=[linked_phase_id])
+    created_by = relationship("User", foreign_keys=[created_by_user_id],
+                              back_populates="created_design_quests")
+    assignments = relationship("DesignQuestAssignment", back_populates="quest",
+                               cascade="all, delete-orphan")
+    references = relationship("DesignQuestReference", back_populates="quest",
+                              cascade="all, delete-orphan",
+                              order_by="DesignQuestReference.sort_order")
+    events = relationship("DesignQuestEvent", back_populates="quest",
+                          cascade="all, delete-orphan",
+                          order_by="DesignQuestEvent.created_at.desc()")
+
+
+class DesignQuestAssignment(Base):
+    __tablename__ = "design_quest_assignments"
+    __table_args__ = (
+        UniqueConstraint("quest_id", "designer_user_id", name="uq_design_quest_assignment_user"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    quest_id = Column(Integer, ForeignKey("design_quests.id"), nullable=False)
+    designer_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    assigned_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    status = Column(String, nullable=False, default="assigned")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    quest = relationship("DesignQuest", back_populates="assignments")
+    designer = relationship("User", foreign_keys=[designer_user_id],
+                            back_populates="design_quest_assignments")
+    assigned_by = relationship("User", foreign_keys=[assigned_by_user_id])
+
+
+class DesignQuestReference(Base):
+    __tablename__ = "design_quest_references"
+
+    id = Column(Integer, primary_key=True, index=True)
+    quest_id = Column(Integer, ForeignKey("design_quests.id"), nullable=False)
+    project_file_id = Column(Integer, ForeignKey("project_files.id"), nullable=False)
+    label = Column(String, nullable=True)
+    visibility = Column(String, nullable=False, default="designer_visible")
+    sort_order = Column(Integer, nullable=False, default=0)
+    added_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    quest = relationship("DesignQuest", back_populates="references")
+    project_file = relationship("ProjectFile", foreign_keys=[project_file_id])
+    added_by = relationship("User", foreign_keys=[added_by_user_id])
+
+
+class DesignQuestEvent(Base):
+    __tablename__ = "design_quest_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    quest_id = Column(Integer, ForeignKey("design_quests.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    event_type = Column(String, nullable=False)
+    actor_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    summary = Column(Text, nullable=True)
+    payload_json = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    quest = relationship("DesignQuest", back_populates="events")
+    project = relationship("Project")
+    actor = relationship("User", foreign_keys=[actor_user_id])
 
 
 class ProjectVariant(Base):

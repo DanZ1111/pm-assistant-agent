@@ -160,10 +160,15 @@ def main():
             "INVITE_ROLES",
         ],
     )
-    if "DesignQuest" not in read("app/models.py") and "011_v1_5" not in migrations and "design_quest" not in ai_tools:
-        ok("Build 01 does not add quest tables, v1.5 migrations, or AI handlers")
+    models = read("app/models.py")
+    if (
+        "DesignSubmission" not in models
+        and "design_submission" not in migrations
+        and all(name not in ai_tools for name in ("draft_design_quest", "publish_design_quest", "close_design_quest"))
+    ):
+        ok("Build 01 boundary remains intact after later v1.5 data-model additions")
     else:
-        fail("Build 01 scope leak", "quest model/migration/AI marker found")
+        fail("Build 01 scope leak", "submission model/migration or AI quest handler found")
 
     print("\n── 2. i18n parity and locked keys ──")
     en = json.loads(read("app/i18n/en.json"))

@@ -10,7 +10,8 @@ from app.models import (
     ProjectCreationToken, User,
     PlanningModule, PlanningTemplate, PlanningTemplateNode, PlanningTemplateEdge,
     PlanningSandbox, PlanningSandboxNode, PlanningSandboxEdge, PlanningApplyEvent,
-    ProjectBlocker,
+    ProjectBlocker, DesignQuest, DesignQuestAssignment, DesignQuestReference,
+    DesignQuestEvent,
 )
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app", "uploads")
@@ -332,6 +333,349 @@ def create_project(db: Session, data: dict, prototype_rounds: str = "single") ->
     db.commit()
     db.refresh(project)
     return project
+
+
+# ---------------------------------------------------------------------------
+# v1.5 Build 02 — Designer Portal design quest service layer
+# ---------------------------------------------------------------------------
+
+DESIGN_QUEST_ACTIVE_STATUSES = ("draft", "open", "reviewing", "revision_needed", "selected")
+DESIGN_QUEST_DESIGNER_VISIBLE_STATUSES = ("open", "reviewing", "revision_needed", "selected")
+DESIGN_QUEST_VISIBILITIES = ("all_active_designers", "assigned_designers_only")
+DESIGNER_PORTAL_ROLES = ("designer", "designer_manager")
+
+
+def _can_edit_project_for_design_quest(user: User | None, project: Project | None) -> bool:
+    if not user or not project:
+        return False
+    if user.role == "admin":
+        return True
+    if user.role == "pm":
+        pm_field = (project.product_manager or "").lower().strip()
+        return bool(pm_field) and (
+            pm_field == (user.username or "").lower().strip()
+            or pm_field == (user.display_name or "").lower().strip()
+        )
+    return False
+
+
+def _require_design_quest_editor(db: Session, project: Project | None, user_id: int | None) -> User:
+    user = db.query(User).filter(User.id == user_id).first() if user_id else None
+    if not _can_edit_project_for_design_quest(user, project):
+        raise PermissionError("user_cannot_edit_design_quest_project")
+    return user
+
+
+def _write_design_quest_event(
+    db: Session,
+    quest: DesignQuest,
+    event_type: str,
+    actor_user_id: int | None,
+    summary: str,
+    payload: dict | None = None,
+) -> DesignQuestEvent:
+    event = DesignQuestEvent(
+        quest_id=quest.id,
+        project_id=quest.project_id,
+        event_type=event_type,
+        actor_user_id=actor_user_id,
+        summary=summary,
+        payload_json=payload or {},
+    )
+    db.add(event)
+    return event
+
+
+def get_active_design_quest(db: Session, project_id: int) -> DesignQuest | None:
+    return (
+        db.query(DesignQuest)
+        .filter(
+            DesignQuest.project_id == project_id,
+            DesignQuest.status.in_(DESIGN_QUEST_ACTIVE_STATUSES),
+        )
+        .order_by(DesignQuest.updated_at.desc())
+        .first()
+    )
+
+
+def create_design_quest_draft(
+    db: Session,
+    project_id: int,
+    user_id: int,
+    title: str,
+    brief: str,
+    must_keep: str | None = None,
+    must_avoid: str | None = None,
+    soft_deadline: date | None = None,
+    visibility: str = "all_active_designers",
+    is_timeline_blocking: bool = False,
+    linked_phase_id: int | None = None,
+) -> DesignQuest:
+    project = get_project(db, project_id)
+    editor = _require_design_quest_editor(db, project, user_id)
+    if not title or not title.strip():
+        raise ValueError("title_required")
+    if not brief or not brief.strip():
+        raise ValueError("brief_required")
+    if visibility not in DESIGN_QUEST_VISIBILITIES:
+        raise ValueError("invalid_visibility")
+    if get_active_design_quest(db, project_id):
+        raise ValueError("active_design_quest_exists")
+    if linked_phase_id is not None:
+        phase = db.query(ProjectPhase).filter(
+            ProjectPhase.id == linked_phase_id,
+            ProjectPhase.project_id == project_id,
+        ).first()
+        if not phase:
+            raise ValueError("linked_phase_not_in_project")
+
+    now = datetime.utcnow()
+    quest = DesignQuest(
+        project_id=project_id,
+        title=title.strip(),
+        brief=brief.strip(),
+        must_keep=(must_keep or "").strip() or None,
+        must_avoid=(must_avoid or "").strip() or None,
+        status="draft",
+        visibility=visibility,
+        soft_deadline=soft_deadline,
+        is_timeline_blocking=bool(is_timeline_blocking),
+        linked_phase_id=linked_phase_id,
+        created_by_user_id=editor.id,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(quest)
+    db.flush()
+    _write_design_quest_event(
+        db,
+        quest,
+        "quest_created",
+        editor.id,
+        f"Design quest '{quest.title}' created as draft.",
+        {"status": quest.status, "visibility": quest.visibility},
+    )
+    db.commit()
+    db.refresh(quest)
+    return quest
+
+
+def publish_design_quest(db: Session, quest_id: int, user_id: int) -> DesignQuest:
+    quest = db.query(DesignQuest).filter(DesignQuest.id == quest_id).first()
+    if not quest:
+        raise ValueError("design_quest_not_found")
+    editor = _require_design_quest_editor(db, quest.project, user_id)
+    if quest.status != "draft":
+        raise ValueError("only_draft_quest_can_publish")
+    now = datetime.utcnow()
+    quest.status = "open"
+    quest.published_at = now
+    quest.updated_at = now
+    _write_design_quest_event(
+        db,
+        quest,
+        "quest_published",
+        editor.id,
+        f"Design quest '{quest.title}' published.",
+        {"status": quest.status},
+    )
+    db.commit()
+    db.refresh(quest)
+    return quest
+
+
+def close_design_quest(db: Session, quest_id: int, user_id: int, reason: str | None = None) -> DesignQuest:
+    quest = db.query(DesignQuest).filter(DesignQuest.id == quest_id).first()
+    if not quest:
+        raise ValueError("design_quest_not_found")
+    editor = _require_design_quest_editor(db, quest.project, user_id)
+    if quest.status in ("closed", "cancelled"):
+        raise ValueError("design_quest_already_closed")
+    now = datetime.utcnow()
+    old_status = quest.status
+    quest.status = "closed"
+    quest.closed_at = now
+    quest.updated_at = now
+    _write_design_quest_event(
+        db,
+        quest,
+        "quest_closed",
+        editor.id,
+        f"Design quest '{quest.title}' closed.",
+        {"old_status": old_status, "reason": reason},
+    )
+    db.commit()
+    db.refresh(quest)
+    return quest
+
+
+def assign_designers_to_quest(
+    db: Session,
+    quest_id: int,
+    designer_user_ids: list[int],
+    assigned_by_user_id: int,
+) -> list[DesignQuestAssignment]:
+    quest = db.query(DesignQuest).filter(DesignQuest.id == quest_id).first()
+    if not quest:
+        raise ValueError("design_quest_not_found")
+    editor = _require_design_quest_editor(db, quest.project, assigned_by_user_id)
+
+    now = datetime.utcnow()
+    assignments: list[DesignQuestAssignment] = []
+    for designer_user_id in designer_user_ids:
+        designer = db.query(User).filter(User.id == designer_user_id).first()
+        if not designer or designer.role not in DESIGNER_PORTAL_ROLES:
+            raise ValueError("assigned_user_is_not_designer")
+        assignment = (
+            db.query(DesignQuestAssignment)
+            .filter(
+                DesignQuestAssignment.quest_id == quest_id,
+                DesignQuestAssignment.designer_user_id == designer_user_id,
+            )
+            .first()
+        )
+        if assignment:
+            assignment.status = "assigned"
+            assignment.assigned_by_user_id = editor.id
+            assignment.updated_at = now
+        else:
+            assignment = DesignQuestAssignment(
+                quest_id=quest_id,
+                designer_user_id=designer_user_id,
+                assigned_by_user_id=editor.id,
+                status="assigned",
+                created_at=now,
+                updated_at=now,
+            )
+            db.add(assignment)
+        assignments.append(assignment)
+
+    quest.updated_at = now
+    _write_design_quest_event(
+        db,
+        quest,
+        "designers_assigned",
+        editor.id,
+        f"{len(assignments)} designer(s) assigned to design quest '{quest.title}'.",
+        {"designer_user_ids": designer_user_ids},
+    )
+    db.commit()
+    for assignment in assignments:
+        db.refresh(assignment)
+    return assignments
+
+
+def link_design_quest_reference(
+    db: Session,
+    quest_id: int,
+    project_file_id: int,
+    added_by_user_id: int,
+    label: str | None = None,
+    visibility: str = "designer_visible",
+    sort_order: int | None = None,
+) -> DesignQuestReference:
+    quest = db.query(DesignQuest).filter(DesignQuest.id == quest_id).first()
+    if not quest:
+        raise ValueError("design_quest_not_found")
+    editor = _require_design_quest_editor(db, quest.project, added_by_user_id)
+    project_file = db.query(ProjectFile).filter(ProjectFile.id == project_file_id).first()
+    if not project_file or project_file.project_id != quest.project_id:
+        raise ValueError("reference_file_not_in_quest_project")
+    if visibility not in ("designer_visible", "internal_only"):
+        raise ValueError("invalid_reference_visibility")
+    if sort_order is None:
+        sort_order = (
+            db.query(func.max(DesignQuestReference.sort_order))
+            .filter(DesignQuestReference.quest_id == quest_id)
+            .scalar()
+            or 0
+        ) + 10
+
+    ref = DesignQuestReference(
+        quest_id=quest_id,
+        project_file_id=project_file_id,
+        label=(label or "").strip() or project_file.original_filename,
+        visibility=visibility,
+        sort_order=sort_order,
+        added_by_user_id=editor.id,
+        created_at=datetime.utcnow(),
+    )
+    db.add(ref)
+    quest.updated_at = datetime.utcnow()
+    _write_design_quest_event(
+        db,
+        quest,
+        "reference_linked",
+        editor.id,
+        f"Reference '{ref.label}' linked to design quest '{quest.title}'.",
+        {"project_file_id": project_file_id, "visibility": visibility},
+    )
+    db.commit()
+    db.refresh(ref)
+    return ref
+
+
+def can_designer_view_quest(user: User | None, quest: DesignQuest | None) -> bool:
+    if not user or not quest:
+        return False
+    if user.role == "admin":
+        return True
+    if user.role not in DESIGNER_PORTAL_ROLES:
+        return False
+    if quest.status not in DESIGN_QUEST_DESIGNER_VISIBLE_STATUSES:
+        return False
+    if user.role == "designer_manager":
+        return True
+    if quest.visibility == "all_active_designers":
+        return True
+    if quest.visibility == "assigned_designers_only":
+        return any(
+            assignment.designer_user_id == user.id and assignment.status == "assigned"
+            for assignment in quest.assignments
+        )
+    return False
+
+
+def list_design_quests_for_designer(db: Session, designer_user_id: int) -> list[DesignQuest]:
+    user = db.query(User).filter(User.id == designer_user_id).first()
+    if not user or user.role not in DESIGNER_PORTAL_ROLES:
+        return []
+    quests = (
+        db.query(DesignQuest)
+        .filter(DesignQuest.status.in_(DESIGN_QUEST_DESIGNER_VISIBLE_STATUSES))
+        .order_by(DesignQuest.updated_at.desc())
+        .all()
+    )
+    return [quest for quest in quests if can_designer_view_quest(user, quest)]
+
+
+def shape_design_quest_for_designer(quest: DesignQuest, user: User) -> dict:
+    if not can_designer_view_quest(user, quest):
+        raise PermissionError("designer_cannot_view_quest")
+    references = []
+    for ref in quest.references:
+        if ref.visibility != "designer_visible":
+            continue
+        project_file = ref.project_file
+        references.append({
+            "id": ref.id,
+            "label": ref.label or (project_file.original_filename if project_file else "Reference"),
+            "file_id": ref.project_file_id,
+            "original_filename": project_file.original_filename if project_file else None,
+            "file_type": project_file.file_type if project_file else None,
+            "file_size": project_file.file_size if project_file else None,
+        })
+    return {
+        "id": quest.id,
+        "title": quest.title,
+        "brief": quest.brief,
+        "must_keep": quest.must_keep,
+        "must_avoid": quest.must_avoid,
+        "status": quest.status,
+        "visibility": quest.visibility,
+        "soft_deadline": quest.soft_deadline.isoformat() if quest.soft_deadline else None,
+        "references": references,
+    }
 
 
 # ---------------------------------------------------------------------------

@@ -150,6 +150,10 @@ MIGRATIONS = [
         "010_v1_4_create_planning_templates",
         lambda eng: _create_planning_templates(eng),
     ),
+    (
+        "011_v1_5_create_design_quest_core",
+        lambda eng: _create_design_quest_core(eng),
+    ),
 ]
 
 
@@ -581,6 +585,99 @@ def _create_planning_apply_events(engine):
         conn.execute(text(
             "CREATE INDEX IF NOT EXISTS ix_planning_apply_events_sandbox "
             "ON planning_apply_events(sandbox_id)"
+        ))
+
+
+def _create_design_quest_core(engine):
+    """v1.5 Build 02 — Designer Portal quest source-of-truth tables."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    with engine.begin() as conn:
+        if "design_quests" not in tables:
+            conn.execute(text(
+                "CREATE TABLE design_quests ("
+                "  id INTEGER PRIMARY KEY,"
+                "  project_id INTEGER NOT NULL REFERENCES projects(id),"
+                "  title VARCHAR NOT NULL,"
+                "  brief TEXT NOT NULL,"
+                "  must_keep TEXT NULL,"
+                "  must_avoid TEXT NULL,"
+                "  status VARCHAR NOT NULL DEFAULT 'draft',"
+                "  visibility VARCHAR NOT NULL DEFAULT 'all_active_designers',"
+                "  soft_deadline DATE NULL,"
+                "  is_timeline_blocking BOOLEAN NOT NULL DEFAULT FALSE,"
+                "  linked_phase_id INTEGER NULL REFERENCES project_phases(id),"
+                "  created_by_user_id INTEGER NULL REFERENCES users(id),"
+                "  published_at TIMESTAMP NULL,"
+                "  closed_at TIMESTAMP NULL,"
+                "  created_at TIMESTAMP NOT NULL,"
+                "  updated_at TIMESTAMP NOT NULL"
+                ")"
+            ))
+        if "design_quest_assignments" not in tables:
+            conn.execute(text(
+                "CREATE TABLE design_quest_assignments ("
+                "  id INTEGER PRIMARY KEY,"
+                "  quest_id INTEGER NOT NULL REFERENCES design_quests(id),"
+                "  designer_user_id INTEGER NOT NULL REFERENCES users(id),"
+                "  assigned_by_user_id INTEGER NULL REFERENCES users(id),"
+                "  status VARCHAR NOT NULL DEFAULT 'assigned',"
+                "  created_at TIMESTAMP NOT NULL,"
+                "  updated_at TIMESTAMP NOT NULL,"
+                "  UNIQUE (quest_id, designer_user_id)"
+                ")"
+            ))
+        if "design_quest_references" not in tables:
+            conn.execute(text(
+                "CREATE TABLE design_quest_references ("
+                "  id INTEGER PRIMARY KEY,"
+                "  quest_id INTEGER NOT NULL REFERENCES design_quests(id),"
+                "  project_file_id INTEGER NOT NULL REFERENCES project_files(id),"
+                "  label VARCHAR NULL,"
+                "  visibility VARCHAR NOT NULL DEFAULT 'designer_visible',"
+                "  sort_order INTEGER NOT NULL DEFAULT 0,"
+                "  added_by_user_id INTEGER NULL REFERENCES users(id),"
+                "  created_at TIMESTAMP NOT NULL"
+                ")"
+            ))
+        if "design_quest_events" not in tables:
+            conn.execute(text(
+                "CREATE TABLE design_quest_events ("
+                "  id INTEGER PRIMARY KEY,"
+                "  quest_id INTEGER NOT NULL REFERENCES design_quests(id),"
+                "  project_id INTEGER NOT NULL REFERENCES projects(id),"
+                "  event_type VARCHAR NOT NULL,"
+                "  actor_user_id INTEGER NULL REFERENCES users(id),"
+                "  summary TEXT NULL,"
+                "  payload_json JSON NULL,"
+                "  created_at TIMESTAMP NOT NULL"
+                ")"
+            ))
+
+        conn.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_design_quests_one_active "
+            "ON design_quests(project_id) "
+            "WHERE status IN ('draft', 'open', 'reviewing', 'revision_needed', 'selected')"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_design_quests_project_status "
+            "ON design_quests(project_id, status)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_design_quest_assignments_designer "
+            "ON design_quest_assignments(designer_user_id, status)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_design_quest_references_quest "
+            "ON design_quest_references(quest_id, sort_order)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_design_quest_events_quest "
+            "ON design_quest_events(quest_id, created_at)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_design_quest_events_project "
+            "ON design_quest_events(project_id, created_at)"
         ))
 
 
