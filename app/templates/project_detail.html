@@ -94,17 +94,24 @@
 </div>
 
 <div class="project-workspace" id="projectWorkspace">
-  <div class="project-workspace-tabs" role="tablist" aria-label="{{ t('workspace.project_workspaces') }}">
-    <button type="button" class="project-workspace-tab active"
-            id="workspaceTabOverview" data-workspace-tab="overview"
-            role="tab" aria-selected="true" aria-controls="workspacePanelOverview">
-      <i class="bi bi-layout-text-sidebar-reverse me-1"></i>{{ t('workspace.overview') }}
-    </button>
-    <button type="button" class="project-workspace-tab"
-            id="workspaceTabTimeline" data-workspace-tab="timeline"
-            role="tab" aria-selected="false" aria-controls="workspacePanelTimeline">
-      <i class="bi bi-calendar-range me-1"></i>{{ t('section.timeline') }}
-    </button>
+  <div class="project-workspace-bar">
+    <div class="project-workspace-tabs" role="tablist" aria-label="{{ t('workspace.project_workspaces') }}">
+      <button type="button" class="project-workspace-tab active"
+              id="workspaceTabOverview" data-workspace-tab="overview"
+              role="tab" aria-selected="true" aria-controls="workspacePanelOverview">
+        <i class="bi bi-layout-text-sidebar-reverse me-1"></i>{{ t('workspace.overview') }}
+      </button>
+      <button type="button" class="project-workspace-tab"
+              id="workspaceTabTimeline" data-workspace-tab="timeline"
+              role="tab" aria-selected="false" aria-controls="workspacePanelTimeline">
+        <i class="bi bi-calendar-range me-1"></i>{{ t('section.timeline') }}
+      </button>
+    </div>
+    <a class="project-workspace-action"
+       href="/projects/{{ project.id }}/sandbox"
+       data-project-sandbox-link>
+      <i class="bi bi-diagram-3 me-1"></i>{{ t('sandbox.title') }}
+    </a>
   </div>
 </div>
 
@@ -803,6 +810,11 @@
           <i class="bi bi-robot me-1"></i>{{ t('timeline.btn_open_ai_intake') }}
         </button>
         {% endif %}
+        <a class="btn btn-sm btn-outline-primary"
+           href="/projects/{{ project.id }}/sandbox"
+           data-action="open-planning-sandbox">
+          <i class="bi bi-diagram-3 me-1"></i>{{ t('sandbox.title') }}
+        </a>
       </div>
 
       {# Build 07A — shared inline form mount. Initially hidden; the buttons

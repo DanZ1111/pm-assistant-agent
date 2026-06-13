@@ -43,80 +43,35 @@ add an entry here. If it's a scenario bug, fix the scenario.
 
 ## Open
 
-### 🐛 Planning Sandbox is not reachable via UI navigation
-
-**Discovered:** 2026-06-13, via blind QA suite run + targeted
-discoverability scenario.
-
-**Failing scenario:**
-[`scenario_contracts/acceptance/sandbox_is_discoverable_from_project.py`](scenario_contracts/acceptance/sandbox_is_discoverable_from_project.py)
-
-**Failure message:**
-```
-step 2 (PM looks for a visible link to the Planning Sandbox) check:
-project detail page has at least one <a href=*/sandbox> link
-(PMs need a clickable entry point to the Planning Sandbox):
-expected True, got False
-```
-
-**PM-visible symptom:** From the project detail page (`/projects/{id}`)
-there is no clickable link, button, or tab that leads to the Planning
-Sandbox at `/projects/{id}/sandbox`. The route works and the page
-renders if you type the URL, but PMs cannot find the feature through
-normal navigation. The user reported it as:
-
-> "I couldn't find the 'sandbox' or editor that has nodes, anywhere on
-> this UI. Not a single way I can find out this section."
-
-A grep of `app/templates/` confirms: zero references to `/sandbox`
-outside `planning_sandbox.html` itself. The sandbox page has a
-"back to project" link, but the project detail page has no
-"forward to sandbox" link.
-
-**Why it shipped despite existing UI tests:** every existing UI
-scenario (`ui_sandbox_canvas_smoke`, `ui_sandbox_add_module`, the
-acceptance journey, etc.) navigates **directly** to
-`/projects/{id}/sandbox` via `actions.open_url`. None tests "can a
-PM click their way to the sandbox?" The bug is invisible to
-URL-driven testing — this is now **Rule 6** in
-[SCENARIO_AUTHORING_GUIDE.md](SCENARIO_AUTHORING_GUIDE.md).
-
-**Where the fix lives:** `app/templates/project_detail.html`. Add a
-navigation entry to `/projects/{id}/sandbox`. Reasonable placements
-(any one is enough to satisfy the regression test):
-
-- A button in the Timeline tab near the phase strip (e.g. next to
-  "Open Command Center")
-- A third tab in the workspace tabs alongside "Overview" and
-  "Timeline" (e.g. "Sandbox" or "Plan")
-- A button in the Project Pulse "Attention Needed" card when
-  appropriate
-- A button in the section header bar somewhere always-visible
-
-The regression test does not lock placement — it only requires that
-SOME `<a href*="/projects/{id}/sandbox">` exists on the project
-detail page.
-
-**Verification:**
-```bash
-# Should report PASS: 1 and "3 steps OK" once the fix lands.
-python3 -m scenario_contracts.lib.runner \
-  scenario_contracts/acceptance/sandbox_is_discoverable_from_project.py
-
-# Suite should be all-green:
-bash run_qa_suite.sh
-```
-
-**Status:** OPEN — Codex domain (sandbox UI iteration).
-
-**When fixed:** move this entry to "Recently fixed" below with the
-commit hash and date.
+(none)
 
 ---
 
 ## Recently fixed
 
-(none yet — this file is new as of 2026-06-13)
+### ✅ Planning Sandbox is reachable via UI navigation
+
+**Discovered:** 2026-06-13, via blind QA suite run + targeted
+discoverability scenario.
+
+**Fixed:** 2026-06-13, pending commit.
+
+**Scenario now green:**
+[`scenario_contracts/acceptance/sandbox_is_discoverable_from_project.py`](scenario_contracts/acceptance/sandbox_is_discoverable_from_project.py)
+
+**Fix:** `app/templates/project_detail.html` now exposes
+`/projects/{id}/sandbox` from the project workspace bar and from the
+Timeline Command Center action row. `app/static/css/styles.css` styles
+the workspace-bar link so it reads as an intentional project-planning
+entry point.
+
+**Verification:**
+```bash
+env BASE_URL=http://localhost:8001 python3 -m scenario_contracts.lib.runner \
+  scenario_contracts/acceptance/sandbox_is_discoverable_from_project.py
+```
+
+Result: `PASS: 1 | FAIL: 0 | INVALID: 0 | SKIP: 0`.
 
 ---
 
