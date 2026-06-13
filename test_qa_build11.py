@@ -169,9 +169,10 @@ def main():
     contains_all("guide names the 4-truth model", guide,
                  ["DB truth", "UI truth", "History truth",
                   "PM comprehension"])
-    contains_all("guide locks the 5 hard rules", guide,
-                 ["The 5 hard rules",
-                  "Rule 1", "Rule 2", "Rule 3", "Rule 4", "Rule 5"])
+    contains_all("guide locks the hard rules", guide,
+                 ["hard rules",
+                  "Rule 1", "Rule 2", "Rule 3", "Rule 4", "Rule 5",
+                  "Rule 6"])
     contains_all("guide references UI_TESTABILITY_GAPS workflow", guide,
                  ["UI_TESTABILITY_GAPS.md", "Stable selectors only"])
 
