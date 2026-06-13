@@ -9,7 +9,7 @@ from scenario_contracts.lib import actions, assertions, fixtures
 ID = "golden_db_fail_001"
 TITLE = "DB assertion designed to mismatch — proves failures are visible"
 TAGS = ["deterministic", "golden"]
-MATURITY = "stable"
+MATURITY = "candidate"
 WHY_IT_MATTERS = (
     "If a known-bad assertion does not show up as a failure in the report, "
     "the runner is silently swallowing failures and no scenario can be trusted."

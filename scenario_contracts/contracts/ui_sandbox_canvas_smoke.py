@@ -11,7 +11,7 @@ from scenario_contracts.lib import actions, assertions
 
 ID = "ui_sandbox_canvas_smoke_001"
 TITLE = "Planning Sandbox page loads + shell renders"
-TAGS = ["ui", "deterministic", "smoke", "sandbox"]
+TAGS = ["ui", "deterministic", "smoke", "sandbox", "release_gate"]
 MATURITY = "stable"
 WHY_IT_MATTERS = (
     "The v1.4 Planning Sandbox is the largest UI surface Codex added. "

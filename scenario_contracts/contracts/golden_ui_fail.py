@@ -17,7 +17,7 @@ from scenario_contracts.lib import actions, assertions
 ID = "golden_ui_fail_001"
 TITLE = "Intentional UI failure proves the UI failure pipeline catches regressions"
 TAGS = ["ui", "golden"]
-MATURITY = "stable"
+MATURITY = "candidate"
 WHY_IT_MATTERS = (
     "QA-01 left this scenario as a placeholder skip. QA-03 flips it to "
     "an intentional FAIL so we can prove the browser failure path "

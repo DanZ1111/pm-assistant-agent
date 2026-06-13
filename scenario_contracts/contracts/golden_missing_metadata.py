@@ -7,7 +7,7 @@ and a config-error message naming the missing metadata field.
 ID = "golden_missing_metadata_001"
 TITLE = "Scenario missing WHY_IT_MATTERS — runner must reject"
 TAGS = ["golden"]
-MATURITY = "stable"
+MATURITY = "candidate"
 # WHY_IT_MATTERS is intentionally missing.
 
 

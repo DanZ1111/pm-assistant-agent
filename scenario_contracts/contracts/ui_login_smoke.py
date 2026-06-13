@@ -7,7 +7,7 @@ from scenario_contracts.lib import actions, assertions
 
 ID = "ui_login_smoke_001"
 TITLE = "Admin login lands on /projects with a real project listing"
-TAGS = ["ui", "deterministic", "smoke"]
+TAGS = ["ui", "deterministic", "smoke", "release_gate"]
 MATURITY = "stable"
 WHY_IT_MATTERS = (
     "The most basic browser flow: log in, see your projects list. If this "

@@ -58,13 +58,20 @@ contributor working linearly.
 | **QA-06** | Tier 1 contract gaps — Marine-bug regression + delete permission boundary + create idempotency + finish_phase advancement + blocker lifecycle | ✓ `a91bd5e` |
 | **QA-07** | Sandbox UI mutation — clicking the palette Add button creates a node and the canvas updates end-to-end | ✓ `162501b` |
 | **QA-08** | Disruption library (5 composable helpers) + medium journey (10 steps mixing manual actions + mocked AI + 2 disruptions) | ✓ `d0e491c` |
-| **QA-09** | Full Marine Knife journey — 20 steps. Ideas → link → sandbox apply → 6+ phases → all 5 disruption types → multiple AI proposals → 2 color variants → blocker lifecycle → cumulative final state. End-state integration proof of the QA system itself. | ✓ this build |
+| **QA-09** | Full Marine Knife journey — 20 steps. Ideas → link → sandbox apply → 6+ phases → all 5 disruption types → multiple AI proposals → 2 color variants → blocker lifecycle → cumulative final state. End-state integration proof of the QA system itself. | ✓ `2d1d58e` |
+| **QA-10** | Coverage assistant (offline gap analyzer) + run_qa_suite.sh + run_qa_loop.sh with flakiness tracking + STABLE_CREDIBILITY.md promotion rule + candidates/ scaffolding. **Closes the QA series.** | ✓ this build |
 
 ### Path A — ambition (planned)
 
 | Build | Scope | Why this slice | Effort |
 |---|---|---|---|
-| **QA-05b** | **HTTP-level AI scenarios.** Add FastAPI TestClient + auth-override scaffolding to the QA stack. Exercise `POST /ai/chat` end-to-end: AI proposal flow surfaces a `proposal_id` in the response; `POST /ai/chat/{cid}/proposals/{pid}/confirm` writes; `cancel` does not. Cover the `/ai/intake/extract` panel surface. Test the `_merge_reviewed_args` edit-then-confirm flow. | Layered on QA-05's dispatch-level proof. Picks up the serialization + route surface QA-05 explicitly deferred. | ~3h |
+**The QA series is complete as a system.** The 10 builds above ship the runner, library, scenarios (26 across contracts/journeys/UI), disruption helpers, the journey shape, the AI confirmation guard, the bug-class safety net, and the operational tooling (suite runner, loop runner, gap analyzer, stable-credibility rule). Future QA work happens **incrementally** — each product build adds its own contract scenarios; the gap analyzer surfaces what's missing; humans (with AI help) author into `candidates/` → reviewed → moved to `contracts/` or `journeys/` → gradually promoted to `stable` via [STABLE_CREDIBILITY.md](STABLE_CREDIBILITY.md).
+
+### Deferred / domain-handoff (won't pre-build)
+
+| Build | Scope | Rationale |
+|---|---|---|
+| **QA-05b** | **HTTP-level AI scenarios.** FastAPI TestClient + auth-override scaffolding. Exercise `POST /ai/chat` end-to-end: AI proposal flow surfaces a `proposal_id`; `POST /ai/chat/{cid}/proposals/{pid}/confirm` writes; `cancel` doesn't. Cover the `/ai/intake/extract` panel surface. Test the `_merge_reviewed_args` edit-then-confirm flow. | Picks up the HTTP serialization + route surface that QA-05's dispatch-level proof skipped. Build if route-level regressions start shipping. |
 | **QA-06b** | **Excel batch intake idempotency.** Cover `create_projects_batch_with_idempotency`: review table with per-row create/skip/update semantics, idempotency token reuse, partial-failure rollback. QA-06 deferred this since the basic single-create idempotency contract already locks the atomic-claim mechanism. | Picks up the batch surface introduced in Build 30B. | ~2h |
 | **QA-07b** *(Codex domain)* | **Sandbox UI mutation — non-destructive flows.** Node property panel edit, edge create via dependency checkbox, cycle rejection at edit time, Tidy auto-layout. Domain handoff to whoever ships v1.4 sandbox UI iterations (Codex). If they want regression coverage they can author these on top of QA-07's `lib/browser` + UI actions. We don't build it pre-emptively. | — | — |
 | **QA-07c** *(Codex domain)* | **Sandbox UI Apply via the confirmation modal.** Destructive — needs a real test-project lifecycle. Same handoff rule: Codex picks this up if/when they want it. We provide the QA infrastructure (runner, browser path, scenario shape); they use it. | — | — |

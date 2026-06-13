@@ -7,7 +7,7 @@ and a config-error message naming the missing function.
 ID = "golden_invalid_shape_001"
 TITLE = "Scenario missing check() — runner must reject as config error"
 TAGS = ["golden"]
-MATURITY = "stable"
+MATURITY = "candidate"
 WHY_IT_MATTERS = (
     "If the runner silently runs scenarios that are missing required "
     "functions, malformed scenarios can pass by doing nothing. The runner "
