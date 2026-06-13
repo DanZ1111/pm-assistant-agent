@@ -2,7 +2,51 @@
 
 ## Unreleased
 
-- No unreleased changes after v1.4.0 release hardening.
+- No unreleased changes after v1.5.0 release hardening.
+
+## v1.5.0 — Designer Portal MVP
+_2026-06-13_
+
+v1.5.0 adds a restricted Designer Portal for design briefs, submissions,
+revision loops, final selection, and explicit design completion. PMs continue
+working in Project Detail `Renderings & Design`; designers work only inside
+`/designer`; selected work flows back into project renderings with source
+metadata.
+
+- **v1.5 Build 01 — Roles & Portal Shell.** Adds `designer` and
+  `designer_manager` roles, invite PIN support, `/designer` shell, and route
+  blocking so Designer Portal users cannot access PM Workspace project pages.
+- **v1.5 Build 02 — Design Quest Data Model.** Adds design quest,
+  assignment, reference, and event models/migration plus designer-safe read
+  shaping and visibility rules.
+- **v1.5 Build 03 — PM Renderings & Design Quest MVP.** Replaces the old
+  Designer Portal placeholder with PM quest creation/edit/publish/close,
+  guarded reference linking, and designer-safe preview.
+- **v1.5 Build 04 — Designer Portal Quest View.** Designers can browse
+  available/assigned quests, view safe brief fields/references, and download
+  references through guarded routes.
+- **v1.5 Build 05 — Submissions & Versions.** Designers can upload validated
+  images/PDFs, preserving every version; PMs see incoming submissions with
+  guarded version downloads.
+- **v1.5 Build 06 — Revision Loop & Review Actions.** PMs can shortlist,
+  reject, and request structured revisions; designers can answer open revision
+  requests with linked revised versions.
+- **v1.5 Build 07 — Select Final & Promote Rendering.** PMs select a specific
+  submission version as final; the app copies it into project renderings with
+  `design_submission_version` source metadata.
+- **v1.5 Build 08 — Design Status In Timeline/Pulse.** Project Pulse and
+  Timeline Command Center show derived design status. `Mark Design Complete`
+  is explicit and does not mutate phase status.
+- **v1.5 Build 09 — Designer Manager Operations.** Designer managers get a
+  safe operations page for assigning designers to assigned-only quests and
+  reopening mistakenly rejected submissions; they remain blocked from PM
+  project pages.
+- **v1.5 Build 10 — Release Hardening.** Bumps runtime/docs to v1.5.0,
+  documents deferred AI write handlers, and adds `test_v15_build10.py`.
+
+Migrations 011-015 are the v1.5 schema changes. No Designer Portal AI write
+handlers are registered in this release; future handlers must use the standard
+confirmation flow and the same permission boundaries as the manual UI.
 
 ## v1.4.0 — Planning Sandbox Release
 _2026-06-10_

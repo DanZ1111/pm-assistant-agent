@@ -1,9 +1,52 @@
 # PM Product Tracker — Version
 
-**Current Version:** v1.4.0
-**Current Build:** v1.4.0 — Planning Sandbox Release (v1.4 Builds 01-09)
-**Status:** v1.1.0 released; v1.2.0 released; v1.2.1 released; v1.3.0 released; v1.4.0 released
-**Last Updated:** 2026-06-10
+**Current Version:** v1.5.0
+**Current Build:** v1.5.0 — Designer Portal MVP (v1.5 Builds 01-10)
+**Status:** v1.1.0 released; v1.2.0 released; v1.2.1 released; v1.3.0 released; v1.4.0 released; v1.5.0 released
+**Last Updated:** 2026-06-13
+
+## What's new in v1.5.0
+
+v1.5.0 adds a restricted Designer Portal and closes the PM-to-designer design
+workflow loop without exposing internal project pages to designers. PMs stay in
+the existing Project Detail `Renderings & Design` surface; designers work only
+inside `/designer`.
+
+- **Roles & Portal Shell (Build 01)** — adds `designer` and
+  `designer_manager` roles, invite PIN support, `/designer` shell, and PM
+  Workspace route blocking for Designer Portal users.
+- **Design Quest Data Model (Build 02)** — adds design quest, assignment,
+  reference, and audit-event source-of-truth tables with designer-safe shaping.
+- **PM Renderings & Design Quest MVP (Build 03)** — PM/admin users can create,
+  edit, publish, close, and attach references to one active design quest from
+  Project Detail.
+- **Designer Portal Quest View (Build 04)** — designers see available/assigned
+  quests, designer-facing brief fields, and guarded reference downloads without
+  PM Workspace chrome.
+- **Submissions & Versions (Build 05)** — designers upload validated files;
+  each upload is preserved as an immutable version; PMs see incoming
+  submissions through guarded download routes.
+- **Revision Loop & Review Actions (Build 06)** — PMs can shortlist, reject,
+  and request structured revisions; designers see their own revision checklist
+  and upload revised versions linked to the request.
+- **Select Final & Promote Rendering (Build 07)** — PMs select a specific
+  submission version as final; the selected version is copied into project
+  renderings with explicit source metadata.
+- **Design Status In Timeline/Pulse (Build 08)** — Project Pulse and Timeline
+  show derived design status; PMs explicitly mark design complete after final
+  selection without automatic phase completion.
+- **Designer Manager Operations (Build 09)** — designer managers get a safe
+  `/designer/manager` operations page for assignment assistance and rejected
+  submission recovery, while still blocked from PM project pages.
+- **Release Hardening (Build 10)** — bumps runtime/docs to v1.5.0, documents
+  the deferred Designer Portal AI write surface, and adds release-proof
+  regression coverage.
+
+Migrations 011-015 are the v1.5 data changes. v1.5 intentionally adds no AI
+write handlers; the manual workflow ships first and future AI tools must use
+the same confirmation and permission rules.
+
+i18n bundle reaches 927/927 EN/zh parity at the v1.5.0 lock.
 
 ## What's new in v1.4.0
 

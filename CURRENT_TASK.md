@@ -20,35 +20,35 @@ Codex implemented and committed:
 - `fe8cdda` — v1.5 Build 08 plan.
 - `a59097a` — v1.5 Build 08 design status in Timeline/Pulse.
 - `2aace2f` — v1.5 Build 09 plan.
+- `41ec1d3` — v1.5 Build 09 designer manager operations.
+- `c90f0a6` — v1.5 Build 10 plan.
 
-Codex is committing v1.5 Build 09 now:
+Codex is committing v1.5 Build 10 release hardening now:
 
-- Added Designer Manager operations dashboard at `/designer/manager`.
-- Designer managers can see safe portal data: designer roster, active
-  assigned-only quests, and rejected submissions.
-- Designer managers can assign regular designers to active assigned-only
-  quests.
-- Designer managers can reopen mistakenly rejected submissions back to PM
-  review.
-- Manager assignment/reopen operations write `DesignQuestEvent` audit records.
-- Designer managers still cannot access PM project pages.
-- No PM/admin invite controls, phase mutation, design-complete controls, or AI
-  handlers were added.
+- Runtime/docs bumped to v1.5.0 — Designer Portal MVP.
+- `VERSION.md` and `CHANGELOG.md` now document all v1.5 Builds 01-10.
+- `AI_TOOLS_REGISTRY.md` explicitly documents Designer Portal write tools as
+  deferred after the v1.5 manual UI.
+- Added `test_v15_build10.py` release-proof regression for version/docs,
+  artifacts, migrations 011-015, i18n parity, AI boundary, and permission
+  coverage.
+- No new schema, routes, UI, or AI handlers were added in Build 10.
 
-Build 09 verification:
+Build 10 verification:
 
-- `python3 -m py_compile app/crud.py app/routes/designer.py test_v15_build09.py` — PASS.
+- `python3 -m py_compile app/version.py test_v15_build10.py` — PASS.
+- `python3 test_v15_build10.py` — 9/9 PASS.
 - `python3 test_v15_build09.py` — 8/8 PASS.
 - `python3 test_v15_build08.py` — 15/15 PASS.
 - `python3 test_v15_build07.py` — 12/12 PASS.
-- `python3 test_v15_build06.py` — 13/13 PASS.
+- `python3 test_build_v121.py` — 19/19 PASS.
 - `git diff --check` — PASS.
 
-Next v1.5 step:
+Next step:
 
-1. Commit Build 09 as `Implement v1.5 Build 09 designer manager operations`.
-2. Write and commit `V15_BUILD10_RELEASE_HARDENING_PLAN.md`.
-3. Implement Build 10 only after the plan checkpoint.
+1. Commit Build 10 as `Implement v1.5 Build 10 release hardening`.
+2. v1.5 is complete. Next product work should be selected from the current
+   roadmap after checking `QA_OPEN_BUGS.md` and git state.
 
 ## Task
 v1.4 Builds 01-03 and the v1.3 UI Rescue fixes UI-R1 through UI-R4 are implemented in the working tree and are ready to be checkpointed. User asked to commit/push these fixes and then return to building the sandbox app. After the checkpoint commit/push, resume v1.4 with Build 04 planning/implementation discipline.

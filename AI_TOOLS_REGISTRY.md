@@ -83,9 +83,14 @@ The original 16 schemas landed in Build 20. Build 26 added `update_idea`; Build 
 | `save_sandbox_as_template` | Save the current planning sandbox graph as a reusable workflow template | auth + `can_edit_project` + visible sandbox relationship | YES — user confirmation required | deferred after v1.4 manual UI |
 | `explain_sandbox_estimate` | Explain schedule duration, warnings, and critical path from sandbox graph | auth + project visibility | No — read-only | deferred |
 | `propose_sandbox_edits` | Suggest node/dependency edits for a Planning Sandbox | auth + `can_edit_project` | YES before any write | deferred |
-| `draft_design_quest` | Draft a PM-reviewed designer-facing brief from project context | auth + `can_edit_project` | YES — PM confirms before any quest write | planned after v1.5 manual UI |
-| `publish_design_quest` | Publish an existing draft design quest to designer visibility | auth + `can_edit_project` + owning quest/project check | YES — explicit publish confirmation | planned after v1.5 manual UI |
-| `close_design_quest` | Close an active design quest with optional reason | auth + `can_edit_project` + owning quest/project check | YES — explicit close confirmation | planned after v1.5 manual UI |
+| `draft_design_quest` | Draft a PM-reviewed designer-facing brief from project context | auth + `can_edit_project` | YES — PM confirms before any quest write | deferred after v1.5 manual UI |
+| `publish_design_quest` | Publish an existing draft design quest to designer visibility | auth + `can_edit_project` + owning quest/project check | YES — explicit publish confirmation | deferred after v1.5 manual UI |
+| `close_design_quest` | Close an active design quest with optional reason | auth + `can_edit_project` + owning quest/project check | YES — explicit close confirmation | deferred after v1.5 manual UI |
+| `request_design_revision` | Request structured revision on a designer submission | auth + `can_edit_project` + owning submission/project check | YES — PM confirms revision text/checklist | deferred after v1.5 manual UI |
+| `select_final_design_submission` | Select a submission version and promote it to project renderings | auth + `can_edit_project` + owning version/project check | YES — explicit final selection confirmation | deferred after v1.5 manual UI |
+| `mark_design_complete` | Mark selected design work complete without phase mutation | auth + `can_edit_project` + selected rendering required | YES — explicit completion confirmation | deferred after v1.5 manual UI |
+| `designer_manager_assign` | Assign a designer to an assigned-only design quest | designer_manager only; portal-safe quest scope | YES — explicit manager confirmation | deferred after v1.5 manual UI |
+| `designer_manager_reopen_submission` | Reopen a mistakenly rejected designer submission | designer_manager only; rejected submission only | YES — explicit manager confirmation | deferred after v1.5 manual UI |
 | ~~`add_rendering_note(file_id, note)`~~ | Superseded by `update_file_comment` (Build 18) | — | — | ✓ shipped Build 18 |
 | ~~`add_prototype_photo_note(file_id, note)`~~ | Superseded by `update_file_comment` (Build 18) | — | — | ✓ shipped Build 18 |
 
