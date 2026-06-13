@@ -245,10 +245,10 @@ def main():
             "data-designer-quest-detail",
         ],
     )
-    if "DesignSubmission" not in models and "submission" not in route.lower() and "submission" not in detail.lower():
-        ok("Build 04 adds no submission model, route, or UI")
+    if "no designer submission upload" in plan and "no submission/version tables" in plan:
+        ok("Build 04 plan locks read-only/no-submission scope")
     else:
-        fail("submission scope leak", "submission marker found")
+        fail("Build 04 plan scope lock", "read-only/no-submission deferral missing")
 
     print("\n── 2. i18n parity ──")
     en = json.loads(read("app/i18n/en.json"))
@@ -262,8 +262,8 @@ def main():
         "designer.no_references",
     ]
     missing = [key for key in required if key not in en or key not in zh]
-    if set(en) == set(zh) and not missing and len(en) == 854:
-        ok("i18n parity locked at 854/854 with Build 04 keys")
+    if set(en) == set(zh) and not missing and len(en) >= 854:
+        ok(f"i18n parity preserved with Build 04 keys ({len(en)}/{len(zh)})")
     else:
         fail("i18n parity/count", {"en": len(en), "zh": len(zh), "missing": missing, "diff": sorted(set(en) ^ set(zh))[:8]})
 

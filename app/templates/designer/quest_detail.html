@@ -64,6 +64,83 @@
         {% endif %}
       </aside>
     </div>
+
+    <div class="designer-submission-workspace" data-designer-submission-workspace>
+      <div class="designer-section-head compact">
+        <div>
+          <h2>{{ t('designer.submissions_title') }}</h2>
+          <p>{{ t('designer.submissions_body') }}</p>
+        </div>
+      </div>
+
+      {% if submission_error %}
+      <div class="designer-alert warning">{{ t('designer.submission_error_prefix') }} {{ submission_error }}</div>
+      {% endif %}
+      {% if submission_uploaded %}
+      <div class="designer-alert success">{{ t('designer.submission_uploaded') }}</div>
+      {% endif %}
+
+      {% if safe_quest.status in ('open', 'reviewing', 'revision_needed') %}
+      <form method="post"
+            action="/designer/quests/{{ safe_quest.id }}/submissions/upload"
+            enctype="multipart/form-data"
+            class="designer-submission-form">
+        <div>
+          <label class="form-label">{{ t('designer.submission_title_label') }}</label>
+          <input name="title" class="form-control" placeholder="{{ t('designer.submission_title_placeholder') }}">
+        </div>
+        <div>
+          <label class="form-label">{{ t('designer.submission_file_label') }}</label>
+          <input name="file" type="file" class="form-control" accept=".jpg,.jpeg,.png,.webp,.pdf" required>
+          <div class="form-text">{{ t('designer.submission_file_hint') }}</div>
+        </div>
+        <div>
+          <label class="form-label">{{ t('designer.submission_note_label') }}</label>
+          <textarea name="designer_note" class="form-control" rows="2"></textarea>
+        </div>
+        <button class="btn btn-primary">
+          <i class="bi bi-upload me-1"></i>{{ t('designer.upload_submission') }}
+        </button>
+      </form>
+      {% else %}
+      <div class="designer-alert neutral">{{ t('designer.submissions_closed') }}</div>
+      {% endif %}
+
+      {% if submissions %}
+      <div class="designer-submission-list">
+        {% for submission in submissions %}
+        <article class="designer-submission-card">
+          <div class="designer-submission-card-head">
+            <div>
+              <span class="designer-quest-status designer-quest-status-{{ submission.status }}">{{ submission.status }}</span>
+              {% if submission.title %}<h3>{{ submission.title }}</h3>{% endif %}
+            </div>
+            {% if submission.latest_version %}
+            <span>{{ t('designer.latest_version') }} {{ submission.latest_version.version_number }}</span>
+            {% endif %}
+          </div>
+          {% if submission.designer_note %}
+          <p>{{ submission.designer_note }}</p>
+          {% endif %}
+          <div class="designer-version-list">
+            {% for version in submission.versions %}
+            <a class="designer-version-row"
+               href="/designer/quests/{{ safe_quest.id }}/submissions/{{ submission.id }}/versions/{{ version.id }}/download">
+              <span>
+                <strong>v{{ version.version_number }}</strong>
+                {{ version.original_filename }}
+              </span>
+              <em>{{ (version.file_size / 1024) | round(1) }} KB · {{ t('designer.download_reference') }}</em>
+            </a>
+            {% endfor %}
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="designer-empty-inline">{{ t('designer.no_submissions') }}</div>
+      {% endif %}
+    </div>
   </section>
 </div>
 {% endblock %}

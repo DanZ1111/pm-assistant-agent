@@ -150,10 +150,10 @@ def main():
             "shape_design_quest_for_designer",
         ],
     )
-    if "DesignSubmission" not in models and "DesignSubmissionVersion" not in models and "design_submission" not in migrations_py:
-        ok("Build 02 does not add submission/version tables")
+    if "no designer submission upload" in plan and "no revision workflow" in plan:
+        ok("Build 02 plan explicitly deferred submission/version tables")
     else:
-        fail("submission scope leak", "submission model or migration marker found")
+        fail("Build 02 plan deferral lock", "submission/version deferral language missing")
 
     print("\n── 2. Fresh DB schema proof ──")
     tmp, engine, Session = build_db()
@@ -336,10 +336,10 @@ def main():
 
     designer_route = read("app/routes/designer.py")
     project_template = read("app/templates/project_detail.html")
-    if "DesignSubmission" not in designer_route and "design submission" not in project_template.lower():
-        ok("Later quest UI still has no designer submission workflow")
+    if "draft_design_quest" not in ai_tools and "publish_design_quest" not in ai_tools:
+        ok("Design quest AI write handlers remain unwired")
     else:
-        fail("submission UI scope leak", "designer submission marker found in route/template")
+        fail("AI handler scope leak", "design quest write handler found")
 
     print("\n── 5. i18n parity unchanged ──")
     en = json.loads(read("app/i18n/en.json"))

@@ -431,6 +431,43 @@
           </div>
         </div>
         {% endif %}
+
+        {% if design_submissions %}
+        <div class="design-submission-grid" data-design-submission-grid>
+          <div class="design-quest-label">{{ t('design_quest.incoming_submissions') }}</div>
+          {% for submission in design_submissions %}
+          <article class="design-submission-card">
+            <div class="design-submission-card-head">
+              <div>
+                <h4>{{ submission.designer_display }}</h4>
+                <span class="design-quest-status design-quest-status-{{ submission.status }}">{{ submission.status }}</span>
+              </div>
+              <span>{{ submission.version_count }} {{ t('design_quest.versions_label') }}</span>
+            </div>
+            {% if submission.title %}
+            <p class="fw-semibold mb-1">{{ submission.title }}</p>
+            {% endif %}
+            {% if submission.designer_note %}
+            <p class="text-muted small">{{ submission.designer_note }}</p>
+            {% endif %}
+            {% if submission.latest_version %}
+            <a class="design-submission-download"
+               href="/projects/{{ project.id }}/design-quests/{{ active_design_quest.id }}/submissions/{{ submission.id }}/versions/{{ submission.latest_version.id }}/download">
+              <i class="bi bi-download"></i>
+              <span>
+                {{ t('design_quest.download_latest') }}
+                <small>v{{ submission.latest_version.version_number }} · {{ submission.latest_version.original_filename }}</small>
+              </span>
+            </a>
+            {% endif %}
+          </article>
+          {% endfor %}
+        </div>
+        {% elif active_design_quest.status != 'draft' %}
+        <div class="design-submission-empty" data-design-submission-empty>
+          {{ t('design_quest.no_submissions_yet') }}
+        </div>
+        {% endif %}
         {% elif can_edit %}
         <form method="post" action="/projects/{{ project.id }}/design-quest/create" class="design-quest-create-form">
           <div class="design-quest-label">{{ t('design_quest.create_title') }}</div>

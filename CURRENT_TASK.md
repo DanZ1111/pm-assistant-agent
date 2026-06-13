@@ -10,18 +10,27 @@ Codex implemented and committed:
 - `96f51db` — v1.5 Build 03 plan.
 - `448b9d4` — v1.5 Build 03 PM design quest panel.
 - `a94229c` — v1.5 Build 04 plan.
+- `949c0a6` — v1.5 Build 04 Designer Portal quest view.
+- `2bf440c` — v1.5 Build 05 plan.
 
-Codex is committing v1.5 Build 04 now:
+Codex is committing v1.5 Build 05 now:
 
-- Designer dashboard lists published quests visible to each designer.
-- Designer quest detail renders a safe brief from `shape_design_quest_for_designer`.
-- Reference downloads use guarded `/designer/quests/{quest_id}/references/{reference_id}/download` routes.
-- Designer pages no longer render PM help modal/nav-memory source that exposes `Timeline` or `/projects/`.
-- No submissions, revisions, final selection, AI handlers, or new migrations were added.
+- Added `DesignSubmission` and `DesignSubmissionVersion` models.
+- Added migration `012_v1_5_create_design_submissions`.
+- Designers can upload allowed files to open quests from `/designer/quests/{id}`.
+- Each upload is preserved as an immutable version under one active
+  designer/quest submission.
+- Designers see only their own submission history; designer managers can inspect
+  portal submissions.
+- PM/admin project editors see incoming submissions in Renderings & Design.
+- Designer and PM downloads use guarded routes, with no raw `/uploads` links.
+- No revision loop, final selection, promotion, Timeline integration, or AI
+  handlers were added.
 
-Build 04 verification:
+Build 05 verification:
 
-- `python3 -m py_compile app/routes/designer.py test_v15_build02.py test_v15_build03.py test_v15_build04.py` — PASS.
+- `python3 -m py_compile app/models.py app/migrations.py app/crud.py app/routes/designer.py app/routes/projects.py test_v15_build02.py test_v15_build04.py test_v15_build05.py` — PASS.
+- `python3 test_v15_build05.py` — 14/14 PASS.
 - `python3 test_v15_build04.py` — 13/13 PASS.
 - `python3 test_v15_build03.py` — 15/15 PASS.
 - `python3 test_v15_build02.py` — 19/19 PASS.
@@ -31,9 +40,9 @@ Build 04 verification:
 
 Next v1.5 step:
 
-1. Commit Build 04 as `Implement v1.5 Build 04 designer quest view`.
-2. Write and commit `V15_BUILD05_SUBMISSIONS_VERSIONS_PLAN.md`.
-3. Implement Build 05 only after the plan checkpoint.
+1. Commit Build 05 as `Implement v1.5 Build 05 submissions and versions`.
+2. Write and commit `V15_BUILD06_REVISION_LOOP_PLAN.md`.
+3. Implement Build 06 only after the plan checkpoint.
 
 ## Task
 v1.4 Builds 01-03 and the v1.3 UI Rescue fixes UI-R1 through UI-R4 are implemented in the working tree and are ready to be checkpointed. User asked to commit/push these fixes and then return to building the sandbox app. After the checkpoint commit/push, resume v1.4 with Build 04 planning/implementation discipline.

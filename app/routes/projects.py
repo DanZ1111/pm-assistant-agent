@@ -2,7 +2,7 @@ import json
 import os
 import uuid
 from fastapi import APIRouter, Depends, Request, Form, HTTPException, UploadFile, File
-from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, RedirectResponse, HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from datetime import date, datetime
@@ -446,6 +446,13 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
         crud.shape_design_quest_for_pm_preview(active_design_quest)
         if active_design_quest else None
     )
+    design_submissions = (
+        [
+            crud.shape_design_submission_for_pm(submission)
+            for submission in crud.list_design_submissions_for_quest(db, active_design_quest.id)
+        ]
+        if active_design_quest else []
+    )
     design_reference_candidates = [
         f for f in files
         if active_design_quest is None
@@ -587,6 +594,7 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
         "latest_overview_visual": latest_overview_visual,
         "active_design_quest": active_design_quest,
         "design_quest_preview": design_quest_preview,
+        "design_submissions": design_submissions,
         "design_reference_candidates": design_reference_candidates,
         "design_quest_error": design_quest_error,
         # Build 21 — for bottom chat scope toggle
@@ -719,6 +727,40 @@ def design_quest_reference_add(
     except (PermissionError, ValueError) as exc:
         return _design_quest_redirect(project_id, str(exc))
     return _design_quest_redirect(project_id)
+
+
+@router.get("/projects/{project_id}/design-quests/{quest_id}/submissions/{submission_id}/versions/{version_id}/download")
+def design_submission_version_download(
+    request: Request,
+    project_id: int,
+    quest_id: int,
+    submission_id: int,
+    version_id: int,
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+
+    project = crud.get_project(db, project_id)
+    if not project or not can_edit_project(current_user, project):
+        return RedirectResponse(url=f"/projects/{project_id}", status_code=303)
+    try:
+        version = crud.get_design_submission_version_for_download(db, version_id, current_user)
+    except PermissionError:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    if (
+        version.project_id != project_id
+        or version.quest_id != quest_id
+        or version.submission_id != submission_id
+    ):
+        raise HTTPException(status_code=404, detail="Submission not found")
+    disk_path = os.path.join(crud.UPLOAD_DIR, version.filename)
+    if not os.path.exists(disk_path):
+        raise HTTPException(status_code=404, detail="Submission file missing")
+    return FileResponse(disk_path, filename=version.original_filename or version.filename)
 
 
 @router.get("/projects/{project_id}/sandbox", response_class=HTMLResponse)

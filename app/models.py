@@ -61,6 +61,9 @@ class Project(Base):
     design_quests = relationship("DesignQuest", back_populates="project",
                                  cascade="all, delete-orphan",
                                  order_by="DesignQuest.updated_at.desc()")
+    design_submissions = relationship("DesignSubmission", back_populates="project",
+                                      cascade="all, delete-orphan",
+                                      order_by="DesignSubmission.updated_at.desc()")
 
     @property
     def target_factory_cost_display(self) -> str | None:
@@ -190,6 +193,9 @@ class User(Base):
     created_design_quests = relationship("DesignQuest",
                                          foreign_keys="DesignQuest.created_by_user_id",
                                          back_populates="created_by")
+    design_submissions = relationship("DesignSubmission",
+                                      foreign_keys="DesignSubmission.designer_user_id",
+                                      back_populates="designer")
 
 
 class InvitePin(Base):
@@ -619,6 +625,9 @@ class DesignQuest(Base):
     events = relationship("DesignQuestEvent", back_populates="quest",
                           cascade="all, delete-orphan",
                           order_by="DesignQuestEvent.created_at.desc()")
+    submissions = relationship("DesignSubmission", back_populates="quest",
+                               cascade="all, delete-orphan",
+                               order_by="DesignSubmission.updated_at.desc()")
 
 
 class DesignQuestAssignment(Base):
@@ -673,6 +682,56 @@ class DesignQuestEvent(Base):
     quest = relationship("DesignQuest", back_populates="events")
     project = relationship("Project")
     actor = relationship("User", foreign_keys=[actor_user_id])
+
+
+class DesignSubmission(Base):
+    """Designer-owned submission record for one quest.
+
+    Build 05 keeps each designer to one active submission per quest and stores
+    every upload as an immutable DesignSubmissionVersion row.
+    """
+    __tablename__ = "design_submissions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    quest_id = Column(Integer, ForeignKey("design_quests.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    designer_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    status = Column(String, nullable=False, default="submitted")
+    title = Column(String, nullable=True)
+    designer_note = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    quest = relationship("DesignQuest", back_populates="submissions")
+    project = relationship("Project", back_populates="design_submissions")
+    designer = relationship("User", foreign_keys=[designer_user_id],
+                            back_populates="design_submissions")
+    versions = relationship("DesignSubmissionVersion", back_populates="submission",
+                            cascade="all, delete-orphan",
+                            order_by="DesignSubmissionVersion.version_number")
+
+
+class DesignSubmissionVersion(Base):
+    """Immutable uploaded file version for a design submission."""
+    __tablename__ = "design_submission_versions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    submission_id = Column(Integer, ForeignKey("design_submissions.id"), nullable=False)
+    quest_id = Column(Integer, ForeignKey("design_quests.id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
+    version_number = Column(Integer, nullable=False)
+    filename = Column(String, nullable=False)
+    original_filename = Column(String, nullable=False)
+    file_type = Column(String, nullable=False)
+    file_size = Column(Integer, nullable=False)
+    designer_note = Column(Text, nullable=True)
+    uploaded_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    submission = relationship("DesignSubmission", back_populates="versions")
+    quest = relationship("DesignQuest")
+    project = relationship("Project")
+    uploaded_by = relationship("User", foreign_keys=[uploaded_by_user_id])
 
 
 class ProjectVariant(Base):

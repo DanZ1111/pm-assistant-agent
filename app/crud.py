@@ -11,7 +11,7 @@ from app.models import (
     PlanningModule, PlanningTemplate, PlanningTemplateNode, PlanningTemplateEdge,
     PlanningSandbox, PlanningSandboxNode, PlanningSandboxEdge, PlanningApplyEvent,
     ProjectBlocker, DesignQuest, DesignQuestAssignment, DesignQuestReference,
-    DesignQuestEvent,
+    DesignQuestEvent, DesignSubmission, DesignSubmissionVersion,
 )
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app", "uploads")
@@ -343,6 +343,10 @@ DESIGN_QUEST_ACTIVE_STATUSES = ("draft", "open", "reviewing", "revision_needed",
 DESIGN_QUEST_DESIGNER_VISIBLE_STATUSES = ("open", "reviewing", "revision_needed", "selected")
 DESIGN_QUEST_VISIBILITIES = ("all_active_designers", "assigned_designers_only")
 DESIGNER_PORTAL_ROLES = ("designer", "designer_manager")
+DESIGN_QUEST_SUBMISSION_OPEN_STATUSES = ("open", "reviewing", "revision_needed")
+DESIGN_SUBMISSION_ACTIVE_STATUSES = ("submitted", "shortlisted", "revision_requested", "revised", "selected", "rejected")
+DESIGN_SUBMISSION_ALLOWED_EXTENSIONS = ("jpg", "jpeg", "png", "webp", "pdf")
+DESIGN_SUBMISSION_MAX_BYTES = 20 * 1024 * 1024
 
 
 def _can_edit_project_for_design_quest(user: User | None, project: Project | None) -> bool:
@@ -690,6 +694,232 @@ def _shape_design_quest_safe_payload(quest: DesignQuest) -> dict:
         "soft_deadline": quest.soft_deadline.isoformat() if quest.soft_deadline else None,
         "references": references,
     }
+
+
+def _design_submission_file_type(ext: str) -> str:
+    if ext in ("jpg", "jpeg", "png", "webp"):
+        return "image"
+    if ext == "pdf":
+        return "pdf"
+    return "other"
+
+
+def _validate_design_submission_file(original_filename: str, content: bytes) -> tuple[str, str]:
+    if not original_filename or not original_filename.strip():
+        raise ValueError("submission_filename_required")
+    if "." not in original_filename:
+        raise ValueError("submission_invalid_file_type")
+    ext = original_filename.rsplit(".", 1)[-1].lower().strip()
+    if ext not in DESIGN_SUBMISSION_ALLOWED_EXTENSIONS:
+        raise ValueError("submission_invalid_file_type")
+    if not content:
+        raise ValueError("submission_file_empty")
+    if len(content) > DESIGN_SUBMISSION_MAX_BYTES:
+        raise ValueError("submission_file_too_large")
+    return ext, _design_submission_file_type(ext)
+
+
+def can_access_design_submission(user: User | None, submission: DesignSubmission | None) -> bool:
+    if not user or not submission:
+        return False
+    if user.role == "admin":
+        return True
+    if user.role == "pm":
+        return _can_edit_project_for_design_quest(user, submission.project)
+    if user.role == "designer_manager":
+        return can_designer_view_quest(user, submission.quest)
+    if user.role == "designer":
+        return submission.designer_user_id == user.id and can_designer_view_quest(user, submission.quest)
+    return False
+
+
+def list_design_submissions_for_quest(db: Session, quest_id: int) -> list[DesignSubmission]:
+    return (
+        db.query(DesignSubmission)
+        .filter(
+            DesignSubmission.quest_id == quest_id,
+            DesignSubmission.status != "archived",
+        )
+        .order_by(DesignSubmission.updated_at.desc())
+        .all()
+    )
+
+
+def list_design_submissions_for_designer(
+    db: Session,
+    designer_user_id: int,
+    quest_id: int | None = None,
+) -> list[DesignSubmission]:
+    user = db.query(User).filter(User.id == designer_user_id).first()
+    if not user or user.role not in DESIGNER_PORTAL_ROLES:
+        return []
+    query = db.query(DesignSubmission).filter(DesignSubmission.status != "archived")
+    if user.role == "designer":
+        query = query.filter(DesignSubmission.designer_user_id == designer_user_id)
+    if quest_id is not None:
+        query = query.filter(DesignSubmission.quest_id == quest_id)
+    submissions = query.order_by(DesignSubmission.updated_at.desc()).all()
+    return [submission for submission in submissions if can_access_design_submission(user, submission)]
+
+
+def _shape_design_submission_version(version: DesignSubmissionVersion) -> dict:
+    return {
+        "id": version.id,
+        "version_number": version.version_number,
+        "original_filename": version.original_filename,
+        "file_type": version.file_type,
+        "file_size": version.file_size,
+        "designer_note": version.designer_note,
+        "created_at": version.created_at.isoformat() if version.created_at else None,
+    }
+
+
+def shape_design_submission_for_designer(submission: DesignSubmission, user: User) -> dict:
+    if not can_access_design_submission(user, submission):
+        raise PermissionError("designer_cannot_view_submission")
+    versions = [_shape_design_submission_version(version) for version in submission.versions]
+    latest_version = versions[-1] if versions else None
+    return {
+        "id": submission.id,
+        "quest_id": submission.quest_id,
+        "status": submission.status,
+        "title": submission.title,
+        "designer_note": submission.designer_note,
+        "created_at": submission.created_at.isoformat() if submission.created_at else None,
+        "updated_at": submission.updated_at.isoformat() if submission.updated_at else None,
+        "versions": versions,
+        "latest_version": latest_version,
+    }
+
+
+def shape_design_submission_for_pm(submission: DesignSubmission) -> dict:
+    versions = [_shape_design_submission_version(version) for version in submission.versions]
+    latest_version = versions[-1] if versions else None
+    designer = submission.designer
+    return {
+        "id": submission.id,
+        "quest_id": submission.quest_id,
+        "status": submission.status,
+        "title": submission.title,
+        "designer_note": submission.designer_note,
+        "designer_display": (
+            designer.display_name or designer.username
+            if designer else "Designer"
+        ),
+        "created_at": submission.created_at.isoformat() if submission.created_at else None,
+        "updated_at": submission.updated_at.isoformat() if submission.updated_at else None,
+        "versions": versions,
+        "latest_version": latest_version,
+        "version_count": len(versions),
+    }
+
+
+def create_or_append_design_submission_version(
+    db: Session,
+    quest_id: int,
+    designer_user_id: int,
+    original_filename: str,
+    content: bytes,
+    designer_note: str | None = None,
+    title: str | None = None,
+) -> DesignSubmission:
+    designer = db.query(User).filter(User.id == designer_user_id).first()
+    quest = db.query(DesignQuest).filter(DesignQuest.id == quest_id).first()
+    if not designer or designer.role not in DESIGNER_PORTAL_ROLES:
+        raise PermissionError("user_cannot_submit_design")
+    if not quest or not can_designer_view_quest(designer, quest):
+        raise PermissionError("designer_cannot_view_quest")
+    if quest.status not in DESIGN_QUEST_SUBMISSION_OPEN_STATUSES:
+        raise ValueError("quest_not_accepting_submissions")
+
+    ext, file_type = _validate_design_submission_file(original_filename, content)
+    now = datetime.utcnow()
+    submission = (
+        db.query(DesignSubmission)
+        .filter(
+            DesignSubmission.quest_id == quest_id,
+            DesignSubmission.designer_user_id == designer.id,
+            DesignSubmission.status != "archived",
+        )
+        .first()
+    )
+    if submission is None:
+        submission = DesignSubmission(
+            quest_id=quest.id,
+            project_id=quest.project_id,
+            designer_user_id=designer.id,
+            status="submitted",
+            title=(title or "").strip() or None,
+            designer_note=(designer_note or "").strip() or None,
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(submission)
+        db.flush()
+    else:
+        if title and title.strip():
+            submission.title = title.strip()
+        if designer_note and designer_note.strip():
+            submission.designer_note = designer_note.strip()
+        submission.updated_at = now
+
+    version_number = (
+        db.query(func.max(DesignSubmissionVersion.version_number))
+        .filter(DesignSubmissionVersion.submission_id == submission.id)
+        .scalar()
+        or 0
+    ) + 1
+    unique_name = f"design-submission-{uuid.uuid4().hex}.{ext}"
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    disk_path = os.path.join(UPLOAD_DIR, unique_name)
+    with open(disk_path, "wb") as fh:
+        fh.write(content)
+
+    version = DesignSubmissionVersion(
+        submission_id=submission.id,
+        quest_id=quest.id,
+        project_id=quest.project_id,
+        version_number=version_number,
+        filename=unique_name,
+        original_filename=original_filename,
+        file_type=file_type,
+        file_size=len(content),
+        designer_note=(designer_note or "").strip() or None,
+        uploaded_by_user_id=designer.id,
+        created_at=now,
+    )
+    db.add(version)
+    quest.updated_at = now
+    _write_design_quest_event(
+        db,
+        quest,
+        "submission_uploaded",
+        designer.id,
+        f"{designer.display_name or designer.username} uploaded design submission v{version_number}.",
+        {
+            "submission_id": submission.id,
+            "version_number": version_number,
+            "original_filename": original_filename,
+        },
+    )
+    db.commit()
+    db.refresh(submission)
+    return submission
+
+
+def get_design_submission_version_for_download(
+    db: Session,
+    version_id: int,
+    user: User | None,
+) -> DesignSubmissionVersion:
+    version = (
+        db.query(DesignSubmissionVersion)
+        .filter(DesignSubmissionVersion.id == version_id)
+        .first()
+    )
+    if not version or not can_access_design_submission(user, version.submission):
+        raise PermissionError("submission_version_not_found")
+    return version
 
 
 # ---------------------------------------------------------------------------

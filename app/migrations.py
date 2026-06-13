@@ -154,6 +154,10 @@ MIGRATIONS = [
         "011_v1_5_create_design_quest_core",
         lambda eng: _create_design_quest_core(eng),
     ),
+    (
+        "012_v1_5_create_design_submissions",
+        lambda eng: _create_design_submissions(eng),
+    ),
 ]
 
 
@@ -678,6 +682,66 @@ def _create_design_quest_core(engine):
         conn.execute(text(
             "CREATE INDEX IF NOT EXISTS ix_design_quest_events_project "
             "ON design_quest_events(project_id, created_at)"
+        ))
+
+
+def _create_design_submissions(engine):
+    """v1.5 Build 05 — Designer submission and immutable version tables."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    with engine.begin() as conn:
+        if "design_submissions" not in tables:
+            conn.execute(text(
+                "CREATE TABLE design_submissions ("
+                "  id INTEGER PRIMARY KEY,"
+                "  quest_id INTEGER NOT NULL REFERENCES design_quests(id),"
+                "  project_id INTEGER NOT NULL REFERENCES projects(id),"
+                "  designer_user_id INTEGER NOT NULL REFERENCES users(id),"
+                "  status VARCHAR NOT NULL DEFAULT 'submitted',"
+                "  title VARCHAR NULL,"
+                "  designer_note TEXT NULL,"
+                "  created_at TIMESTAMP NOT NULL,"
+                "  updated_at TIMESTAMP NOT NULL"
+                ")"
+            ))
+        if "design_submission_versions" not in tables:
+            conn.execute(text(
+                "CREATE TABLE design_submission_versions ("
+                "  id INTEGER PRIMARY KEY,"
+                "  submission_id INTEGER NOT NULL REFERENCES design_submissions(id),"
+                "  quest_id INTEGER NOT NULL REFERENCES design_quests(id),"
+                "  project_id INTEGER NOT NULL REFERENCES projects(id),"
+                "  version_number INTEGER NOT NULL,"
+                "  filename VARCHAR NOT NULL,"
+                "  original_filename VARCHAR NOT NULL,"
+                "  file_type VARCHAR NOT NULL,"
+                "  file_size INTEGER NOT NULL,"
+                "  designer_note TEXT NULL,"
+                "  uploaded_by_user_id INTEGER NULL REFERENCES users(id),"
+                "  created_at TIMESTAMP NOT NULL"
+                ")"
+            ))
+
+        conn.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_design_submissions_active_designer "
+            "ON design_submissions(quest_id, designer_user_id) "
+            "WHERE status != 'archived'"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_design_submissions_quest_status "
+            "ON design_submissions(quest_id, status)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_design_submissions_designer_status "
+            "ON design_submissions(designer_user_id, status)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_design_submission_versions_submission "
+            "ON design_submission_versions(submission_id, version_number)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_design_submission_versions_quest "
+            "ON design_submission_versions(quest_id, created_at)"
         ))
 
 
