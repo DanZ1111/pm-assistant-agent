@@ -56,7 +56,8 @@ contributor working linearly.
 | **QA-04** | Journey runner skeleton + first mini-journey (6 steps, deterministic, no AI) | ✓ `a273f74` |
 | **QA-05** | Mocked AI library + 4 confirmation-required contracts (idea / journal / due_date_shift / blocker) at dispatch level | ✓ `d24cfec` |
 | **QA-06** | Tier 1 contract gaps — Marine-bug regression + delete permission boundary + create idempotency + finish_phase advancement + blocker lifecycle | ✓ `a91bd5e` |
-| **QA-07** | Sandbox UI mutation — clicking the palette Add button creates a node and the canvas updates end-to-end | ✓ this build |
+| **QA-07** | Sandbox UI mutation — clicking the palette Add button creates a node and the canvas updates end-to-end | ✓ `162501b` |
+| **QA-08** | Disruption library (5 composable helpers) + medium journey (10 steps mixing manual actions + mocked AI + 2 disruptions) | ✓ this build |
 
 ### Path A — ambition (planned)
 

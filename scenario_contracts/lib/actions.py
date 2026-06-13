@@ -136,6 +136,32 @@ def create_journal_entry(db, project_id, entry_text, entry_type="general",
     )
 
 
+def update_project(db, project_id, data, changed_by="user",
+                   source_type="manual_edit"):
+    """Update one or more project fields via the real service helper.
+
+    Wraps crud.update_project. Used by disruptions.factory_raises_cost_by_pct
+    to bump target_factory_cost.
+    """
+    from app import crud
+
+    return crud.update_project(
+        db, project_id, data,
+        changed_by=changed_by, source_type=source_type,
+    )
+
+
+def add_phase(db, project_id, data):
+    """Append a new phase to a project via the real service helper.
+
+    Wraps crud.add_phase. The new phase always lands at phase_order =
+    max(existing) + 1; used by disruptions.prototype_round_added.
+    """
+    from app import crud
+
+    return crud.add_phase(db, project_id, data)
+
+
 def delete_project(db, project_id):
     """Hard-delete a project via the real service helper.
 
