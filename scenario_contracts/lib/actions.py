@@ -136,6 +136,35 @@ def create_journal_entry(db, project_id, entry_text, entry_type="general",
     )
 
 
+def create_idea(db, data, contributor_user_id=None):
+    """Create a new idea via the real service helper.
+
+    `data` keys: name, description, idea_type, source, source_detail,
+    contributor, notes. Used by QA-09's full Marine Knife journey to
+    seed the project's product backlog.
+    """
+    from app import crud
+
+    return crud.create_idea(
+        db, data=data, contributor_user_id=contributor_user_id,
+    )
+
+
+def link_idea_to_project(db, project_id, idea_id, user_id=None, note=None,
+                        changed_by="user"):
+    """Link an existing idea to a project via the real service helper.
+
+    Wraps crud.link_idea_to_project. Idempotent: re-linking returns
+    the existing link row without inserting a duplicate.
+    """
+    from app import crud
+
+    return crud.link_idea_to_project(
+        db, project_id=project_id, idea_id=idea_id,
+        linked_by_user_id=user_id, note=note, changed_by=changed_by,
+    )
+
+
 def update_project(db, project_id, data, changed_by="user",
                    source_type="manual_edit"):
     """Update one or more project fields via the real service helper.

@@ -57,7 +57,8 @@ contributor working linearly.
 | **QA-05** | Mocked AI library + 4 confirmation-required contracts (idea / journal / due_date_shift / blocker) at dispatch level | ✓ `d24cfec` |
 | **QA-06** | Tier 1 contract gaps — Marine-bug regression + delete permission boundary + create idempotency + finish_phase advancement + blocker lifecycle | ✓ `a91bd5e` |
 | **QA-07** | Sandbox UI mutation — clicking the palette Add button creates a node and the canvas updates end-to-end | ✓ `162501b` |
-| **QA-08** | Disruption library (5 composable helpers) + medium journey (10 steps mixing manual actions + mocked AI + 2 disruptions) | ✓ this build |
+| **QA-08** | Disruption library (5 composable helpers) + medium journey (10 steps mixing manual actions + mocked AI + 2 disruptions) | ✓ `d0e491c` |
+| **QA-09** | Full Marine Knife journey — 20 steps. Ideas → link → sandbox apply → 6+ phases → all 5 disruption types → multiple AI proposals → 2 color variants → blocker lifecycle → cumulative final state. End-state integration proof of the QA system itself. | ✓ this build |
 
 ### Path A — ambition (planned)
 
