@@ -336,10 +336,10 @@ def main():
 
     designer_route = read("app/routes/designer.py")
     project_template = read("app/templates/project_detail.html")
-    if "/designer/quests" not in designer_route and "DesignQuest" not in project_template:
-        ok("Build 02 adds no Designer Portal quest UI or PM quest panel")
+    if "DesignSubmission" not in designer_route and "design submission" not in project_template.lower():
+        ok("Later quest UI still has no designer submission workflow")
     else:
-        fail("UI scope leak", "quest UI marker found in route/template")
+        fail("submission UI scope leak", "designer submission marker found in route/template")
 
     print("\n── 5. i18n parity unchanged ──")
     en = json.loads(read("app/i18n/en.json"))

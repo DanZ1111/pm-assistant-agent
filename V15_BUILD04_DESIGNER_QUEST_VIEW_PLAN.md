@@ -129,13 +129,14 @@ Design guidance:
 - detail page should read like a brief,
 - no PM project links,
 - no raw upload links,
+- no raw `/uploads` links,
 - no inactive upload/submission form that implies functionality exists.
 
 ## i18n Plan
 
 Add exact EN/ZH parity for Build 04 labels under `designer.*`.
 
-Expected new keys: 16.
+Expected new keys: 12.
 
 ## Testing Plan
 

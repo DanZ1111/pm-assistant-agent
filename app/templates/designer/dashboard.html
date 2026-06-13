@@ -20,6 +20,36 @@
     </div>
   </section>
 
+  {% if quests %}
+  <section class="designer-quest-list" data-designer-quest-list>
+    <div class="designer-section-head">
+      <div>
+        <h2>{{ t('designer.available_quests') }}</h2>
+        <p>{{ t('designer.available_quests_body') }}</p>
+      </div>
+      <span>{{ quests|length }} {{ t('designer.quest_count_label') }}</span>
+    </div>
+
+    <div class="designer-quest-grid">
+      {% for quest in quests %}
+      <a class="designer-quest-card" href="/designer/quests/{{ quest.id }}">
+        <div class="designer-quest-card-top">
+          <span class="designer-quest-status designer-quest-status-{{ quest.status }}">{{ quest.status }}</span>
+          {% if quest.soft_deadline %}
+          <span><i class="bi bi-calendar-event me-1"></i>{{ quest.soft_deadline.strftime('%b %d, %Y') }}</span>
+          {% endif %}
+        </div>
+        <h3>{{ quest.title }}</h3>
+        <p>{{ quest.brief }}</p>
+        <div class="designer-quest-card-foot">
+          <span>{{ t('designer.open_quest') }}</span>
+          <i class="bi bi-arrow-right"></i>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% else %}
   <section class="designer-empty-state" data-designer-empty-state>
     <div class="designer-empty-icon"><i class="bi bi-inboxes"></i></div>
     <div>
@@ -27,5 +57,6 @@
       <p>{{ t('designer.empty_body') }}</p>
     </div>
   </section>
+  {% endif %}
 </div>
 {% endblock %}

@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}{{ safe_quest.title }} — {{ t('designer.title') }}{% endblock %}
+
+{% block content %}
+<div class="designer-shell">
+  <div class="designer-back-row">
+    <a href="/designer" class="text-decoration-none">
+      <i class="bi bi-arrow-left me-1"></i>{{ t('designer.back_to_dashboard') }}
+    </a>
+  </div>
+
+  <section class="designer-quest-detail" data-designer-quest-detail>
+    <div class="designer-quest-detail-head">
+      <div>
+        <div class="designer-eyebrow">{{ t('designer.quest_brief_label') }}</div>
+        <h1>{{ safe_quest.title }}</h1>
+        <div class="designer-quest-meta-row">
+          <span class="designer-quest-status designer-quest-status-{{ safe_quest.status }}">{{ safe_quest.status }}</span>
+          {% if safe_quest.soft_deadline %}
+          <span><i class="bi bi-calendar-event me-1"></i>{{ safe_quest.soft_deadline }}</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="designer-brief-grid">
+      <article class="designer-brief-main">
+        <section>
+          <h2>{{ t('designer.brief') }}</h2>
+          <p>{{ safe_quest.brief }}</p>
+        </section>
+        {% if safe_quest.must_keep %}
+        <section>
+          <h2>{{ t('designer.must_keep') }}</h2>
+          <p>{{ safe_quest.must_keep }}</p>
+        </section>
+        {% endif %}
+        {% if safe_quest.must_avoid %}
+        <section>
+          <h2>{{ t('designer.must_avoid') }}</h2>
+          <p>{{ safe_quest.must_avoid }}</p>
+        </section>
+        {% endif %}
+      </article>
+
+      <aside class="designer-reference-panel">
+        <h2>{{ t('designer.references') }}</h2>
+        {% if safe_quest.references %}
+        <div class="designer-reference-list">
+          {% for ref in safe_quest.references %}
+          <a class="designer-reference-card"
+             href="/designer/quests/{{ safe_quest.id }}/references/{{ ref.id }}/download">
+            <i class="bi bi-paperclip"></i>
+            <span>
+              <strong>{{ ref.label }}</strong>
+              <small>{{ ref.original_filename }}{% if ref.file_size %} · {{ (ref.file_size / 1024) | round(1) }} KB{% endif %}</small>
+            </span>
+            <em>{{ t('designer.download_reference') }}</em>
+          </a>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p>{{ t('designer.no_references') }}</p>
+        {% endif %}
+      </aside>
+    </div>
+  </section>
+</div>
+{% endblock %}

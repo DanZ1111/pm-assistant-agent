@@ -192,8 +192,8 @@ def main():
         "design_quest.visibility_assigned_designers_only",
     ]
     missing = [key for key in required_keys if key not in en or key not in zh]
-    if set(en) == set(zh) and not missing and len(en) == 842:
-        ok("i18n parity locked at 842/842 with Build 03 keys")
+    if set(en) == set(zh) and not missing and len(en) >= 842:
+        ok(f"i18n parity preserved with Build 03 keys ({len(en)}/{len(zh)})")
     else:
         fail("i18n parity/count", {"en": len(en), "zh": len(zh), "missing": missing, "diff": sorted(set(en) ^ set(zh))[:8]})
 

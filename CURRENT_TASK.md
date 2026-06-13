@@ -8,50 +8,32 @@ Codex implemented and committed:
 - `204f158` — v1.5 Build 02 plan.
 - `1cd02a6` — v1.5 Build 02 design quest data model.
 - `96f51db` — v1.5 Build 03 plan.
+- `448b9d4` — v1.5 Build 03 PM design quest panel.
+- `a94229c` — v1.5 Build 04 plan.
 
-Codex implemented but could **not commit** v1.5 Build 03 because escalated git
-operations are blocked by the current Codex usage limit. Do not reimplement;
-inspect the dirty tree and commit these files once git is available:
+Codex is committing v1.5 Build 04 now:
 
-- `app/crud.py`
-- `app/i18n/en.json`
-- `app/i18n/zh.json`
-- `app/routes/projects.py`
-- `app/static/css/styles.css`
-- `app/templates/project_detail.html`
-- `test_v15_build01.py`
-- `test_v15_build02.py`
-- `test_v15_build03.py` (new)
+- Designer dashboard lists published quests visible to each designer.
+- Designer quest detail renders a safe brief from `shape_design_quest_for_designer`.
+- Reference downloads use guarded `/designer/quests/{quest_id}/references/{reference_id}/download` routes.
+- Designer pages no longer render PM help modal/nav-memory source that exposes `Timeline` or `/projects/`.
+- No submissions, revisions, final selection, AI handlers, or new migrations were added.
 
-Build 03 summary:
+Build 04 verification:
 
-- Project Detail Renderings section now displays as `Renderings & Design`.
-- Old PM-side Designer Portal placeholder was removed from the renderings card.
-- PM/admin project editors can create draft design quests, publish, close, and
-  link existing project files as references.
-- Designer-safe PM preview omits raw upload URLs and `file_path`.
-- No Designer Portal quest list/detail, no submissions, no revisions, no guarded
-  file-serving route, and no AI handlers were added.
-
-Build 03 verification already run:
-
-- `python3 -m py_compile app/routes/projects.py app/crud.py test_v15_build01.py test_v15_build02.py test_v15_build03.py` — PASS.
-- `python3 test_v15_build03.py` — 15/15 PASS using FastAPI `TestClient`.
+- `python3 -m py_compile app/routes/designer.py test_v15_build02.py test_v15_build03.py test_v15_build04.py` — PASS.
+- `python3 test_v15_build04.py` — 13/13 PASS.
+- `python3 test_v15_build03.py` — 15/15 PASS.
 - `python3 test_v15_build02.py` — 19/19 PASS.
 - `python3 test_build_v121.py` — 19/19 PASS.
 - `python3 test_v14_build09.py` — 15/15 PASS.
 - `git diff --check` — PASS.
 
-Note: live localhost server restart could not be run after Build 03 because
-escalation was blocked by Codex usage limits. Build 03 uses `TestClient` as the
-safer no-port alternative and includes a designer project-route boundary check.
+Next v1.5 step:
 
-Next step when git is available:
-
-1. Inspect `git status` and `git diff`.
-2. Commit Build 03 as `Implement v1.5 Build 03 PM design quest panel`.
-3. Continue to v1.5 Build 04 — Designer Portal Quest View — by writing and
-   committing the build-specific plan first.
+1. Commit Build 04 as `Implement v1.5 Build 04 designer quest view`.
+2. Write and commit `V15_BUILD05_SUBMISSIONS_VERSIONS_PLAN.md`.
+3. Implement Build 05 only after the plan checkpoint.
 
 ## Task
 v1.4 Builds 01-03 and the v1.3 UI Rescue fixes UI-R1 through UI-R4 are implemented in the working tree and are ready to be checkpointed. User asked to commit/push these fixes and then return to building the sandbox app. After the checkpoint commit/push, resume v1.4 with Build 04 planning/implementation discipline.
