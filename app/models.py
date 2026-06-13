@@ -616,6 +616,8 @@ class DesignQuest(Base):
     selected_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     selected_at = Column(DateTime, nullable=True)
     promoted_project_file_id = Column(Integer, ForeignKey("project_files.id"), nullable=True)
+    design_completed_at = Column(DateTime, nullable=True)
+    design_completed_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     published_at = Column(DateTime, nullable=True)
     closed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -626,6 +628,7 @@ class DesignQuest(Base):
     created_by = relationship("User", foreign_keys=[created_by_user_id],
                               back_populates="created_design_quests")
     selected_by = relationship("User", foreign_keys=[selected_by_user_id])
+    design_completed_by = relationship("User", foreign_keys=[design_completed_by_user_id])
     promoted_project_file = relationship("ProjectFile", foreign_keys=[promoted_project_file_id])
     assignments = relationship("DesignQuestAssignment", back_populates="quest",
                                cascade="all, delete-orphan")

@@ -166,6 +166,10 @@ MIGRATIONS = [
         "014_v1_5_select_final_promote_rendering",
         lambda eng: _select_final_promote_rendering(eng),
     ),
+    (
+        "015_v1_5_design_status_timeline_pulse",
+        lambda eng: _design_status_timeline_pulse(eng),
+    ),
 ]
 
 
@@ -863,6 +867,28 @@ def _select_final_promote_rendering(engine):
         conn.execute(text(
             "CREATE INDEX IF NOT EXISTS ix_design_submissions_selected_version "
             "ON design_submissions(selected_version_id)"
+        ))
+
+
+def _design_status_timeline_pulse(engine):
+    """v1.5 Build 08 — explicit design completion metadata."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    columns_by_table = {
+        table: {col["name"] for col in inspector.get_columns(table)}
+        for table in tables
+    }
+    with engine.begin() as conn:
+        design_quest_columns = columns_by_table.get("design_quests", set())
+        for column_name, column_sql in (
+            ("design_completed_at", "TIMESTAMP NULL"),
+            ("design_completed_by_user_id", "INTEGER NULL REFERENCES users(id)"),
+        ):
+            if "design_quests" in tables and column_name not in design_quest_columns:
+                conn.execute(text(f"ALTER TABLE design_quests ADD COLUMN {column_name} {column_sql}"))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_design_quests_completed_at "
+            "ON design_quests(design_completed_at)"
         ))
 
 

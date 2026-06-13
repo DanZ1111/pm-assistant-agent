@@ -204,6 +204,22 @@
             <p class="pulse-action-copy">{{ t('pulse.no_urgent_copy') }}</p>
           {% endif %}
         </div>
+
+        <div class="pulse-card pulse-design-card" data-design-pulse-status="{{ design_status.key }}">
+          <div class="pulse-card-label">{{ t('pulse.design_status') }}</div>
+          <div class="pulse-action-title">{{ t(design_status.label_key) }}</div>
+          {% if design_status.title %}
+          <p class="pulse-action-copy">{{ design_status.title }}</p>
+          {% else %}
+          <p class="pulse-action-copy">{{ t('design_quest.no_active_body') }}</p>
+          {% endif %}
+          {% if design_status.is_timeline_blocking %}
+          <span class="timeline-health-badge timeline-health-at_risk">{{ t('design_quest.timeline_blocking_short') }}</span>
+          {% endif %}
+          <a href="#renderings-overview" class="pulse-action-link">
+            <i class="bi bi-image me-1"></i>{{ t('pulse.open_design_work') }}
+          </a>
+        </div>
       </div>
     </section>
 
@@ -942,6 +958,38 @@
       </div>
 
       <div class="timeline-command-support-grid">
+      <div class="timeline-design-status-tile" data-design-timeline-status="{{ design_status.key }}">
+        <div class="timeline-blocker-head">
+          <i class="bi bi-palette me-2"></i>
+          <strong>{{ t('timeline.design_status_title') }}</strong>
+        </div>
+        <div class="timeline-blocker-title-row">
+          <span class="timeline-health-badge timeline-health-{% if design_status.key == 'design_complete' %}on_track{% elif design_status.key in ('revision_requested', 'pm_review_needed') %}at_risk{% else %}not_scheduled{% endif %}">
+            {{ t(design_status.label_key) }}
+          </span>
+          {% if design_status.is_timeline_blocking %}
+          <span class="timeline-blocker-title-text">{{ t('design_quest.timeline_blocking_short') }}</span>
+          {% endif %}
+        </div>
+        {% if design_status.key == 'final_selected' %}
+        <p class="timeline-blocker-description">{{ t('timeline.design_final_selected_copy') }}</p>
+        {% elif design_status.key == 'design_complete' %}
+        <p class="timeline-blocker-description">{{ t('timeline.design_complete_copy') }}</p>
+        {% elif design_status.key == 'none' %}
+        <p class="timeline-blocker-description">{{ t('timeline.design_none_copy') }}</p>
+        {% else %}
+        <p class="timeline-blocker-description">{{ t('timeline.design_in_progress_copy') }}</p>
+        {% endif %}
+        {% if can_edit and design_status.can_mark_complete and design_status.quest_id %}
+        <form method="post"
+              action="/projects/{{ project.id }}/design-quest/{{ design_status.quest_id }}/mark-complete"
+              onsubmit="return confirm('{{ t('design_quest.mark_complete_confirm') }}');">
+          <button class="btn btn-sm btn-success" data-action="mark-design-complete">
+            <i class="bi bi-check2-circle me-1"></i>{{ t('design_quest.mark_complete_button') }}
+          </button>
+        </form>
+        {% endif %}
+      </div>
       {# v1.3 Build 07B — Honest Main Blocker tile. Replaces the Build 06
          placeholder. Shows newest active blocker + active count badge
          (Lock 4: no +N more expanded list — count only). Empty state is

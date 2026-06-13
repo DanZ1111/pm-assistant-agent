@@ -1147,6 +1147,108 @@ def get_selected_design_rendering_source(db: Session, project_id: int) -> dict |
     }
 
 
+def get_project_design_status(db: Session, project_id: int) -> dict:
+    quest = (
+        db.query(DesignQuest)
+        .filter(DesignQuest.project_id == project_id)
+        .order_by(DesignQuest.updated_at.desc(), DesignQuest.created_at.desc())
+        .first()
+    )
+    if not quest:
+        return {
+            "key": "none",
+            "quest_id": None,
+            "title": None,
+            "label_key": "design_quest.status_none",
+            "is_timeline_blocking": False,
+            "can_mark_complete": False,
+        }
+
+    submissions = [s for s in quest.submissions if s.status != "archived"]
+    open_revision_count = sum(
+        1
+        for submission in submissions
+        for revision_request in submission.revision_requests
+        if revision_request.status in DESIGN_REVISION_OPEN_STATUSES
+    )
+    if quest.design_completed_at:
+        key = "design_complete"
+    elif quest.status in ("closed", "cancelled"):
+        key = "closed"
+    elif quest.status == "draft":
+        key = "draft"
+    elif quest.selected_version_id and quest.promoted_project_file_id:
+        key = "final_selected"
+    elif open_revision_count:
+        key = "revision_requested"
+    elif submissions:
+        key = "pm_review_needed"
+    else:
+        key = "waiting_for_submissions"
+
+    selected_by = quest.selected_by
+    completed_by = quest.design_completed_by
+    return {
+        "key": key,
+        "quest_id": quest.id,
+        "title": quest.title,
+        "label_key": f"design_quest.status_{key}",
+        "is_timeline_blocking": bool(quest.is_timeline_blocking),
+        "can_mark_complete": key == "final_selected",
+        "selected_version_id": quest.selected_version_id,
+        "selected_at": quest.selected_at.isoformat() if quest.selected_at else None,
+        "selected_by_display": (
+            selected_by.display_name or selected_by.username
+            if selected_by else None
+        ),
+        "design_completed_at": quest.design_completed_at.isoformat() if quest.design_completed_at else None,
+        "design_completed_by_display": (
+            completed_by.display_name or completed_by.username
+            if completed_by else None
+        ),
+        "submission_count": len(submissions),
+        "open_revision_count": open_revision_count,
+    }
+
+
+def mark_design_quest_complete(db: Session, quest_id: int, user_id: int) -> DesignQuest:
+    quest = db.query(DesignQuest).filter(DesignQuest.id == quest_id).first()
+    if not quest:
+        raise ValueError("design_quest_not_found")
+    actor = _require_design_quest_editor(db, quest.project, user_id)
+    if not quest.selected_version_id or not quest.promoted_project_file_id:
+        raise ValueError("design_final_not_selected")
+    if quest.design_completed_at:
+        return quest
+    now = datetime.utcnow()
+    quest.design_completed_at = now
+    quest.design_completed_by_user_id = actor.id
+    quest.updated_at = now
+    _write_design_quest_event(
+        db,
+        quest,
+        "design_completed",
+        actor.id,
+        "Design marked complete.",
+        {
+            "selected_submission_id": quest.selected_submission_id,
+            "selected_version_id": quest.selected_version_id,
+            "promoted_project_file_id": quest.promoted_project_file_id,
+        },
+    )
+    write_change(
+        db,
+        quest.project_id,
+        "event_note",
+        changed_by="user",
+        summary="Design marked complete.",
+        source_type="design_quest",
+    )
+    db.commit()
+    db.refresh(quest)
+    return quest
+
+
 def create_or_append_design_submission_version(
     db: Session,
     quest_id: int,

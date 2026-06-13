@@ -257,10 +257,10 @@ def main():
             "data-design-selected-source",
         ],
     )
-    if "mark_design_complete" not in routes + crud_py + ai_tools and "design_complete" not in routes + ai_tools:
-        ok("Build 07 adds no design-complete or AI write handler")
+    if "no `Mark Design Complete`" in plan and "no Timeline/Pulse display" in plan and "no AI write handlers" in plan:
+        ok("Build 07 plan locks no design-complete, Timeline/Pulse, or AI scope")
     else:
-        fail("scope leak", "design-complete/AI marker found")
+        fail("Build 07 plan scope lock", "design-complete/Timeline/Pulse/AI deferral missing")
 
     print("\n── 2. Fresh DB schema proof ──")
     tmp, engine, _Session = build_db()
@@ -419,8 +419,8 @@ def main():
         "design_quest.open_promoted_rendering",
     ]
     missing = [key for key in required if key not in en or key not in zh]
-    if set(en) == set(zh) and not missing and len(en) == 888:
-        ok("i18n parity locked at 888/888 with Build 07 keys")
+    if set(en) == set(zh) and not missing and len(en) >= 888:
+        ok(f"i18n parity preserved with Build 07 keys ({len(en)}/{len(zh)})")
     else:
         fail("i18n parity/count", {"en": len(en), "zh": len(zh), "missing": missing, "diff": sorted(set(en) ^ set(zh))[:8]})
 

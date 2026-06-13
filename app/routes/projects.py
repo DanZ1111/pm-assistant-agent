@@ -442,6 +442,7 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
     prototype_photos = crud.get_files_by_category(db, project_id, "prototype_photo")
     latest_overview_visual = _pick_latest_overview_visual(renderings, prototype_photos)
     selected_design_rendering_source = crud.get_selected_design_rendering_source(db, project_id)
+    design_status = crud.get_project_design_status(db, project_id)
     active_design_quest = crud.get_active_design_quest(db, project_id)
     design_quest_preview = (
         crud.shape_design_quest_for_pm_preview(active_design_quest)
@@ -594,6 +595,7 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
         "prototype_photos": prototype_photos,
         "latest_overview_visual": latest_overview_visual,
         "selected_design_rendering_source": selected_design_rendering_source,
+        "design_status": design_status,
         "active_design_quest": active_design_quest,
         "design_quest_preview": design_quest_preview,
         "design_submissions": design_submissions,
@@ -893,6 +895,43 @@ def design_submission_select_final(
     except (PermissionError, ValueError) as exc:
         return _design_quest_redirect(project_id, str(exc))
     return _design_quest_redirect(project_id)
+
+
+@router.post("/projects/{project_id}/design-quest/{quest_id}/mark-complete")
+def design_quest_mark_complete(
+    request: Request,
+    project_id: int,
+    quest_id: int,
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+    project = crud.get_project(db, project_id)
+    if not project or not can_edit_project(current_user, project):
+        return RedirectResponse(
+            url=f"/projects/{project_id}?design_quest_error=forbidden#timeline-command-center",
+            status_code=303,
+        )
+    quest = db.query(DesignQuest).filter(
+        DesignQuest.id == quest_id,
+        DesignQuest.project_id == project_id,
+    ).first()
+    if not quest:
+        return RedirectResponse(
+            url=f"/projects/{project_id}?design_quest_error=design_quest_not_found#timeline-command-center",
+            status_code=303,
+        )
+    try:
+        crud.mark_design_quest_complete(db, quest_id, current_user.id)
+    except (PermissionError, ValueError) as exc:
+        return RedirectResponse(
+            url=f"/projects/{project_id}?design_quest_error={str(exc)}#timeline-command-center",
+            status_code=303,
+        )
+    return RedirectResponse(url=f"/projects/{project_id}#timeline-command-center", status_code=303)
 
 
 @router.get("/projects/{project_id}/sandbox", response_class=HTMLResponse)

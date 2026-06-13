@@ -1039,6 +1039,9 @@ body {
   background: #fff;
   padding: 16px;
 }
+.pulse-design-card {
+  border-left: 4px solid #2563eb;
+}
 .pulse-card-label {
   margin-bottom: 10px;
   color: var(--color-text-muted);
@@ -4204,6 +4207,7 @@ body.has-bottom-chat.assistant-dock-collapsed .main-content { padding-bottom: 76
 }
 
 .timeline-command-card .timeline-blocker-tile,
+.timeline-command-card .timeline-design-status-tile,
 .timeline-assistant-suggestion {
   min-height: 136px;
   margin: 0;
@@ -4222,6 +4226,11 @@ body.has-bottom-chat.assistant-dock-collapsed .main-content { padding-bottom: 76
 .timeline-command-card .timeline-blocker-tile.timeline-blocker-empty {
   border-left: 4px solid #94a3b8;
   background: #f8fafc;
+}
+
+.timeline-command-card .timeline-design-status-tile {
+  border-left: 4px solid #2563eb;
+  background: #eff6ff;
 }
 
 .timeline-assistant-suggestion {

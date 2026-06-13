@@ -16,25 +16,26 @@ Codex implemented and committed:
 - `4bd19e2` — v1.5 Build 06 plan.
 - `43186d4` — v1.5 Build 06 revision loop.
 - `a85156b` — v1.5 Build 07 plan.
+- `2fe1e69` — v1.5 Build 07 select final and promote rendering.
+- `fe8cdda` — v1.5 Build 08 plan.
 
-Codex is committing v1.5 Build 07 now:
+Codex is committing v1.5 Build 08 now:
 
-- Added selected/final metadata on design quests and submissions.
-- Added source metadata on project files.
-- Added migration `014_v1_5_select_final_promote_rendering`.
-- PM/admin project editors can select a specific immutable submission version
-  as final.
-- Selected versions are copied into a new project rendering `ProjectFile` row
-  with `source_type='design_submission_version'` and source metadata.
-- Selecting a newer final clears the previous selected submission state and
-  creates a newer promoted rendering.
-- Project Renderings & Design shows the selected/final source summary.
-- No Mark Design Complete, Timeline/Pulse integration, or AI handlers were
-  added.
+- Added explicit design completion metadata on design quests.
+- Added migration `015_v1_5_design_status_timeline_pulse`.
+- Added derived project design status service for waiting/review/revision/final
+  selected/design complete states.
+- PM/admin project editors can explicitly Mark Design Complete after a selected
+  final rendering exists.
+- Project Pulse and Timeline Command Center now show design status.
+- Design completion writes design quest/project audit records but does not
+  mutate `project_phases`.
+- No AI handlers or automatic phase completion were added.
 
-Build 07 verification:
+Build 08 verification:
 
-- `python3 -m py_compile app/models.py app/migrations.py app/crud.py app/routes/projects.py test_v15_build05.py test_v15_build06.py test_v15_build07.py` — PASS.
+- `python3 -m py_compile app/models.py app/migrations.py app/crud.py app/routes/projects.py test_v15_build07.py test_v15_build08.py` — PASS.
+- `python3 test_v15_build08.py` — 15/15 PASS.
 - `python3 test_v15_build07.py` — 12/12 PASS.
 - `python3 test_v15_build06.py` — 13/13 PASS.
 - `python3 test_v15_build05.py` — 14/14 PASS.
@@ -42,9 +43,9 @@ Build 07 verification:
 
 Next v1.5 step:
 
-1. Commit Build 07 as `Implement v1.5 Build 07 select final promote`.
-2. Write and commit `V15_BUILD08_DESIGN_STATUS_TIMELINE_PULSE_PLAN.md`.
-3. Implement Build 08 only after the plan checkpoint.
+1. Commit Build 08 as `Implement v1.5 Build 08 design status timeline pulse`.
+2. Write and commit `V15_BUILD09_DESIGNER_MANAGER_OPERATIONS_PLAN.md`.
+3. Implement Build 09 only after the plan checkpoint.
 
 ## Task
 v1.4 Builds 01-03 and the v1.3 UI Rescue fixes UI-R1 through UI-R4 are implemented in the working tree and are ready to be checkpointed. User asked to commit/push these fixes and then return to building the sandbox app. After the checkpoint commit/push, resume v1.4 with Build 04 planning/implementation discipline.
