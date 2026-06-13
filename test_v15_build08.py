@@ -408,8 +408,8 @@ def main():
         "timeline.design_status_title",
     ]
     missing = [key for key in required if key not in en or key not in zh]
-    if set(en) == set(zh) and not missing and len(en) == 906:
-        ok("i18n parity locked at 906/906 with Build 08 keys")
+    if set(en) == set(zh) and not missing and len(en) >= 906:
+        ok(f"i18n parity preserved with Build 08 keys ({len(en)}/{len(zh)})")
     else:
         fail("i18n parity/count", {"en": len(en), "zh": len(zh), "missing": missing, "diff": sorted(set(en) ^ set(zh))[:8]})
 

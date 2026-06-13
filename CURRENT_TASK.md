@@ -18,34 +18,37 @@ Codex implemented and committed:
 - `a85156b` — v1.5 Build 07 plan.
 - `2fe1e69` — v1.5 Build 07 select final and promote rendering.
 - `fe8cdda` — v1.5 Build 08 plan.
+- `a59097a` — v1.5 Build 08 design status in Timeline/Pulse.
+- `2aace2f` — v1.5 Build 09 plan.
 
-Codex is committing v1.5 Build 08 now:
+Codex is committing v1.5 Build 09 now:
 
-- Added explicit design completion metadata on design quests.
-- Added migration `015_v1_5_design_status_timeline_pulse`.
-- Added derived project design status service for waiting/review/revision/final
-  selected/design complete states.
-- PM/admin project editors can explicitly Mark Design Complete after a selected
-  final rendering exists.
-- Project Pulse and Timeline Command Center now show design status.
-- Design completion writes design quest/project audit records but does not
-  mutate `project_phases`.
-- No AI handlers or automatic phase completion were added.
+- Added Designer Manager operations dashboard at `/designer/manager`.
+- Designer managers can see safe portal data: designer roster, active
+  assigned-only quests, and rejected submissions.
+- Designer managers can assign regular designers to active assigned-only
+  quests.
+- Designer managers can reopen mistakenly rejected submissions back to PM
+  review.
+- Manager assignment/reopen operations write `DesignQuestEvent` audit records.
+- Designer managers still cannot access PM project pages.
+- No PM/admin invite controls, phase mutation, design-complete controls, or AI
+  handlers were added.
 
-Build 08 verification:
+Build 09 verification:
 
-- `python3 -m py_compile app/models.py app/migrations.py app/crud.py app/routes/projects.py test_v15_build07.py test_v15_build08.py` — PASS.
+- `python3 -m py_compile app/crud.py app/routes/designer.py test_v15_build09.py` — PASS.
+- `python3 test_v15_build09.py` — 8/8 PASS.
 - `python3 test_v15_build08.py` — 15/15 PASS.
 - `python3 test_v15_build07.py` — 12/12 PASS.
 - `python3 test_v15_build06.py` — 13/13 PASS.
-- `python3 test_v15_build05.py` — 14/14 PASS.
 - `git diff --check` — PASS.
 
 Next v1.5 step:
 
-1. Commit Build 08 as `Implement v1.5 Build 08 design status timeline pulse`.
-2. Write and commit `V15_BUILD09_DESIGNER_MANAGER_OPERATIONS_PLAN.md`.
-3. Implement Build 09 only after the plan checkpoint.
+1. Commit Build 09 as `Implement v1.5 Build 09 designer manager operations`.
+2. Write and commit `V15_BUILD10_RELEASE_HARDENING_PLAN.md`.
+3. Implement Build 10 only after the plan checkpoint.
 
 ## Task
 v1.4 Builds 01-03 and the v1.3 UI Rescue fixes UI-R1 through UI-R4 are implemented in the working tree and are ready to be checkpointed. User asked to commit/push these fixes and then return to building the sandbox app. After the checkpoint commit/push, resume v1.4 with Build 04 planning/implementation discipline.

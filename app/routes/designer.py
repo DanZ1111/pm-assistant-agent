@@ -36,6 +36,62 @@ def designer_dashboard(request: Request, db: Session = Depends(get_db)):
     })
 
 
+@router.get("/designer/manager", response_class=HTMLResponse)
+def designer_manager_dashboard(request: Request, db: Session = Depends(get_db)):
+    current_user = get_current_user(request, db)
+    try:
+        require_designer_portal_user(current_user)
+    except _RedirectException as e:
+        return e.response
+    if current_user.role != "designer_manager":
+        return RedirectResponse(url="/designer", status_code=303)
+    operations = crud.list_designer_manager_operations(db, current_user.id)
+    return templates.TemplateResponse(request, "designer/manager.html", {
+        "current_user": current_user,
+        "operations": operations,
+        "manager_error": request.query_params.get("manager_error"),
+        "manager_result": request.query_params.get("manager_result"),
+        **i18n_context(request, current_user),
+    })
+
+
+@router.post("/designer/manager/quests/{quest_id}/assign")
+def designer_manager_assign(
+    request: Request,
+    quest_id: int,
+    designer_user_id: int = Form(...),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_designer_portal_user(current_user)
+    except _RedirectException as e:
+        return e.response
+    try:
+        crud.manager_assign_designer_to_quest(db, quest_id, designer_user_id, current_user.id)
+    except (PermissionError, ValueError) as exc:
+        return RedirectResponse(url=f"/designer/manager?manager_error={str(exc)}", status_code=303)
+    return RedirectResponse(url="/designer/manager?manager_result=assigned", status_code=303)
+
+
+@router.post("/designer/manager/submissions/{submission_id}/reopen")
+def designer_manager_reopen_submission(
+    request: Request,
+    submission_id: int,
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_designer_portal_user(current_user)
+    except _RedirectException as e:
+        return e.response
+    try:
+        crud.manager_reopen_design_submission(db, submission_id, current_user.id)
+    except (PermissionError, ValueError) as exc:
+        return RedirectResponse(url=f"/designer/manager?manager_error={str(exc)}", status_code=303)
+    return RedirectResponse(url="/designer/manager?manager_result=reopened", status_code=303)
+
+
 @router.get("/designer/quests/{quest_id}", response_class=HTMLResponse)
 def designer_quest_detail(request: Request, quest_id: int, db: Session = Depends(get_db)):
     current_user = get_current_user(request, db)

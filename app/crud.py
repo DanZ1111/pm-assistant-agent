@@ -1249,6 +1249,165 @@ def mark_design_quest_complete(db: Session, quest_id: int, user_id: int) -> Desi
     return quest
 
 
+def _require_designer_manager(db: Session, user_id: int | None) -> User:
+    user = db.query(User).filter(User.id == user_id).first() if user_id else None
+    if not user or user.role != "designer_manager":
+        raise PermissionError("designer_manager_required")
+    return user
+
+
+def list_designer_manager_operations(db: Session, manager_user_id: int) -> dict:
+    _require_designer_manager(db, manager_user_id)
+    designers = (
+        db.query(User)
+        .filter(User.role == "designer")
+        .order_by(User.display_name.asc(), User.username.asc())
+        .all()
+    )
+    quests = (
+        db.query(DesignQuest)
+        .filter(
+            DesignQuest.visibility == "assigned_designers_only",
+            DesignQuest.status.in_(("open", "reviewing", "revision_needed", "selected")),
+        )
+        .order_by(DesignQuest.updated_at.desc())
+        .all()
+    )
+    rejected_submissions = (
+        db.query(DesignSubmission)
+        .filter(DesignSubmission.status == "rejected")
+        .order_by(DesignSubmission.updated_at.desc())
+        .all()
+    )
+    return {
+        "designers": [
+            {
+                "id": designer.id,
+                "username": designer.username,
+                "display_name": designer.display_name or designer.username,
+            }
+            for designer in designers
+        ],
+        "quests": [
+            {
+                "id": quest.id,
+                "title": quest.title,
+                "status": quest.status,
+                "soft_deadline": quest.soft_deadline,
+                "assigned_designers": [
+                    {
+                        "id": assignment.designer.id,
+                        "display_name": assignment.designer.display_name or assignment.designer.username,
+                    }
+                    for assignment in quest.assignments
+                    if assignment.status == "assigned" and assignment.designer
+                ],
+            }
+            for quest in quests
+        ],
+        "rejected_submissions": [
+            {
+                "id": submission.id,
+                "quest_id": submission.quest_id,
+                "quest_title": submission.quest.title if submission.quest else "Design quest",
+                "designer_display": (
+                    submission.designer.display_name or submission.designer.username
+                    if submission.designer else "Designer"
+                ),
+                "title": submission.title,
+                "updated_at": submission.updated_at,
+            }
+            for submission in rejected_submissions
+        ],
+    }
+
+
+def manager_assign_designer_to_quest(
+    db: Session,
+    quest_id: int,
+    designer_user_id: int,
+    manager_user_id: int,
+) -> DesignQuestAssignment:
+    manager = _require_designer_manager(db, manager_user_id)
+    quest = db.query(DesignQuest).filter(DesignQuest.id == quest_id).first()
+    if not quest:
+        raise ValueError("design_quest_not_found")
+    if quest.visibility != "assigned_designers_only":
+        raise ValueError("quest_not_assigned_only")
+    if quest.status not in ("open", "reviewing", "revision_needed", "selected"):
+        raise ValueError("quest_not_assignable")
+    designer = db.query(User).filter(User.id == designer_user_id).first()
+    if not designer or designer.role != "designer":
+        raise ValueError("assigned_user_is_not_designer")
+    now = datetime.utcnow()
+    assignment = (
+        db.query(DesignQuestAssignment)
+        .filter(
+            DesignQuestAssignment.quest_id == quest.id,
+            DesignQuestAssignment.designer_user_id == designer.id,
+        )
+        .first()
+    )
+    if assignment:
+        assignment.status = "assigned"
+        assignment.assigned_by_user_id = manager.id
+        assignment.updated_at = now
+    else:
+        assignment = DesignQuestAssignment(
+            quest_id=quest.id,
+            designer_user_id=designer.id,
+            assigned_by_user_id=manager.id,
+            status="assigned",
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(assignment)
+    quest.updated_at = now
+    _write_design_quest_event(
+        db,
+        quest,
+        "manager_designer_assigned",
+        manager.id,
+        f"Designer manager assigned {designer.display_name or designer.username} to design quest.",
+        {"designer_user_id": designer.id},
+    )
+    db.commit()
+    db.refresh(assignment)
+    return assignment
+
+
+def manager_reopen_design_submission(
+    db: Session,
+    submission_id: int,
+    manager_user_id: int,
+) -> DesignSubmission:
+    manager = _require_designer_manager(db, manager_user_id)
+    submission = db.query(DesignSubmission).filter(DesignSubmission.id == submission_id).first()
+    if not submission:
+        raise ValueError("design_submission_not_found")
+    if submission.status != "rejected":
+        raise ValueError("submission_not_reopenable")
+    if submission.quest.status in ("closed", "cancelled"):
+        raise ValueError("quest_not_accepting_reopen")
+    now = datetime.utcnow()
+    submission.status = "submitted"
+    submission.updated_at = now
+    if submission.quest.status == "open":
+        submission.quest.status = "reviewing"
+    submission.quest.updated_at = now
+    _write_design_quest_event(
+        db,
+        submission.quest,
+        "manager_submission_reopened",
+        manager.id,
+        f"Designer manager reopened rejected submission from {submission.designer.display_name or submission.designer.username}.",
+        {"submission_id": submission.id},
+    )
+    db.commit()
+    db.refresh(submission)
+    return submission
+
+
 def create_or_append_design_submission_version(
     db: Session,
     quest_id: int,

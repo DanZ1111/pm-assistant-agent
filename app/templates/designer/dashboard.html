@@ -20,6 +20,18 @@
     </div>
   </section>
 
+  {% if current_user.role == 'designer_manager' %}
+  <section class="designer-manager-entry" data-designer-manager-entry>
+    <div>
+      <h2>{{ t('designer.manager.open_operations') }}</h2>
+      <p>{{ t('designer.manager.subtitle') }}</p>
+    </div>
+    <a class="btn btn-sm btn-primary" href="/designer/manager">
+      <i class="bi bi-sliders me-1"></i>{{ t('designer.manager.open_operations') }}
+    </a>
+  </section>
+  {% endif %}
+
   {% if quests %}
   <section class="designer-quest-list" data-designer-quest-list>
     <div class="designer-section-head">

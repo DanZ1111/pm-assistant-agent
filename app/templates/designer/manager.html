@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}{{ t('designer.manager.title') }} — PM Tracker{% endblock %}
+
+{% block content %}
+<div class="designer-shell">
+  <section class="designer-portal-header">
+    <div>
+      <div class="designer-eyebrow">{{ t('designer.role_designer_manager') }}</div>
+      <h1 class="page-title"><i class="bi bi-sliders me-2"></i>{{ t('designer.manager.title') }}</h1>
+      <p class="page-subtitle">{{ t('designer.manager.subtitle') }}</p>
+    </div>
+    <a class="btn btn-sm btn-outline-secondary" href="/designer">
+      <i class="bi bi-arrow-left me-1"></i>{{ t('designer.manager.back_to_dashboard') }}
+    </a>
+  </section>
+
+  {% if manager_error %}
+  <div class="designer-alert warning">{{ t('designer.manager.error_prefix') }} {{ manager_error }}</div>
+  {% endif %}
+  {% if manager_result %}
+  <div class="designer-alert success">{{ t('designer.manager.result_' ~ manager_result) }}</div>
+  {% endif %}
+
+  <section class="designer-manager-grid" data-designer-manager-dashboard>
+    <article class="designer-manager-card" data-designer-roster>
+      <div class="designer-section-head">
+        <div>
+          <h2>{{ t('designer.manager.designer_roster') }}</h2>
+          <p>{{ t('designer.manager.designer_roster_body') }}</p>
+        </div>
+        <span>{{ operations.designers|length }}</span>
+      </div>
+      {% if operations.designers %}
+      <ul class="designer-manager-list">
+        {% for designer in operations.designers %}
+        <li>
+          <strong>{{ designer.display_name }}</strong>
+          <span>{{ designer.username }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-muted">{{ t('designer.manager.no_designers') }}</p>
+      {% endif %}
+    </article>
+
+    <article class="designer-manager-card" data-manager-quest-assignments>
+      <div class="designer-section-head">
+        <div>
+          <h2>{{ t('designer.manager.quest_assignments') }}</h2>
+          <p>{{ t('designer.manager.quest_assignments_body') }}</p>
+        </div>
+        <span>{{ operations.quests|length }}</span>
+      </div>
+      {% if operations.quests %}
+      <div class="designer-manager-stack">
+        {% for quest in operations.quests %}
+        <div class="designer-manager-row">
+          <div>
+            <strong>{{ quest.title }}</strong>
+            <span>{{ t('designer.manager.quest_status') }}: {{ quest.status }}</span>
+            {% if quest.assigned_designers %}
+            <small>
+              {{ t('designer.manager.assigned_designers') }}:
+              {{ quest.assigned_designers | map(attribute='display_name') | join(', ') }}
+            </small>
+            {% endif %}
+          </div>
+          {% if operations.designers %}
+          <form method="post" action="/designer/manager/quests/{{ quest.id }}/assign">
+            <select name="designer_user_id" class="form-select form-select-sm" required>
+              {% for designer in operations.designers %}
+              <option value="{{ designer.id }}">{{ designer.display_name }}</option>
+              {% endfor %}
+            </select>
+            <button class="btn btn-sm btn-primary">{{ t('designer.manager.assign_button') }}</button>
+          </form>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-muted">{{ t('designer.manager.no_assignable_quests') }}</p>
+      {% endif %}
+    </article>
+
+    <article class="designer-manager-card" data-manager-rejected-submissions>
+      <div class="designer-section-head">
+        <div>
+          <h2>{{ t('designer.manager.rejected_submissions') }}</h2>
+          <p>{{ t('designer.manager.rejected_submissions_body') }}</p>
+        </div>
+        <span>{{ operations.rejected_submissions|length }}</span>
+      </div>
+      {% if operations.rejected_submissions %}
+      <div class="designer-manager-stack">
+        {% for submission in operations.rejected_submissions %}
+        <div class="designer-manager-row">
+          <div>
+            <strong>{{ submission.designer_display }}</strong>
+            <span>{{ submission.quest_title }}</span>
+            {% if submission.title %}<small>{{ submission.title }}</small>{% endif %}
+          </div>
+          <form method="post" action="/designer/manager/submissions/{{ submission.id }}/reopen"
+                onsubmit="return confirm('{{ t('designer.manager.reopen_confirm') }}');">
+            <button class="btn btn-sm btn-outline-primary">{{ t('designer.manager.reopen_button') }}</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-muted">{{ t('designer.manager.no_rejected_submissions') }}</p>
+      {% endif %}
+    </article>
+  </section>
+</div>
+{% endblock %}
