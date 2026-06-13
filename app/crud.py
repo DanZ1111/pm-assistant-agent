@@ -2,6 +2,7 @@ import os
 import uuid
 import math
 import re
+import shutil
 from datetime import datetime, date, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, update, desc
@@ -797,6 +798,7 @@ def _shape_design_submission_version(version: DesignSubmissionVersion) -> dict:
         "file_size": version.file_size,
         "designer_note": version.designer_note,
         "revision_request_id": version.revision_request_id,
+        "is_selected": bool(version.submission and version.submission.selected_version_id == version.id),
         "created_at": version.created_at.isoformat() if version.created_at else None,
     }
 
@@ -850,6 +852,8 @@ def shape_design_submission_for_pm(submission: DesignSubmission) -> dict:
         "latest_version": latest_version,
         "version_count": len(versions),
         "open_revision_requests": open_revisions,
+        "selected_version_id": submission.selected_version_id,
+        "selected_at": submission.selected_at.isoformat() if submission.selected_at else None,
     }
 
 
@@ -989,6 +993,158 @@ def request_design_revision(
     db.commit()
     db.refresh(revision_request)
     return revision_request
+
+
+def select_final_design_submission_version(
+    db: Session,
+    submission_id: int,
+    version_id: int,
+    user_id: int,
+) -> ProjectFile:
+    submission, reviewer = _require_design_submission_reviewer(db, submission_id, user_id)
+    if submission.status in ("rejected", "archived"):
+        raise ValueError("submission_not_selectable")
+    version = (
+        db.query(DesignSubmissionVersion)
+        .filter(
+            DesignSubmissionVersion.id == version_id,
+            DesignSubmissionVersion.submission_id == submission.id,
+            DesignSubmissionVersion.quest_id == submission.quest_id,
+            DesignSubmissionVersion.project_id == submission.project_id,
+        )
+        .first()
+    )
+    if not version:
+        raise ValueError("design_submission_version_not_found")
+    source_path = os.path.join(UPLOAD_DIR, version.filename)
+    if not os.path.exists(source_path):
+        raise ValueError("design_submission_file_missing")
+
+    now = datetime.utcnow()
+    ext = version.filename.rsplit(".", 1)[-1].lower() if "." in version.filename else ""
+    promoted_filename = f"promoted-rendering-{uuid.uuid4().hex}.{ext}" if ext else f"promoted-rendering-{uuid.uuid4().hex}"
+    promoted_path = os.path.join(UPLOAD_DIR, promoted_filename)
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    shutil.copyfile(source_path, promoted_path)
+
+    for sibling in list_design_submissions_for_quest(db, submission.quest_id):
+        if sibling.id == submission.id:
+            continue
+        if sibling.status == "selected":
+            sibling.status = "shortlisted"
+        sibling.selected_version_id = None
+        sibling.selected_by_user_id = None
+        sibling.selected_at = None
+
+    source_metadata = {
+        "quest_id": submission.quest_id,
+        "submission_id": submission.id,
+        "version_id": version.id,
+        "version_number": version.version_number,
+        "designer_user_id": submission.designer_user_id,
+        "designer_display": submission.designer.display_name or submission.designer.username,
+        "selected_by_user_id": reviewer.id,
+        "selected_by_display": reviewer.display_name or reviewer.username,
+        "selected_at": now.isoformat(),
+        "original_filename": version.original_filename,
+    }
+    rendering = ProjectFile(
+        project_id=submission.project_id,
+        filename=promoted_filename,
+        original_filename=version.original_filename,
+        file_path=f"uploads/{promoted_filename}",
+        file_type=version.file_type,
+        file_category="rendering",
+        file_size=version.file_size,
+        source_note=(
+            f"Promoted from design submission v{version.version_number} "
+            f"by {submission.designer.display_name or submission.designer.username}."
+        ),
+        source_type="design_submission_version",
+        source_id=version.id,
+        source_metadata=source_metadata,
+        uploaded_at=now,
+    )
+    db.add(rendering)
+    db.flush()
+
+    submission.status = "selected"
+    submission.selected_version_id = version.id
+    submission.selected_by_user_id = reviewer.id
+    submission.selected_at = now
+    submission.updated_at = now
+
+    submission.quest.status = "selected"
+    submission.quest.selected_submission_id = submission.id
+    submission.quest.selected_version_id = version.id
+    submission.quest.selected_by_user_id = reviewer.id
+    submission.quest.selected_at = now
+    submission.quest.promoted_project_file_id = rendering.id
+    submission.quest.updated_at = now
+
+    _write_design_quest_event(
+        db,
+        submission.quest,
+        "submission_selected",
+        reviewer.id,
+        f"Submission from {submission.designer.display_name or submission.designer.username} selected as final.",
+        {
+            "submission_id": submission.id,
+            "version_id": version.id,
+            "version_number": version.version_number,
+        },
+    )
+    _write_design_quest_event(
+        db,
+        submission.quest,
+        "submission_promoted_to_rendering",
+        reviewer.id,
+        f"Submission version {version.version_number} promoted to project rendering.",
+        {
+            "submission_id": submission.id,
+            "version_id": version.id,
+            "project_file_id": rendering.id,
+        },
+    )
+    write_change(
+        db,
+        submission.project_id,
+        "file_upload",
+        changed_by="user",
+        summary=f"Selected design promoted to renderings: {version.original_filename}.",
+        source_type="design_submission_promotion",
+    )
+    db.commit()
+    db.refresh(rendering)
+    return rendering
+
+
+def get_selected_design_rendering_source(db: Session, project_id: int) -> dict | None:
+    rendering = (
+        db.query(ProjectFile)
+        .filter(
+            ProjectFile.project_id == project_id,
+            ProjectFile.file_category == "rendering",
+            ProjectFile.source_type == "design_submission_version",
+        )
+        .order_by(ProjectFile.uploaded_at.desc())
+        .first()
+    )
+    if not rendering:
+        return None
+    metadata = rendering.source_metadata or {}
+    return {
+        "project_file_id": rendering.id,
+        "filename": rendering.filename,
+        "original_filename": rendering.original_filename,
+        "uploaded_at": rendering.uploaded_at.isoformat() if rendering.uploaded_at else None,
+        "designer_display": metadata.get("designer_display"),
+        "selected_by_display": metadata.get("selected_by_display"),
+        "selected_at": metadata.get("selected_at"),
+        "version_number": metadata.get("version_number"),
+        "submission_id": metadata.get("submission_id"),
+        "version_id": metadata.get("version_id"),
+    }
 
 
 def create_or_append_design_submission_version(

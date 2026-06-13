@@ -123,6 +123,9 @@ class ProjectFile(Base):
     file_size = Column(Integer, nullable=True)
     ai_summary = Column(Text, nullable=True)
     source_note = Column(Text, nullable=True)
+    source_type = Column(String, nullable=True)
+    source_id = Column(Integer, nullable=True)
+    source_metadata = Column(JSON, nullable=True)
     uploaded_at = Column(DateTime, default=datetime.utcnow)
 
     project = relationship("Project", back_populates="files")
@@ -608,6 +611,11 @@ class DesignQuest(Base):
     is_timeline_blocking = Column(Boolean, nullable=False, default=False)
     linked_phase_id = Column(Integer, ForeignKey("project_phases.id"), nullable=True)
     created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    selected_submission_id = Column(Integer, nullable=True)
+    selected_version_id = Column(Integer, nullable=True)
+    selected_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    selected_at = Column(DateTime, nullable=True)
+    promoted_project_file_id = Column(Integer, ForeignKey("project_files.id"), nullable=True)
     published_at = Column(DateTime, nullable=True)
     closed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -617,6 +625,8 @@ class DesignQuest(Base):
     linked_phase = relationship("ProjectPhase", foreign_keys=[linked_phase_id])
     created_by = relationship("User", foreign_keys=[created_by_user_id],
                               back_populates="created_design_quests")
+    selected_by = relationship("User", foreign_keys=[selected_by_user_id])
+    promoted_project_file = relationship("ProjectFile", foreign_keys=[promoted_project_file_id])
     assignments = relationship("DesignQuestAssignment", back_populates="quest",
                                cascade="all, delete-orphan")
     references = relationship("DesignQuestReference", back_populates="quest",
@@ -699,6 +709,9 @@ class DesignSubmission(Base):
     status = Column(String, nullable=False, default="submitted")
     title = Column(String, nullable=True)
     designer_note = Column(Text, nullable=True)
+    selected_version_id = Column(Integer, nullable=True)
+    selected_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    selected_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
@@ -706,6 +719,7 @@ class DesignSubmission(Base):
     project = relationship("Project", back_populates="design_submissions")
     designer = relationship("User", foreign_keys=[designer_user_id],
                             back_populates="design_submissions")
+    selected_by = relationship("User", foreign_keys=[selected_by_user_id])
     versions = relationship("DesignSubmissionVersion", back_populates="submission",
                             cascade="all, delete-orphan",
                             order_by="DesignSubmissionVersion.version_number")

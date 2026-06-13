@@ -162,6 +162,10 @@ MIGRATIONS = [
         "013_v1_5_create_design_revision_requests",
         lambda eng: _create_design_revision_requests(eng),
     ),
+    (
+        "014_v1_5_select_final_promote_rendering",
+        lambda eng: _select_final_promote_rendering(eng),
+    ),
 ]
 
 
@@ -807,6 +811,58 @@ def _create_design_revision_requests(engine):
         conn.execute(text(
             "CREATE INDEX IF NOT EXISTS ix_design_submission_versions_revision_request "
             "ON design_submission_versions(revision_request_id)"
+        ))
+
+
+def _select_final_promote_rendering(engine):
+    """v1.5 Build 07 — selected submission and promoted rendering metadata."""
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    columns_by_table = {
+        table: {col["name"] for col in inspector.get_columns(table)}
+        for table in tables
+    }
+    with engine.begin() as conn:
+        design_quest_columns = columns_by_table.get("design_quests", set())
+        for column_name, column_sql in (
+            ("selected_submission_id", "INTEGER NULL"),
+            ("selected_version_id", "INTEGER NULL"),
+            ("selected_by_user_id", "INTEGER NULL REFERENCES users(id)"),
+            ("selected_at", "TIMESTAMP NULL"),
+            ("promoted_project_file_id", "INTEGER NULL REFERENCES project_files(id)"),
+        ):
+            if "design_quests" in tables and column_name not in design_quest_columns:
+                conn.execute(text(f"ALTER TABLE design_quests ADD COLUMN {column_name} {column_sql}"))
+
+        design_submission_columns = columns_by_table.get("design_submissions", set())
+        for column_name, column_sql in (
+            ("selected_version_id", "INTEGER NULL"),
+            ("selected_by_user_id", "INTEGER NULL REFERENCES users(id)"),
+            ("selected_at", "TIMESTAMP NULL"),
+        ):
+            if "design_submissions" in tables and column_name not in design_submission_columns:
+                conn.execute(text(f"ALTER TABLE design_submissions ADD COLUMN {column_name} {column_sql}"))
+
+        project_file_columns = columns_by_table.get("project_files", set())
+        for column_name, column_sql in (
+            ("source_type", "VARCHAR NULL"),
+            ("source_id", "INTEGER NULL"),
+            ("source_metadata", "JSON NULL"),
+        ):
+            if "project_files" in tables and column_name not in project_file_columns:
+                conn.execute(text(f"ALTER TABLE project_files ADD COLUMN {column_name} {column_sql}"))
+
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_project_files_source "
+            "ON project_files(source_type, source_id)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_design_quests_selected_version "
+            "ON design_quests(selected_version_id)"
+        ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_design_submissions_selected_version "
+            "ON design_submissions(selected_version_id)"
         ))
 
 

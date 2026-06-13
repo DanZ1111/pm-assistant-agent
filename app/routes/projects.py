@@ -441,6 +441,7 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
     renderings = crud.get_files_by_category(db, project_id, "rendering")
     prototype_photos = crud.get_files_by_category(db, project_id, "prototype_photo")
     latest_overview_visual = _pick_latest_overview_visual(renderings, prototype_photos)
+    selected_design_rendering_source = crud.get_selected_design_rendering_source(db, project_id)
     active_design_quest = crud.get_active_design_quest(db, project_id)
     design_quest_preview = (
         crud.shape_design_quest_for_pm_preview(active_design_quest)
@@ -592,6 +593,7 @@ def project_detail(request: Request, project_id: int, db: Session = Depends(get_
         "renderings": renderings,
         "prototype_photos": prototype_photos,
         "latest_overview_visual": latest_overview_visual,
+        "selected_design_rendering_source": selected_design_rendering_source,
         "active_design_quest": active_design_quest,
         "design_quest_preview": design_quest_preview,
         "design_submissions": design_submissions,
@@ -857,6 +859,37 @@ def design_submission_request_revision(
             general_comment=general_comment,
             checklist_text=checklist_text,
         )
+    except (PermissionError, ValueError) as exc:
+        return _design_quest_redirect(project_id, str(exc))
+    return _design_quest_redirect(project_id)
+
+
+@router.post("/projects/{project_id}/design-quests/{quest_id}/submissions/{submission_id}/versions/{version_id}/select-final")
+def design_submission_select_final(
+    request: Request,
+    project_id: int,
+    quest_id: int,
+    submission_id: int,
+    version_id: int,
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_auth(current_user)
+    except _RedirectException as e:
+        return e.response
+    project = crud.get_project(db, project_id)
+    if not project or not can_edit_project(current_user, project):
+        return _design_quest_redirect(project_id, "forbidden")
+    submission_row = db.query(DesignSubmission).filter(
+        DesignSubmission.id == submission_id,
+        DesignSubmission.project_id == project_id,
+        DesignSubmission.quest_id == quest_id,
+    ).first()
+    if not submission_row:
+        return _design_quest_redirect(project_id, "submission_not_found")
+    try:
+        crud.select_final_design_submission_version(db, submission_id, version_id, current_user.id)
     except (PermissionError, ValueError) as exc:
         return _design_quest_redirect(project_id, str(exc))
     return _design_quest_redirect(project_id)

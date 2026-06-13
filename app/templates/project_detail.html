@@ -371,6 +371,27 @@
         <div class="alert alert-warning py-2 mb-3">{{ t('design_quest.error_prefix') }} {{ design_quest_error }}</div>
         {% endif %}
 
+        {% if selected_design_rendering_source %}
+        <div class="design-selected-source" data-design-selected-source>
+          <div>
+            <div class="design-quest-label">{{ t('design_quest.selected_final_title') }}</div>
+            <strong>{{ selected_design_rendering_source.original_filename }}</strong>
+            <p>
+              {{ t('design_quest.selected_source_prefix') }}
+              {{ selected_design_rendering_source.designer_display or t('designer.title') }}
+              · v{{ selected_design_rendering_source.version_number }}
+              {% if selected_design_rendering_source.selected_by_display %}
+              · {{ t('design_quest.selected_by_label') }} {{ selected_design_rendering_source.selected_by_display }}
+              {% endif %}
+            </p>
+          </div>
+          <a class="btn btn-sm btn-outline-primary"
+             href="/projects/{{ project.id }}/files/{{ selected_design_rendering_source.project_file_id }}/download">
+            <i class="bi bi-box-arrow-up-right me-1"></i>{{ t('design_quest.open_promoted_rendering') }}
+          </a>
+        </div>
+        {% endif %}
+
         {% if active_design_quest %}
         <div class="design-quest-grid">
           <div class="design-quest-brief">
@@ -463,12 +484,23 @@
             {% if submission.versions %}
             <div class="design-submission-version-history" data-design-submission-version-history>
               {% for version in submission.versions %}
-              <a href="/projects/{{ project.id }}/design-quests/{{ active_design_quest.id }}/submissions/{{ submission.id }}/versions/{{ version.id }}/download">
-                <span>v{{ version.version_number }} · {{ version.original_filename }}</span>
-                {% if version.revision_request_id %}
-                <em>{{ t('design_quest.revision_response_label') }} #{{ version.revision_request_id }}</em>
+              <div class="design-submission-version-row">
+                <a href="/projects/{{ project.id }}/design-quests/{{ active_design_quest.id }}/submissions/{{ submission.id }}/versions/{{ version.id }}/download">
+                  <span>v{{ version.version_number }} · {{ version.original_filename }}</span>
+                  {% if version.is_selected %}
+                  <em>{{ t('design_quest.selected_version_label') }}</em>
+                  {% elif version.revision_request_id %}
+                  <em>{{ t('design_quest.revision_response_label') }} #{{ version.revision_request_id }}</em>
+                  {% endif %}
+                </a>
+                {% if can_edit %}
+                <form method="post"
+                      action="/projects/{{ project.id }}/design-quests/{{ active_design_quest.id }}/submissions/{{ submission.id }}/versions/{{ version.id }}/select-final"
+                      onsubmit="return confirm('{{ t('design_quest.select_final_confirm') }}');">
+                  <button class="btn btn-sm btn-outline-success">{{ t('design_quest.select_final_button') }}</button>
+                </form>
                 {% endif %}
-              </a>
+              </div>
               {% endfor %}
             </div>
             {% endif %}
