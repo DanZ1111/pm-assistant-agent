@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ t('designer.title') }} — PM Tracker{% endblock %}
+
+{% block content %}
+<div class="designer-shell">
+  <section class="designer-portal-header">
+    <div>
+      <div class="designer-eyebrow">{{ t('designer.portal_label') }}</div>
+      <h1 class="page-title"><i class="bi bi-palette me-2"></i>{{ t('designer.title') }}</h1>
+      <p class="page-subtitle">{{ t('designer.subtitle') }}</p>
+    </div>
+    <div class="designer-role-chip">
+      {% if current_user.role == 'designer_manager' %}
+        {{ t('designer.role_designer_manager') }}
+      {% elif current_user.role == 'designer' %}
+        {{ t('designer.role_designer') }}
+      {% else %}
+        {{ current_user.role }}
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="designer-empty-state" data-designer-empty-state>
+    <div class="designer-empty-icon"><i class="bi bi-inboxes"></i></div>
+    <div>
+      <h2>{{ t('designer.empty_title') }}</h2>
+      <p>{{ t('designer.empty_body') }}</p>
+    </div>
+  </section>
+</div>
+{% endblock %}

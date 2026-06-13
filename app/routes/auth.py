@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User, UserSession, InvitePin
-from app.dependencies import get_current_user
+from app.dependencies import auth_landing_path, get_current_user
 from app.i18n import i18n_context
 
 router = APIRouter()
@@ -46,7 +46,7 @@ def _set_session_cookie(response, token: str):
 def login_form(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if user:
-        return RedirectResponse(url="/projects", status_code=303)
+        return RedirectResponse(url=auth_landing_path(user), status_code=303)
     return templates.TemplateResponse(request, "auth/login.html", {
         "error": None,
         **i18n_context(request),
@@ -70,7 +70,7 @@ def login_submit(
         })
 
     token = _create_session(db, user)
-    response = RedirectResponse(url="/projects", status_code=303)
+    response = RedirectResponse(url=auth_landing_path(user), status_code=303)
     _set_session_cookie(response, token)
     return response
 

@@ -42,6 +42,27 @@ def require_admin(user: User | None) -> User:
 
 # ── Permission helpers ────────────────────────────────────────────────────────
 
+DESIGNER_ROLES = ("designer", "designer_manager")
+
+
+def is_designer_role(user: User | None) -> bool:
+    return bool(user) and user.role in DESIGNER_ROLES
+
+
+def is_designer_manager(user: User | None) -> bool:
+    return bool(user) and user.role == "designer_manager"
+
+
+def auth_landing_path(user: User | None) -> str:
+    return "/designer" if is_designer_role(user) else "/projects"
+
+
+def require_designer_portal_user(user: User | None) -> User:
+    u = require_auth(user)
+    if u.role not in ("admin", "designer", "designer_manager"):
+        raise _redirect("/projects")
+    return u
+
 def can_edit_project(user: User, project) -> bool:
     """Admin can edit anything. PM can edit projects where they are the assigned PM."""
     if user.role == "admin":

@@ -67,6 +67,11 @@ Out:
   blocking.
 - Do not merge Build 01 with quest workflow for speed.
 
+Test-lock wording:
+
+- designer_manager is a portal operations role.
+- Build 01 must only add roles, invite support, /designer shell, and route blocking.
+
 ## Architecture Review
 
 1. Problem solved: establish a safe account and route boundary before any

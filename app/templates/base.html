@@ -9,13 +9,19 @@
   <link href="/static/css/styles.css?v={{ STATIC_ASSET_VERSION }}" rel="stylesheet">
 </head>
 <body>
+{% set is_designer_portal_user = current_user and current_user.role in ('designer', 'designer_manager') %}
 
 <nav class="navbar navbar-dark navbar-main">
   <div class="container-fluid px-4">
-    <a class="navbar-brand fw-bold" href="/projects">
+    <a class="navbar-brand fw-bold" href="{% if is_designer_portal_user %}/designer{% else %}/projects{% endif %}">
       <i class="bi bi-grid-3x3-gap me-2"></i>PM Tracker
     </a>
     <div class="navbar-nav flex-row gap-1 align-items-center">
+      {% if is_designer_portal_user %}
+      <a class="nav-link px-3 {% if request.url.path.startswith('/designer') %}active{% endif %}" href="/designer">
+        <i class="bi bi-palette me-1"></i>{{ t('nav.designer_portal') }}
+      </a>
+      {% else %}
       <a class="nav-link px-3 {% if request.url.path.startswith('/projects') %}active{% endif %}" href="/projects" id="navProjectsLink">
         <i class="bi bi-folder2 me-1"></i>{{ t('nav.projects') }}
       </a>
@@ -45,15 +51,18 @@
         <i class="bi bi-people me-1"></i>{{ t('nav.users') }}
       </a>
       {% endif %}
+      {% endif %}
       {# Build 23 — language switcher (visible to everyone, anon or logged-in) #}
       {% include "components/lang_switcher.html" %}
+      {% if not is_designer_portal_user %}
       <button class="btn btn-sm nav-help-btn ms-1" data-bs-toggle="modal" data-bs-target="#helpModal">
         <i class="bi bi-question-circle me-1"></i>v{{ APP_VERSION }} {{ t('nav.help') }}
       </button>
+      {% endif %}
       {% if current_user %}
       <span class="nav-link px-2 text-white-50 small" style="cursor:default">
         <i class="bi bi-person-circle me-1"></i>{{ current_user.display_name or current_user.username }}
-        <span class="badge {% if current_user.role == 'admin' %}bg-danger{% elif current_user.role == 'pm' %}bg-primary{% else %}bg-secondary{% endif %} ms-1" style="font-size:0.65rem">{{ current_user.role }}</span>
+        <span class="badge {% if current_user.role == 'admin' %}bg-danger{% elif current_user.role == 'pm' %}bg-primary{% elif is_designer_portal_user %}bg-info text-dark{% else %}bg-secondary{% endif %} ms-1" style="font-size:0.65rem">{{ current_user.role }}</span>
       </span>
       <form method="post" action="/auth/logout" class="d-inline">
         <button type="submit" class="btn btn-sm nav-help-btn">
@@ -327,7 +336,7 @@
   {% block content %}{% endblock %}
 </main>
 
-{% if current_user %}
+{% if current_user and not is_designer_portal_user %}
 {% include "components/bottom_chat.html" %}
 {% endif %}
 

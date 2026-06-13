@@ -14,7 +14,14 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
-PIN_PREFIXES = {"pm": "PM", "viewer": "VW", "admin": "AD"}
+PIN_PREFIXES = {
+    "pm": "PM",
+    "viewer": "VW",
+    "admin": "AD",
+    "designer": "DS",
+    "designer_manager": "DM",
+}
+INVITE_ROLES = ("pm", "viewer", "designer", "designer_manager")
 
 
 def _generate_pin(role: str) -> str:
@@ -66,7 +73,7 @@ def generate_pin(
     except _RedirectException as e:
         return e.response
 
-    if role not in ("pm", "viewer"):
+    if role not in INVITE_ROLES:
         role = "viewer"
 
     pin = _generate_pin(role)

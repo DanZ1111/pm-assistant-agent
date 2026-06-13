@@ -43,11 +43,13 @@
         <div class="mb-3">
           <label class="form-label fw-semibold">Role</label>
           <select name="role" class="form-select">
-            <option value="pm">PM — Can create and edit own projects, see factory/engineer</option>
-            <option value="viewer">Viewer — Read-only, no sensitive fields</option>
+            <option value="pm">{{ t('admin.role_pm') }} — Can create and edit own projects, see factory/engineer</option>
+            <option value="viewer">{{ t('admin.role_viewer') }} — Read-only, no sensitive fields</option>
+            <option value="designer">{{ t('admin.role_designer') }} — Designer Portal only</option>
+            <option value="designer_manager">{{ t('admin.role_designer_manager') }} — Designer Portal operations role</option>
           </select>
           <div class="form-text">
-            PM PINs look like <code>PM-XXXXXX</code> · Viewer PINs look like <code>VW-XXXXXX</code>
+            PM <code>PM-XXXXXX</code> · Viewer <code>VW-XXXXXX</code> · Designer <code>DS-XXXXXX</code> · Designer Manager <code>DM-XXXXXX</code>
           </div>
         </div>
         <button type="submit" class="btn btn-primary">
@@ -61,7 +63,7 @@
       {% for pin in unused_pins %}
       <div class="d-flex align-items-center gap-2 mb-2">
         <code style="letter-spacing:0.15em">{{ pin.pin }}</code>
-        <span class="badge {% if pin.role == 'pm' %}bg-primary{% else %}bg-secondary{% endif %}">{{ pin.role }}</span>
+        <span class="badge {% if pin.role == 'pm' %}bg-primary{% elif pin.role in ('designer', 'designer_manager') %}bg-info text-dark{% else %}bg-secondary{% endif %}">{{ pin.role }}</span>
         <span class="text-muted small ms-auto">{{ pin.created_at.strftime('%b %d') }}</span>
       </div>
       {% endfor %}
@@ -93,7 +95,7 @@
               <td><strong>{{ u.username }}</strong></td>
               <td>{{ u.display_name or '—' }}</td>
               <td>
-                <span class="badge {% if u.role == 'admin' %}bg-danger{% elif u.role == 'pm' %}bg-primary{% else %}bg-secondary{% endif %}">
+                <span class="badge {% if u.role == 'admin' %}bg-danger{% elif u.role == 'pm' %}bg-primary{% elif u.role in ('designer', 'designer_manager') %}bg-info text-dark{% else %}bg-secondary{% endif %}">
                   {{ u.role }}
                 </span>
               </td>

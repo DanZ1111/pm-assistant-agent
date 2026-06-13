@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 import os
 
 from app.database import engine, Base, SessionLocal
@@ -21,6 +21,8 @@ from app.routes.journal import router as journal_router
 from app.routes.variants import router as variants_router
 from app.routes.ai_chat import router as ai_chat_router
 from app.routes.i18n import router as i18n_router
+from app.routes.designer import router as designer_router
+from app.dependencies import get_current_user, is_designer_role
 
 
 def _bootstrap_admin_from_env():
@@ -84,6 +86,7 @@ from app.version import CURRENT_VERSION, CURRENT_BUILD_NAME, LAST_UPDATED  # noq
 from app.routes import projects as _r_projects, admin as _r_admin, files as _r_files  # noqa: E402
 from app.routes import intake as _r_intake, help as _r_help, auth as _r_auth  # noqa: E402
 from app.routes import admin_users as _r_admin_users, calendar as _r_calendar, ideas as _r_ideas  # noqa: E402
+from app.routes import designer as _r_designer  # noqa: E402
 from app.i18n import (  # noqa: E402  Build 23 — Jinja2 globals
     t as _i18n_t,
     current_locale as _i18n_current_locale,
@@ -121,10 +124,40 @@ _GLOBALS = {
     "phase_name": _i18n_phase_name,
 }
 for _mod in (_r_projects, _r_admin, _r_files, _r_intake, _r_help, _r_auth,
-             _r_admin_users, _r_calendar, _r_ideas):
+             _r_admin_users, _r_calendar, _r_ideas, _r_designer):
     _t = getattr(_mod, "templates", None)
     if _t is not None:
         _t.env.globals.update(_GLOBALS)
+
+
+DESIGNER_BLOCKED_PREFIXES = (
+    "/projects",
+    "/my-projects",
+    "/calendar",
+    "/ideas",
+    "/admin",
+    "/ai",
+)
+
+
+@app.middleware("http")
+async def designer_portal_boundary(request, call_next):
+    """Build 01: keep designer roles inside the Designer Portal surface."""
+    path = request.url.path
+    if path == "/" or any(path == prefix or path.startswith(prefix + "/") for prefix in DESIGNER_BLOCKED_PREFIXES):
+        db = SessionLocal()
+        try:
+            user = get_current_user(request, db)
+            if is_designer_role(user):
+                if request.method in ("GET", "HEAD"):
+                    return RedirectResponse(url="/designer", status_code=303)
+                return JSONResponse(
+                    {"detail": "Designer Portal users cannot access PM Workspace routes."},
+                    status_code=403,
+                )
+        finally:
+            db.close()
+    return await call_next(request)
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.mount("/uploads", StaticFiles(directory="app/uploads"), name="uploads")
@@ -142,6 +175,7 @@ app.include_router(journal_router)
 app.include_router(variants_router)
 app.include_router(ai_chat_router)
 app.include_router(i18n_router)
+app.include_router(designer_router)
 
 
 @app.get("/healthz")
