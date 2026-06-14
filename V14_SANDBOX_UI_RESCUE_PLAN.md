@@ -89,6 +89,15 @@ Do not implement this as one large build. Use the four builds below.
 Goal: separate the mixed UI jobs into stable zones without changing canvas
 internals yet.
 
+Review lock: this is the largest rescue build. Implement it internally as two
+small commits or checkpoints:
+
+- **01A Action Bar / zone shell:** create Header, Action Bar, Canvas, and Right
+  Work Panel zones while keeping existing controls wired.
+- **01B Right-panel tabs:** convert palette/properties/issues into stable tabs,
+  add Back to Modules, move template/save-template out of the panel, and move
+  warning summaries into chips.
+
 Required changes:
 
 - Create four visible zones: Header, Action Bar, Canvas, Right Work Panel.
@@ -170,6 +179,14 @@ Acceptance for SB-Rescue-01:
 - Save as Template is no longer inline above the module library.
 - Warning/action summary no longer blocks the canvas.
 
+Viewer behavior:
+
+- Viewers can open the sandbox and inspect canvas/modules/issues.
+- Viewers do not see Apply, Save Draft, Save as Template, Add Module, Delete
+  Node, or Save Node affordances.
+- If a read-only hint is needed, place it in the action bar or panel header,
+  not as a giant blocking card.
+
 ### SB-Rescue-02 — Canvas Stability
 
 Goal: stop canvas jumping and make the graph visually legible.
@@ -214,6 +231,16 @@ Acceptance for SB-Rescue-02:
 - Edges are visually obvious in screenshots.
 - Mouse wheel over the canvas does not unexpectedly zoom the graph.
 - Fit, Tidy, and Reset View are the only normal ways to change global view.
+
+Test mechanism:
+
+- Add stable viewport hooks on `[data-sandbox-workspace]`:
+  `data-sandbox-zoom`, `data-sandbox-pan-x`, `data-sandbox-pan-y`, and
+  `data-sandbox-selected-node-id`.
+- The JS updates these hooks after initial render, pan/zoom, selection, save,
+  delete, Tidy, Fit, and Reset View.
+- Tests compare those `data-*` values before/after save/edit/delete instead of
+  relying on text selectors or private Cytoscape internals.
 
 ### SB-Rescue-03 — PM-Friendly Module Library
 
@@ -278,6 +305,14 @@ Acceptance for SB-Rescue-03:
 - Advanced module filtering is explicitly documented in code or plan comments.
 - No migration is added.
 
+Add-module behavior:
+
+- The Add button exists only in the Modules tab.
+- Adding a module leaves the right panel on the Modules tab.
+- If the user is editing a selected node, they must explicitly click Back to
+  Modules before adding another module. The rescue does not silently switch
+  modes or pretend unsaved field edits were saved.
+
 ### SB-Rescue-04 — Warnings, Apply Polish, and QA
 
 Goal: make status and validation understandable, then prove the whole rescue
@@ -310,10 +345,14 @@ Required acceptance scenario:
 - Add `scenario_contracts/acceptance/sandbox_right_panel_mode_recovery.py`.
 - Scenario must verify:
   - PM opens sandbox from project detail.
-  - PM can reach Modules tab.
-  - PM selects or creates a node and enters Selected Node tab.
-  - PM saves a node without canvas refit.
-  - PM clicks Back to Modules and returns to module library.
+  - Scenario setup creates a deterministic sandbox warning, preferably a fresh
+    sandbox node with blank owner to trigger `missing_owner`.
+  - PM can reach Modules tab via stable selector.
+  - PM selects or creates a node and enters Selected Node tab via stable
+    selector.
+  - PM saves a node without canvas refit by comparing
+    `data-sandbox-zoom/pan-*` before and after save.
+  - PM clicks Back to Modules and returns to module library via stable selector.
   - PM opens Issues tab.
   - Issues show human-readable warnings, not raw warning codes.
 
@@ -330,6 +369,37 @@ Acceptance for SB-Rescue-04:
 - Full QA scenario suite remains green.
 
 ## 5. Testing Requirements Across All Rescue Builds
+
+Stable UI hooks required:
+
+- `[data-sandbox-action-bar]`
+- `[data-sandbox-template-trigger]`
+- `[data-sandbox-save-template-trigger]`
+- `[data-sandbox-apply-button]`
+- `[data-sandbox-apply-status]`
+- `[data-sandbox-warning-chip]`
+- `[data-sandbox-right-panel]`
+- `[data-sandbox-tab="modules"]`
+- `[data-sandbox-tab="selected"]`
+- `[data-sandbox-tab="issues"]`
+- `[data-sandbox-panel="modules"]`
+- `[data-sandbox-panel="selected"]`
+- `[data-sandbox-panel="issues"]`
+- `[data-sandbox-back-to-modules]`
+- `[data-sandbox-module-search]`
+- `[data-sandbox-module-filter]`
+- `[data-sandbox-module-card]`
+- `[data-sandbox-node-save]`
+- `[data-sandbox-node-delete]`
+- `[data-sandbox-issue-code]`
+- `[data-sandbox-issue-message]`
+- `[data-sandbox-fit]`
+- `[data-sandbox-tidy]`
+- `[data-sandbox-reset-view]`
+- `[data-sandbox-workspace][data-sandbox-zoom][data-sandbox-pan-x][data-sandbox-pan-y]`
+
+If a required scenario assertion cannot be written with stable hooks, document
+the gap in `UI_TESTABILITY_GAPS.md` before writing any brittle fallback.
 
 Screenshots:
 
