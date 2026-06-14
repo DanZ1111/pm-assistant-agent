@@ -9,13 +9,21 @@
   var emptyLabel = canvas.dataset.emptyLabel || 'Empty canvas';
   var cy = null;
   var payload = {};
+  var warningCopy = {};
   var selectedNodeId = null;
   var dropModuleKey = null;
+  var activeModuleFilter = 'default';
+  var initialViewport = {zoom: 1, pan: {x: 0, y: 0}};
 
   try {
     payload = JSON.parse(workspace.dataset.payload || '{}');
   } catch (err) {
     payload = {};
+  }
+  try {
+    warningCopy = JSON.parse(workspace.dataset.warningCopy || '{}');
+  } catch (err) {
+    warningCopy = {};
   }
 
   function addDaysIso(dateValue, days) {
@@ -27,21 +35,8 @@
     return date.toISOString().slice(0, 10);
   }
 
-  function initApplyPreview() {
-    var panel = document.querySelector('[data-apply-preview]');
-    var startInput = document.querySelector('[data-apply-start-date]');
-    var endOutput = document.querySelector('[data-apply-end-date]');
-    if (!panel || !startInput || !endOutput) return;
-    var totalDays = Number(panel.dataset.totalDays || 0);
-    var updateEnd = function () {
-      endOutput.textContent = addDaysIso(startInput.value, totalDays) || '—';
-    };
-    startInput.addEventListener('input', updateEnd);
-    updateEnd();
-  }
-
-  function elements() {
-    return payload.elements || [];
+  function endpoint(path) {
+    return '/projects/' + projectId + '/sandbox/' + sandboxId + path;
   }
 
   function postForm(url, data) {
@@ -69,8 +64,60 @@
     });
   }
 
-  function endpoint(path) {
-    return '/projects/' + projectId + '/sandbox/' + sandboxId + path;
+  function elements() {
+    return payload.elements || [];
+  }
+
+  function nodeElements() {
+    return elements().filter(function (el) {
+      return el.data && String(el.data.id || '').indexOf('node-') === 0;
+    });
+  }
+
+  function edgeElements() {
+    return elements().filter(function (el) {
+      return el.data && String(el.data.id || '').indexOf('edge-') === 0;
+    });
+  }
+
+  function findNode(dbId) {
+    return nodeElements().find(function (el) {
+      return String(el.data.db_id) === String(dbId);
+    });
+  }
+
+  function nodeTitle(dbId) {
+    var node = findNode(dbId);
+    return node && node.data ? (node.data.display_label || node.data.label) : ('Node ' + dbId);
+  }
+
+  function findIncomingEdge(fromNodeId, toNodeId) {
+    return edgeElements().find(function (edge) {
+      return String(edge.data.source) === 'node-' + fromNodeId && String(edge.data.target) === 'node-' + toNodeId;
+    });
+  }
+
+  function updateViewportHooks() {
+    if (cy) {
+      var pan = cy.pan();
+      workspace.dataset.sandboxZoom = String(Math.round(cy.zoom() * 10000) / 10000);
+      workspace.dataset.sandboxPanX = String(Math.round(pan.x * 100) / 100);
+      workspace.dataset.sandboxPanY = String(Math.round(pan.y * 100) / 100);
+    }
+    workspace.dataset.sandboxSelectedNodeId = selectedNodeId ? String(selectedNodeId) : '';
+  }
+
+  function initApplyPreview() {
+    var panel = document.querySelector('[data-apply-preview]');
+    var startInput = document.querySelector('[data-apply-start-date]');
+    var endOutput = document.querySelector('[data-apply-end-date]');
+    if (!panel || !startInput || !endOutput) return;
+    var totalDays = Number(panel.dataset.totalDays || 0);
+    var updateEnd = function () {
+      endOutput.textContent = addDaysIso(startInput.value, totalDays) || '—';
+    };
+    startInput.addEventListener('input', updateEnd);
+    updateEnd();
   }
 
   function showMessage(text, isError) {
@@ -90,12 +137,34 @@
 
   function updateSummary() {
     var schedule = payload.schedule || {};
-    var totalDays = document.querySelector('[data-sandbox-total-days]');
-    var nodeCount = document.querySelector('[data-sandbox-node-count]');
-    var warningCount = document.querySelector('[data-sandbox-warning-count]');
-    if (totalDays) totalDays.textContent = schedule.total_days || 0;
-    if (nodeCount) nodeCount.textContent = (schedule.nodes || []).length;
-    if (warningCount) warningCount.textContent = (schedule.soft_warnings || []).length;
+    document.querySelectorAll('[data-sandbox-total-days]').forEach(function (el) {
+      el.textContent = schedule.total_days || 0;
+    });
+    document.querySelectorAll('[data-sandbox-node-count]').forEach(function (el) {
+      el.textContent = (schedule.nodes || []).length;
+    });
+    document.querySelectorAll('[data-sandbox-warning-count]').forEach(function (el) {
+      el.textContent = (schedule.hard_errors || []).length + (schedule.soft_warnings || []).length;
+    });
+  }
+
+  function issueText(issue) {
+    var code = issue && issue.code ? issue.code : String(issue || '');
+    return warningCopy[code] || code;
+  }
+
+  function appendWarningChips(strip, label, warnings) {
+    var labelEl = document.createElement('span');
+    labelEl.className = 'sandbox-warning-label';
+    labelEl.textContent = label;
+    strip.appendChild(labelEl);
+    warnings.forEach(function (warning) {
+      var chip = document.createElement('span');
+      chip.className = 'sandbox-warning-chip';
+      chip.dataset.sandboxWarningChip = '';
+      chip.textContent = issueText(warning);
+      strip.appendChild(chip);
+    });
   }
 
   function updateWarningStrip() {
@@ -117,135 +186,133 @@
     }
   }
 
-  function appendWarningChips(strip, label, warnings) {
-    var labelEl = document.createElement('span');
-    labelEl.className = 'sandbox-warning-label';
-    labelEl.textContent = label;
-    strip.appendChild(labelEl);
-    warnings.forEach(function (warning) {
-      var chip = document.createElement('span');
-      chip.className = 'sandbox-warning-chip';
-      chip.textContent = warning.code || warning;
-      strip.appendChild(chip);
-    });
-  }
-
-  function refreshFromPayload(nextPayload) {
-    payload = nextPayload || payload;
-    canvas.dataset.elements = JSON.stringify(elements());
-    updateSummary();
-    updateWarningStrip();
-    renderCanvas();
-    if (selectedNodeId) {
-      var found = findNode(selectedNodeId);
-      if (found) {
-        selectNode(selectedNodeId);
-      } else {
-        selectedNodeId = null;
-        showPalette();
-      }
-    }
-  }
-
-  function renderCanvas() {
-    if (cy) {
-      cy.destroy();
-      cy = null;
-    }
-    if (!elements().length) {
-      canvas.innerHTML = '<div class="sandbox-canvas-empty">' + emptyLabel + '</div>';
+  function updateIssuesPanel() {
+    var list = document.querySelector('[data-sandbox-issues-list]');
+    if (!list) return;
+    var schedule = payload.schedule || {};
+    var hardErrors = schedule.hard_errors || [];
+    var softWarnings = schedule.soft_warnings || [];
+    list.innerHTML = '';
+    if (!hardErrors.length && !softWarnings.length) {
+      var empty = document.createElement('p');
+      empty.className = 'sandbox-read-only-note';
+      empty.textContent = workspace.dataset.labelNoIssues || 'No issues.';
+      list.appendChild(empty);
       return;
     }
-    canvas.innerHTML = '';
-    cy = cytoscape({
-      container: canvas,
-      elements: elements(),
-      userZoomingEnabled: true,
-      userPanningEnabled: true,
-      boxSelectionEnabled: false,
-      autoungrabify: !canEdit,
-      style: [
-        {
-          selector: 'node',
-          style: {
-            'shape': 'round-rectangle',
-            'width': 190,
-            'height': 'data(node_height)',
-            'background-color': '#ffffff',
-            'border-width': 2,
-            'border-color': '#cbd5e1',
-            'label': 'data(display_label)',
-            'font-size': 13,
-            'font-weight': 700,
-            'color': '#0f172a',
-            'text-wrap': 'wrap',
-            'text-max-width': 160,
-            'text-valign': 'center',
-            'text-halign': 'center'
-          }
-        },
-        {
-          selector: 'node:selected',
-          style: {
-            'border-color': '#2563eb',
-            'border-width': 4,
-            'background-color': '#eff6ff'
-          }
-        },
-        {
-          selector: 'node[phase_type = "launch"]',
-          style: {'border-color': '#22c55e', 'background-color': '#f0fdf4'}
-        },
-        {
-          selector: 'node[phase_type = "production"]',
-          style: {'border-color': '#f59e0b', 'background-color': '#fffbeb'}
-        },
-        {
-          selector: 'node[phase_type = "prototype"]',
-          style: {'border-color': '#3b82f6', 'background-color': '#eff6ff'}
-        },
-        {
-          selector: 'node[duration_bin = "S"]',
-          style: {'height': 66}
-        },
-        {
-          selector: 'node[duration_bin = "M"]',
-          style: {'height': 82}
-        },
-        {
-          selector: 'node[duration_bin = "L"]',
-          style: {'height': 100}
-        },
-        {
-          selector: 'node[duration_bin = "XL"]',
-          style: {'height': 122, 'border-width': 3}
-        },
-        {
-          selector: 'edge',
-          style: {
-            'width': 2,
-            'line-color': '#94a3b8',
-            'target-arrow-color': '#94a3b8',
-            'target-arrow-shape': 'triangle',
-            'curve-style': 'bezier'
-          }
-        },
-        {
-          selector: 'edge:selected',
-          style: {
-            'width': 4,
-            'line-color': '#2563eb',
-            'target-arrow-color': '#2563eb'
-          }
-        }
-      ],
-      layout: {
-        name: 'preset',
-        fit: true,
-        padding: 40
-      }
+    hardErrors.forEach(function (issue) {
+      list.appendChild(issueCard(issue, workspace.dataset.labelWarningHard || 'Hard error', true));
     });
+    softWarnings.forEach(function (issue) {
+      list.appendChild(issueCard(issue, workspace.dataset.labelWarningSoft || 'Warning', false));
+    });
+  }
 
+  function issueCard(issue, label, isHard) {
+    var card = document.createElement('article');
+    card.className = 'sandbox-issue-card' + (isHard ? ' sandbox-issue-card-hard' : '');
+    var type = document.createElement('span');
+    type.className = 'sandbox-issue-type';
+    type.textContent = label;
+    var message = document.createElement('strong');
+    message.dataset.sandboxIssueMessage = '';
+    message.textContent = issueText(issue);
+    var code = document.createElement('code');
+    code.dataset.sandboxIssueCode = '';
+    code.dataset.issueCode = issue && issue.code ? issue.code : String(issue || '');
+    code.className = 'visually-hidden';
+    card.appendChild(type);
+    card.appendChild(message);
+    card.appendChild(code);
+    return card;
+  }
+
+  function setActiveTab(tabName) {
+    // data-sandbox-palette is the persistent Modules tab; older Build 04
+    // regressions look for this marker to prove palette mode still exists.
+    var target = tabName || 'modules';
+    document.querySelectorAll('[data-sandbox-tab]').forEach(function (tab) {
+      tab.classList.toggle('is-active', tab.dataset.sandboxTab === target);
+    });
+    document.querySelectorAll('[data-sandbox-panel]').forEach(function (panel) {
+      panel.hidden = panel.dataset.sandboxPanel !== target;
+    });
+  }
+
+  function showPalette() {
+    selectedNodeId = null;
+    setActiveTab('modules');
+    if (cy) cy.elements().unselect();
+    updateViewportHooks();
+  }
+
+  function nodeStyle() {
+    // Backend still emits duration_bin for schedule/debug consumers; the UI
+    // rescue intentionally uses fixed compact node height instead.
+    return [
+      {
+        selector: 'node',
+        style: {
+          'shape': 'round-rectangle',
+          'width': 164,
+          'height': 74,
+          'background-color': '#ffffff',
+          'border-width': 2,
+          'border-color': '#94a3b8',
+          'label': 'data(display_label)',
+          'font-size': 12,
+          'font-weight': 750,
+          'color': '#0f172a',
+          'text-wrap': 'wrap',
+          'text-max-width': 132,
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'padding': 8
+        }
+      },
+      {
+        selector: 'node:selected',
+        style: {
+          'border-color': '#2563eb',
+          'border-width': 4,
+          'background-color': '#eff6ff'
+        }
+      },
+      {
+        selector: 'node[phase_type = "launch"]',
+        style: {'border-color': '#16a34a', 'background-color': '#f0fdf4'}
+      },
+      {
+        selector: 'node[phase_type = "production"]',
+        style: {'border-color': '#d97706', 'background-color': '#fffbeb'}
+      },
+      {
+        selector: 'node[phase_type = "prototype"]',
+        style: {'border-color': '#2563eb', 'background-color': '#eff6ff'}
+      },
+      {
+        selector: 'edge',
+        style: {
+          'width': 3.5,
+          'line-color': '#334155',
+          'target-arrow-color': '#334155',
+          'target-arrow-shape': 'triangle',
+          'arrow-scale': 1.25,
+          'curve-style': 'bezier'
+        }
+      },
+      {
+        selector: 'edge:selected',
+        style: {
+          'width': 5,
+          'line-color': '#2563eb',
+          'target-arrow-color': '#2563eb'
+        }
+      }
+    ];
+  }
+
+  function bindCyEvents() {
     cy.on('tap', 'node', function (event) {
       selectNode(event.target.data('db_id'));
     });
@@ -253,23 +320,28 @@
       if (cy) {
         cy.elements().unselect();
         event.target.select();
+        updateViewportHooks();
       }
     });
     cy.on('tap', function (event) {
       if (event.target === cy) {
-        selectedNodeId = null;
         showPalette();
       }
     });
+    cy.on('pan zoom', updateViewportHooks);
     if (canEdit) {
       cy.on('dragfree', 'node', function (event) {
         var node = event.target;
         var position = node.position();
+        updateViewportHooks();
         postForm(endpoint('/nodes/' + node.data('db_id') + '/position'), {
           x_position: position.x,
           y_position: position.y
         }).then(function (json) {
           payload = json.sandbox_payload || payload;
+          updateSummary();
+          updateWarningStrip();
+          updateIssuesPanel();
         }).catch(function (err) {
           showMessage(workspace.dataset.labelNodeError || err.message, true);
         });
@@ -277,41 +349,92 @@
     }
   }
 
-  function findNode(dbId) {
-    return elements().find(function (el) {
-      return el.data && String(el.data.db_id) === String(dbId) && String(el.data.id || '').indexOf('node-') === 0;
+  function ensureCy(shouldFit) {
+    if (!elements().length) {
+      if (cy) {
+        cy.destroy();
+        cy = null;
+      }
+      canvas.innerHTML = '<div class="sandbox-canvas-empty">' + emptyLabel + '</div>';
+      updateViewportHooks();
+      return;
+    }
+    if (cy) return;
+    canvas.innerHTML = '';
+    cy = cytoscape({
+      container: canvas,
+      elements: elements(),
+      userZoomingEnabled: false,
+      userPanningEnabled: true,
+      boxSelectionEnabled: false,
+      autoungrabify: !canEdit,
+      style: nodeStyle(),
+      layout: {
+        name: 'preset',
+        fit: !!shouldFit,
+        padding: 46
+      }
+    });
+    bindCyEvents();
+    if (shouldFit) {
+      initialViewport = {zoom: cy.zoom(), pan: cy.pan()};
+    }
+    updateViewportHooks();
+  }
+
+  function applyElementDiff() {
+    if (!cy) return;
+    var next = elements();
+    var nextById = {};
+    next.forEach(function (el) {
+      if (el.data && el.data.id) nextById[el.data.id] = el;
+    });
+    cy.elements().forEach(function (ele) {
+      if (!nextById[ele.id()]) {
+        ele.remove();
+      }
+    });
+    next.forEach(function (el) {
+      var id = el.data && el.data.id;
+      if (!id) return;
+      var existing = cy.getElementById(id);
+      if (existing && existing.length) {
+        existing.data(el.data || {});
+        if (el.position && existing.isNode()) {
+          existing.position(el.position);
+        }
+      } else {
+        cy.add(el);
+      }
     });
   }
 
-  function nodeElements() {
-    return elements().filter(function (el) {
-      return el.data && String(el.data.id || '').indexOf('node-') === 0;
-    });
-  }
-
-  function edgeElements() {
-    return elements().filter(function (el) {
-      return el.data && String(el.data.id || '').indexOf('edge-') === 0;
-    });
-  }
-
-  function nodeTitle(dbId) {
-    var node = findNode(dbId);
-    return node && node.data ? (node.data.display_label || node.data.label) : ('Node ' + dbId);
-  }
-
-  function findIncomingEdge(fromNodeId, toNodeId) {
-    return edgeElements().find(function (edge) {
-      return String(edge.data.source) === 'node-' + fromNodeId && String(edge.data.target) === 'node-' + toNodeId;
-    });
-  }
-
-  function showPalette() {
-    var palette = document.querySelector('[data-sandbox-palette]');
-    var properties = document.querySelector('[data-sandbox-properties]');
-    if (palette) palette.hidden = false;
-    if (properties) properties.hidden = true;
-    if (cy) cy.elements().unselect();
+  function refreshFromPayload(nextPayload, options) {
+    options = options || {};
+    var viewport = cy ? {zoom: cy.zoom(), pan: cy.pan()} : null;
+    payload = nextPayload || payload;
+    canvas.dataset.elements = JSON.stringify(elements());
+    updateSummary();
+    updateWarningStrip();
+    updateIssuesPanel();
+    ensureCy(!cy && options.fit !== false);
+    if (cy) {
+      applyElementDiff();
+      if (viewport && !options.fit) {
+        cy.zoom(viewport.zoom);
+        cy.pan(viewport.pan);
+      } else if (options.fit) {
+        cy.fit(undefined, 46);
+      }
+    }
+    if (selectedNodeId && findNode(selectedNodeId)) {
+      selectNode(selectedNodeId, {preserveViewport: true});
+    } else if (selectedNodeId) {
+      showPalette();
+    } else {
+      updateViewportHooks();
+    }
+    filterModules();
   }
 
   function populateDependencyPanel(data) {
@@ -360,10 +483,7 @@
       showPalette();
       return;
     }
-    var palette = document.querySelector('[data-sandbox-palette]');
-    var properties = document.querySelector('[data-sandbox-properties]');
-    if (palette) palette.hidden = true;
-    if (properties) properties.hidden = false;
+    setActiveTab('selected');
     var data = node.data || {};
     var set = function (selector, value) {
       var field = document.querySelector(selector);
@@ -379,18 +499,21 @@
     if (cy) {
       cy.elements().unselect();
       var cyNode = cy.getElementById('node-' + data.db_id);
-      if (cyNode) cyNode.select();
+      if (cyNode && cyNode.length) cyNode.select();
     }
+    updateViewportHooks();
   }
 
   function addModule(moduleKey, position) {
     if (!canEdit || !moduleKey) return;
     postForm(endpoint('/nodes/add'), {
       module_key: moduleKey,
-      x_position: position && position.x !== undefined ? position.x : 80,
-      y_position: position && position.y !== undefined ? position.y : 80
+      x_position: position && position.x !== undefined ? position.x : 120,
+      y_position: position && position.y !== undefined ? position.y : 120
     }).then(function (json) {
-      refreshFromPayload(json.sandbox_payload);
+      selectedNodeId = null;
+      refreshFromPayload(json.sandbox_payload, {fit: false});
+      setActiveTab('modules');
     }).catch(function (err) {
       showMessage(workspace.dataset.labelNodeError || err.message, true);
     });
@@ -412,7 +535,7 @@
     postForm(endpoint('/nodes/positions'), {
       positions_json: JSON.stringify(collectPositions())
     }).then(function (json) {
-      refreshFromPayload(json.sandbox_payload);
+      refreshFromPayload(json.sandbox_payload, {fit: false});
       showMessage(workspace.dataset.labelTidySaved || 'Canvas tidied.', false);
     }).catch(function (err) {
       showMessage(workspace.dataset.labelTidyError || err.message, true);
@@ -433,8 +556,8 @@
     });
     nodes.forEach(function (node, index) {
       node.position({
-        x: 140 + (index % 3) * 260,
-        y: 120 + Math.floor(index / 3) * 160
+        x: 130 + index * 210,
+        y: 170 + (index % 2) * 95
       });
     });
   }
@@ -446,17 +569,18 @@
     var persistOnce = function () {
       if (persisted) return;
       persisted = true;
+      cy.fit(undefined, 52);
+      updateViewportHooks();
       persistTidyPositions();
     };
     try {
       var layout = cy.layout({
         name: 'dagre',
-        rankDir: 'TB',
-        nodeSep: 80,
-        rankSep: 110,
+        rankDir: 'LR',
+        nodeSep: 64,
+        rankSep: 120,
         animate: false,
-        fit: true,
-        padding: 40
+        fit: false
       });
       layout.on('layoutstop', persistOnce);
       layout.run();
@@ -467,9 +591,70 @@
     }
   }
 
+  function filterModules() {
+    var search = document.querySelector('[data-sandbox-module-search]');
+    var query = search ? search.value.trim().toLowerCase() : '';
+    document.querySelectorAll('[data-sandbox-module-card]').forEach(function (card) {
+      var title = (card.dataset.moduleTitle || '').toLowerCase();
+      var category = card.dataset.moduleCategory || '';
+      var isAdvanced = card.dataset.moduleAdvanced === 'true';
+      var matchesSearch = !query || title.indexOf(query) !== -1 || (card.textContent || '').toLowerCase().indexOf(query) !== -1;
+      var matchesFilter = true;
+      if (activeModuleFilter === 'default') matchesFilter = !isAdvanced;
+      if (activeModuleFilter === 'advanced') matchesFilter = isAdvanced;
+      if (!['default', 'advanced'].includes(activeModuleFilter)) matchesFilter = category === activeModuleFilter && !isAdvanced;
+      card.hidden = !(matchesSearch && matchesFilter);
+    });
+    document.querySelectorAll('[data-module-group]').forEach(function (group) {
+      var visible = Array.prototype.slice.call(group.querySelectorAll('[data-sandbox-module-card]')).some(function (card) {
+        return !card.hidden;
+      });
+      group.hidden = !visible;
+    });
+  }
+
+  function fitCanvas() {
+    if (!cy || !cy.elements().length) return;
+    cy.fit(undefined, 52);
+    updateViewportHooks();
+  }
+
+  function resetCanvasView() {
+    if (!cy) return;
+    cy.zoom(initialViewport.zoom || 1);
+    cy.pan(initialViewport.pan || {x: 0, y: 0});
+    updateViewportHooks();
+  }
+
+  document.querySelectorAll('[data-sandbox-tab]').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      setActiveTab(tab.dataset.sandboxTab);
+    });
+  });
+
+  document.querySelectorAll('[data-sandbox-tab-target]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      setActiveTab(button.dataset.sandboxTabTarget);
+    });
+  });
+
+  document.querySelectorAll('[data-sandbox-template-trigger], [data-sandbox-save-template-trigger]').forEach(function (trigger) {
+    trigger.addEventListener('click', function () {
+      var details = trigger.closest('details');
+      window.setTimeout(function () {
+        if (details) details.open = true;
+      }, 0);
+    });
+  });
+
+  var backToModules = document.querySelector('[data-sandbox-back-to-modules]');
+  if (backToModules) {
+    backToModules.addEventListener('click', showPalette);
+  }
+
   document.querySelectorAll('.sandbox-add-module-btn').forEach(function (button) {
     button.addEventListener('click', function () {
-      addModule(button.dataset.moduleKey, {x: 120, y: 120});
+      addModule(button.dataset.moduleKey, {x: 140, y: 160});
     });
   });
 
@@ -483,6 +668,26 @@
     });
   });
 
+  var moduleSearch = document.querySelector('[data-sandbox-module-search]');
+  if (moduleSearch) {
+    moduleSearch.addEventListener('input', filterModules);
+  }
+  document.querySelectorAll('[data-sandbox-module-filter]').forEach(function (button) {
+    button.addEventListener('click', function () {
+      activeModuleFilter = button.dataset.sandboxModuleFilter || 'default';
+      document.querySelectorAll('[data-sandbox-module-filter]').forEach(function (other) {
+        other.classList.toggle('is-active', other === button);
+      });
+      filterModules();
+    });
+  });
+
+  var fitButton = document.querySelector('[data-sandbox-fit]');
+  if (fitButton) fitButton.addEventListener('click', fitCanvas);
+
+  var resetButton = document.querySelector('[data-sandbox-reset-view]');
+  if (resetButton) resetButton.addEventListener('click', resetCanvasView);
+
   var tidyButton = document.querySelector('[data-tidy-canvas]');
   if (tidyButton && canEdit) {
     tidyButton.addEventListener('click', tidyCanvas);
@@ -495,11 +700,8 @@
     canvas.addEventListener('drop', function (event) {
       event.preventDefault();
       var moduleKey = dropModuleKey || (event.dataTransfer && event.dataTransfer.getData('text/plain'));
-      var rect = canvas.getBoundingClientRect();
-      addModule(moduleKey, {
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top
-      });
+      var rendered = cy ? cy.renderer().projectIntoViewport(event.clientX, event.clientY) : null;
+      addModule(moduleKey, rendered ? {x: rendered[0], y: rendered[1]} : {x: 140, y: 160});
       dropModuleKey = null;
     });
   }
@@ -516,7 +718,8 @@
         data[key] = value;
       });
       postForm(endpoint('/nodes/' + nodeId + '/update'), data).then(function (json) {
-        refreshFromPayload(json.sandbox_payload);
+        selectedNodeId = nodeId;
+        refreshFromPayload(json.sandbox_payload, {fit: false});
         showMessage(workspace.dataset.labelNodeSaved || 'Node saved.', false);
       }).catch(function (err) {
         showMessage(workspace.dataset.labelNodeError || err.message, true);
@@ -537,7 +740,8 @@
       postForm(endpoint('/nodes/' + nodeId + '/dependencies'), {
         depends_on_ids: selected
       }).then(function (json) {
-        refreshFromPayload(json.sandbox_payload);
+        selectedNodeId = nodeId;
+        refreshFromPayload(json.sandbox_payload, {fit: false});
         showMessage(workspace.dataset.labelDependenciesSaved || 'Dependencies saved.', false);
       }).catch(function (err) {
         var message = err.message === 'circular_dependency'
@@ -554,7 +758,7 @@
       var button = event.target.closest('[data-delete-edge-id]');
       if (!button) return;
       postForm(endpoint('/edges/' + button.dataset.deleteEdgeId + '/delete'), {}).then(function (json) {
-        refreshFromPayload(json.sandbox_payload);
+        refreshFromPayload(json.sandbox_payload, {fit: false});
         showMessage(workspace.dataset.labelDependenciesSaved || 'Dependencies saved.', false);
       }).catch(function (err) {
         showMessage(workspace.dataset.labelDependencyError || err.message, true);
@@ -570,7 +774,7 @@
       if (!window.confirm(workspace.dataset.confirmDelete || 'Delete this sandbox node?')) return;
       postForm(endpoint('/nodes/' + nodeId + '/delete'), {}).then(function (json) {
         selectedNodeId = null;
-        refreshFromPayload(json.sandbox_payload);
+        refreshFromPayload(json.sandbox_payload, {fit: false});
         showPalette();
       }).catch(function (err) {
         showMessage(workspace.dataset.labelNodeError || err.message, true);
@@ -578,9 +782,27 @@
     });
   }
 
-  renderCanvas();
+  ensureCy(true);
   updateSummary();
   updateWarningStrip();
+  updateIssuesPanel();
   initApplyPreview();
+  filterModules();
   showPalette();
+  window.__planningSandboxQA = {
+    selectFirstNode: function () {
+      var first = nodeElements()[0];
+      if (!first || !first.data) return null;
+      selectNode(first.data.db_id);
+      return first.data.db_id;
+    },
+    viewport: function () {
+      return {
+        zoom: workspace.dataset.sandboxZoom,
+        panX: workspace.dataset.sandboxPanX,
+        panY: workspace.dataset.sandboxPanY,
+        selectedNodeId: workspace.dataset.sandboxSelectedNodeId
+      };
+    }
+  };
 })();

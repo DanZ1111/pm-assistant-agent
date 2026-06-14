@@ -19,7 +19,7 @@ from app.dependencies import (
     can_use_ai_intake,
     _RedirectException
 )
-from app.i18n import get_locale, i18n_context, translate_phase_name
+from app.i18n import DEFAULT_LOCALE, TRANSLATIONS, get_locale, i18n_context, translate_phase_name
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -97,6 +97,52 @@ def _localize_sandbox_payload(payload: dict | None, locale: str) -> dict | None:
     for module in payload.get("modules", []):
         module["display_title"] = translate_phase_name(module.get("title"), locale)
     return payload
+
+
+_SANDBOX_ADVANCED_MODULE_KEYS = {
+    # v1.4 sandbox UI rescue: keep granular engineering validation rows in the
+    # database, but hide them from the default PM milestone picker.
+    "blade_steel_validation",
+    "handle_material_validation",
+}
+
+_SANDBOX_WARNING_COPY_KEYS = {
+    "zero_nodes": "sandbox.warning_zero_nodes",
+    "missing_title": "sandbox.warning_missing_title",
+    "invalid_duration": "sandbox.warning_invalid_duration",
+    "dangling_edge": "sandbox.warning_dangling_edge",
+    "cross_sandbox_edge": "sandbox.warning_cross_sandbox_edge",
+    "circular_dependency": "sandbox.warning_circular_dependency",
+    "preconditions_failed": "sandbox.warning_preconditions_failed",
+    "terminal_not_launch_like": "sandbox.warning_terminal_not_launch_like",
+    "missing_owner": "sandbox.warning_missing_owner",
+    "disconnected_branch": "sandbox.warning_disconnected_branch",
+}
+
+
+def _bundle_text(locale: str, key: str) -> str:
+    return (
+        TRANSLATIONS.get(locale, {}).get(key)
+        or TRANSLATIONS.get(DEFAULT_LOCALE, {}).get(key)
+        or key
+    )
+
+
+def _sandbox_warning_copy(locale: str) -> dict[str, str]:
+    return {
+        code: _bundle_text(locale, key)
+        for code, key in _SANDBOX_WARNING_COPY_KEYS.items()
+    }
+
+
+def _prepare_sandbox_modules(payload: dict | None) -> dict:
+    modules_by_category = {}
+    if not payload:
+        return modules_by_category
+    for module in payload.get("modules", []):
+        module["is_advanced"] = module.get("module_key") in _SANDBOX_ADVANCED_MODULE_KEYS
+        modules_by_category.setdefault(module.get("category") or "Other", []).append(module)
+    return modules_by_category
 
 
 def _save_uploaded_business_plan(
@@ -974,14 +1020,12 @@ def planning_sandbox(
         "modules": payload["modules"],
         "schedule": payload["schedule"],
     }) if payload else "{}"
-    modules_by_category = {}
-    if payload:
-        for module in payload.get("modules", []):
-            modules_by_category.setdefault(module.get("category") or "Other", []).append(module)
+    modules_by_category = _prepare_sandbox_modules(payload)
     apply_preview = (
         crud.get_sandbox_apply_preview(db, project_id, sandbox.id)
         if sandbox else None
     )
+    warning_copy = _sandbox_warning_copy(locale)
 
     return templates.TemplateResponse(request, "planning_sandbox.html", {
         "project": project,
@@ -996,6 +1040,8 @@ def planning_sandbox(
         "sandbox_payload": payload,
         "modules_by_category": modules_by_category,
         "apply_preview": apply_preview,
+        "sandbox_warning_copy": warning_copy,
+        "sandbox_warning_copy_json": json.dumps(warning_copy),
         "sandbox_elements_json": json.dumps(payload["elements"] if payload else []),
         "sandbox_payload_json": sandbox_payload_json,
         **i18n_context(request, current_user),
