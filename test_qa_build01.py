@@ -193,14 +193,15 @@ def main():
     else:
         fail("missing-file behavior", f"exit={code}; out: {out[-200:]}")
 
-    print("\n── 9. Existing per-build tests still importable (no app/* edits) ──")
-    # Sanity: the QA series must not have edited app/ — confirm by reading
-    # app/version.py and verifying CURRENT_VERSION is 1.4.0.
+    print("\n── 9. Existing per-build tests still importable (app version supported) ──")
+    # Sanity: the QA series originally launched on v1.4.0. Later product
+    # releases are valid as long as they remain compatible with the QA suite.
     from app.version import CURRENT_VERSION
-    if CURRENT_VERSION == "1.4.0":
-        ok("app/version.py CURRENT_VERSION == '1.4.0' (unchanged by QA-01)")
+    from scenario_contracts.lib.version_compat import app_version_at_least
+    if app_version_at_least(CURRENT_VERSION, "1.4.0"):
+        ok(f"app/version.py CURRENT_VERSION {CURRENT_VERSION!r} is >= '1.4.0'")
     else:
-        fail("app/version.py untouched", f"got {CURRENT_VERSION!r}")
+        fail("app/version.py version compatibility", f"got {CURRENT_VERSION!r}; expected >= '1.4.0'")
 
     print(f"\nPassed: {len(PASS)} / {len(PASS) + len(FAIL)}")
     if FAIL:

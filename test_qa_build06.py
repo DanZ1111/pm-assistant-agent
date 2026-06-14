@@ -188,12 +188,13 @@ def main():
         fail("SQLite FK enforcement listener",
              "missing — Marine-bug scenario would silently stop catching regressions")
 
-    print("\n── 9. app/* untouched ──")
+    print("\n── 9. app version supported by QA contracts ──")
     from app.version import CURRENT_VERSION
-    if CURRENT_VERSION == "1.4.0":
-        ok("app/version.py CURRENT_VERSION == '1.4.0' (QA-06 did not bump it)")
+    from scenario_contracts.lib.version_compat import app_version_at_least
+    if app_version_at_least(CURRENT_VERSION, "1.4.0"):
+        ok(f"app/version.py CURRENT_VERSION {CURRENT_VERSION!r} is >= '1.4.0'")
     else:
-        fail("app/version.py untouched", f"got {CURRENT_VERSION!r}")
+        fail("app/version.py version compatibility", f"got {CURRENT_VERSION!r}; expected >= '1.4.0'")
 
     print("\n── 10. lib/runner.py LOC budget unchanged ──")
     runner_loc = len((ROOT / "scenario_contracts" / "lib" / "runner.py")

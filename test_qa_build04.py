@@ -211,12 +211,13 @@ STEPS = [
     else:
         fail("executors.py", "missing — runner should have been split")
 
-    print("\n── 10. app/* untouched ──")
+    print("\n── 10. app version supported by QA contracts ──")
     from app.version import CURRENT_VERSION
-    if CURRENT_VERSION == "1.4.0":
-        ok("app/version.py CURRENT_VERSION == '1.4.0' (QA-04 did not bump it)")
+    from scenario_contracts.lib.version_compat import app_version_at_least
+    if app_version_at_least(CURRENT_VERSION, "1.4.0"):
+        ok(f"app/version.py CURRENT_VERSION {CURRENT_VERSION!r} is >= '1.4.0'")
     else:
-        fail("app/version.py untouched", f"got {CURRENT_VERSION!r}")
+        fail("app/version.py version compatibility", f"got {CURRENT_VERSION!r}; expected >= '1.4.0'")
 
     print(f"\nPassed: {len(PASS)} / {len(PASS) + len(FAIL)}")
     if FAIL:

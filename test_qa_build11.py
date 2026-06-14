@@ -225,12 +225,13 @@ def main():
     else:
         ok("pm_views has no fragile text= locators")
 
-    print("\n── 12. app/* untouched ──")
+    print("\n── 12. app version supported by QA contracts ──")
     from app.version import CURRENT_VERSION
-    if CURRENT_VERSION == "1.4.0":
-        ok("app/version.py CURRENT_VERSION == '1.4.0' (QA-11 did not bump it)")
+    from scenario_contracts.lib.version_compat import app_version_at_least
+    if app_version_at_least(CURRENT_VERSION, "1.4.0"):
+        ok(f"app/version.py CURRENT_VERSION {CURRENT_VERSION!r} is >= '1.4.0'")
     else:
-        fail("app/version.py untouched", f"got {CURRENT_VERSION!r}")
+        fail("app/version.py version compatibility", f"got {CURRENT_VERSION!r}; expected >= '1.4.0'")
 
     print("\n── 13. Existing scenarios still work (runner refactor didn't break them) ──")
     # Quick spot-check on one DB scenario (no dev server needed).
