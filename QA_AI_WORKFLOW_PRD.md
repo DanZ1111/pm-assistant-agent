@@ -12,6 +12,23 @@ workflow scenarios, while deterministic Python/Playwright tests remain the final
 release gate. AI should help us discover missing coverage and weak assertions;
 it should not become a nondeterministic pass/fail judge.
 
+## 2026-06-16 Revision After Claude Review
+
+Claude reviewed the first version of this PRD against QA Build 11 and correctly
+flagged that the first draft overreached into meta-tooling. The immediate path is
+now journey-first:
+
+- Do not start with a coverage matrix.
+- Do not add live AI scenario generation.
+- Add realistic PM acceptance journeys first.
+- Expand action/assertion helpers only when a journey needs them.
+- Keep AI as a conversation-time drafting/review aid, not a release-gate judge.
+
+QA Build 12 implements this revised direction with two concrete journeys:
+
+1. AI prototype approval confirmation guard.
+2. Planning Sandbox parallel workflow planning.
+
 ## Problem
 
 The sandbox failures exposed a coverage gap:
@@ -165,39 +182,42 @@ or reports. It must not decide pass/fail and must not mutate app data.
 7. Verify Prototype starts after both upstream branches are complete.
 8. Verify warnings are human-readable and apply status is understandable.
 
-## Proposed Build Breakdown
+## Deferred Build Ideas
 
-### QA-v2 Build 01 — Coverage Matrix And Rules
+The original draft listed these as a six-build program. They are now deferred
+until the acceptance tier proves that additional tooling is actually needed.
+
+### Coverage Matrix And Rules
 
 - Add the QA coverage matrix format.
 - Add scenario metadata expectations for feature, PRD reference, buttons touched,
   and truth tiers.
 - Add a coverage/lint report that identifies uncovered critical workflows.
 
-### QA-v2 Build 02 — PM Workflow Actions
+### PM Workflow Actions
 
 - Expand deterministic scenario helpers for AI intake, timeline actions,
   sandbox interactions, and history assertions.
 - Add stable selector requirements where scenarios need them.
 
-### QA-v2 Build 03 — Sandbox Acceptance Journeys
+### Sandbox Acceptance Journeys
 
 - Add journeys for template use, graph appearance, node connection,
   selected-node recovery, parallel branches, warning comprehension, and apply
   readiness.
 
-### QA-v2 Build 04 — Timeline And AI Intake Journeys
+### Timeline And AI Intake Journeys
 
 - Add journeys for prototype approval, delay/blocker handling, due-date changes,
   phase advancement, and history visibility.
 
-### QA-v2 Build 05 — AI Reviewer Prompt Pack
+### AI Reviewer Prompt Pack
 
 - Add prompt templates/instructions for AI scenario generation and coverage
   critique.
 - Keep this offline/manual first; no live model dependency required.
 
-### QA-v2 Build 06 — Optional Live AI Draft Generator
+### Optional Live AI Draft Generator
 
 - Add an environment-gated draft generator using a configured LLM.
 - Output draft scenario proposals and review notes only.
