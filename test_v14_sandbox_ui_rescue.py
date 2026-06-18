@@ -55,6 +55,7 @@ def test_source_locks():
             "data-sandbox-tab=\"selected\"",
             "data-sandbox-tab=\"issues\"",
             "data-sandbox-back-to-modules",
+            "data-sandbox-connect-from",
             "data-sandbox-module-search",
             "data-sandbox-module-filter",
             "data-sandbox-apply-button",
@@ -74,6 +75,10 @@ def test_source_locks():
             "existing.data(el.data || {})",
             "userZoomingEnabled: false",
             "dataset.sandboxZoom",
+            "connectSourceNodeId",
+            "created_node_id",
+            "endpoint('/edges')",
+            "setConnectSource",
             "__planningSandboxQA",
             "selectFirstNode",
             "duration_bin",
@@ -91,6 +96,8 @@ def test_source_locks():
             "blade_steel_validation",
             "handle_material_validation",
             "_SANDBOX_WARNING_COPY_KEYS",
+            "replace_existing=True",
+            '"created_node_id": node.id',
             "sandbox.warning_missing_owner",
             "sandbox_warning_copy_json",
         ],
@@ -105,6 +112,7 @@ def test_source_locks():
             ".sandbox-filter-chip",
             ".sandbox-issue-card",
             ".sandbox-module-card-main",
+            ".sandbox-property-actions .is-connecting",
         ],
     )
     required_keys = [
@@ -116,6 +124,10 @@ def test_source_locks():
         "sandbox.search_modules",
         "sandbox.filter_advanced",
         "sandbox.back_to_modules",
+        "sandbox.connect_from_node",
+        "sandbox.connect_ready",
+        "sandbox.connect_saved",
+        "sandbox.connect_error",
         "sandbox.warning_missing_owner",
         "sandbox.warning_terminal_not_launch_like",
     ]
@@ -130,7 +142,7 @@ def test_route_smoke():
     from fastapi.testclient import TestClient
     from app.main import app
     from app.database import SessionLocal
-    from app.models import Project
+    from app.models import PlanningSandbox, Project
     import app.crud as crud
 
     client = TestClient(app)
@@ -174,6 +186,49 @@ def test_route_smoke():
             ok("In-process sandbox route renders rescued workspace")
         else:
             fail("In-process sandbox route", f"status={response.status_code}")
+
+        before = (
+            db.query(PlanningSandbox)
+            .filter(PlanningSandbox.project_id == project.id, PlanningSandbox.status == "draft")
+            .first()
+        )
+        before_key = before.base_template_key if before else None
+        before_node_count = len(before.nodes) if before else None
+        reset = client.post(
+            f"/projects/{project.id}/sandbox/create",
+            data={"template_key": "standard_folding_knife"},
+            cookies=login.cookies,
+            follow_redirects=False,
+        )
+        db.expire_all()
+        after = (
+            db.query(PlanningSandbox)
+            .filter(PlanningSandbox.project_id == project.id, PlanningSandbox.status == "draft")
+            .first()
+        )
+        if (
+            reset.status_code in (302, 303)
+            and after
+            and before_key != "standard_folding_knife"
+            and after.base_template_key == "standard_folding_knife"
+            and len(after.nodes) != before_node_count
+            and len(after.nodes) > 0
+            and len(after.edges) > 0
+        ):
+            ok("Template picker route replaces the current draft with the chosen template graph")
+        else:
+            fail(
+                "Template picker reset",
+                {
+                    "status": reset.status_code,
+                    "before_key": before_key,
+                    "before_node_count": before_node_count,
+                    "after_id": after.id if after else None,
+                    "base_template_key": after.base_template_key if after else None,
+                    "nodes": len(after.nodes) if after else None,
+                    "edges": len(after.edges) if after else None,
+                },
+            )
     finally:
         if project is not None:
             db.delete(project)
@@ -181,11 +236,49 @@ def test_route_smoke():
         db.close()
 
 
+def test_sb_rescue_03_stay_on_modules_lock():
+    """SB-Rescue-03 lock: Add Module must leave the panel on the Modules
+    tab and must NOT auto-select the newly-created node. This lock exists
+    because the QA-12 session previously drifted from the SB-Rescue-03
+    plan by switching the JS to `selectNode(createdNodeId)` after add,
+    which made the QA-12 scenario shorter but broke the user-facing
+    workflow. See CLAUDE.md "Spec Drift Gate" for the full case study.
+    """
+    import re
+
+    js = read("app/static/js/planning_sandbox.js")
+    match = re.search(
+        r"function addModule\([^)]*\)\s*\{(.+?)\n  \}",
+        js,
+        re.DOTALL,
+    )
+    if not match:
+        fail("addModule body extractable", "could not locate addModule function")
+        return
+    body = match.group(1)
+    if "setActiveTab('modules')" in body:
+        ok("addModule body calls setActiveTab('modules') after add (SB-Rescue-03 lock)")
+    else:
+        fail(
+            "SB-Rescue-03 lock: addModule must end on Modules tab",
+            "missing setActiveTab('modules') in addModule body",
+        )
+    if "selectNode(createdNodeId)" in body:
+        fail(
+            "SB-Rescue-03 lock: addModule must NOT auto-select created node",
+            "selectNode(createdNodeId) present in addModule body — drift re-introduced",
+        )
+    else:
+        ok("addModule body does not auto-select created node (no SB-Rescue-03 drift)")
+
+
 def main():
     print("\n── 1. Source locks ──")
     test_source_locks()
     print("\n── 2. In-process route smoke ──")
     test_route_smoke()
+    print("\n── 3. SB-Rescue-03 stay-on-Modules lock ──")
+    test_sb_rescue_03_stay_on_modules_lock()
     print("\n── Summary ──")
     print(f"PASSED: {len(PASS)}")
     print(f"FAILED: {len(FAIL)}")

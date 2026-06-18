@@ -2409,15 +2409,26 @@ def _sandbox_duration_bin(duration_days: int | None) -> tuple[str, int]:
     return "XL", 122
 
 
-def create_sandbox_blank(db: Session, project_id: int, user_id: int | None = None) -> PlanningSandbox:
-    """v1.4 Build 03 — create the project's draft sandbox with no nodes.
-
-    If a draft already exists, return it. This mirrors the one-draft lock and
-    keeps double-clicks from creating duplicate drafts.
-    """
+def _delete_active_draft_sandbox(db: Session, project_id: int) -> None:
     existing = get_active_planning_sandbox(db, project_id)
     if existing:
-        return existing
+        db.delete(existing)
+        db.flush()
+
+
+def create_sandbox_blank(
+    db: Session,
+    project_id: int,
+    user_id: int | None = None,
+    replace_existing: bool = False,
+) -> PlanningSandbox:
+    """Create or reset the project's blank draft sandbox."""
+    existing = get_active_planning_sandbox(db, project_id)
+    if existing:
+        if replace_existing:
+            _delete_active_draft_sandbox(db, project_id)
+        else:
+            return existing
     now = datetime.utcnow()
     sandbox = PlanningSandbox(
         project_id=project_id,
@@ -2439,11 +2450,15 @@ def create_sandbox_from_template(
     template_key: str,
     user_id: int | None = None,
     user_role: str | None = None,
+    replace_existing: bool = False,
 ) -> PlanningSandbox:
     """Clone a PlanningTemplate graph into the project's draft sandbox."""
     existing = get_active_planning_sandbox(db, project_id)
     if existing:
-        return existing
+        if replace_existing:
+            _delete_active_draft_sandbox(db, project_id)
+        else:
+            return existing
 
     template_q = db.query(PlanningTemplate).filter(
         PlanningTemplate.template_key == template_key,

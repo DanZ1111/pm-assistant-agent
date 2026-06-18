@@ -156,6 +156,9 @@
            data-label-warning-hard="{{ t('sandbox.warning_hard_label') }}"
            data-label-warning-soft="{{ t('sandbox.warning_soft_label') }}"
            data-label-no-issues="{{ t('sandbox.no_issues') }}"
+           data-label-connect-ready="{{ t('sandbox.connect_ready') }}"
+           data-label-connect-saved="{{ t('sandbox.connect_saved') }}"
+           data-label-connect-error="{{ t('sandbox.connect_error') }}"
            data-confirm-delete="{{ t('sandbox.delete_node_confirm') }}">
     <div class="sandbox-action-bar" data-sandbox-action-bar>
       <div class="sandbox-action-left">
@@ -450,6 +453,9 @@
             </label>
             {% if can_edit %}
             <div class="sandbox-property-actions">
+              <button type="button" class="btn btn-outline-primary" data-sandbox-connect-from>
+                <i class="bi bi-arrow-right me-1"></i>{{ t('sandbox.connect_from_node') }}
+              </button>
               <button type="submit" class="btn btn-primary" data-sandbox-node-save>{{ t('sandbox.save_node') }}</button>
               <button type="button" class="btn btn-outline-danger" data-delete-node data-sandbox-node-delete>{{ t('sandbox.delete_node') }}</button>
             </div>

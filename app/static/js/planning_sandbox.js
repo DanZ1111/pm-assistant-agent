@@ -11,6 +11,7 @@
   var payload = {};
   var warningCopy = {};
   var selectedNodeId = null;
+  var connectSourceNodeId = null;
   var dropModuleKey = null;
   var activeModuleFilter = 'default';
   var initialViewport = {zoom: 1, pan: {x: 0, y: 0}};
@@ -81,8 +82,9 @@
   }
 
   function findNode(dbId) {
+    var normalized = normalizeNodeId(dbId);
     return nodeElements().find(function (el) {
-      return String(el.data.db_id) === String(dbId);
+      return String(el.data.db_id) === String(normalized);
     });
   }
 
@@ -129,6 +131,21 @@
     window.setTimeout(function () {
       msg.hidden = true;
     }, 2400);
+  }
+
+  function normalizeNodeId(dbId) {
+    var value = String(dbId || '');
+    return value.indexOf('node-') === 0 ? value.slice(5) : value;
+  }
+
+  function setConnectSource(dbId) {
+    connectSourceNodeId = dbId ? normalizeNodeId(dbId) : null;
+    document.querySelectorAll('[data-sandbox-connect-from]').forEach(function (button) {
+      button.classList.toggle('is-connecting', !!connectSourceNodeId);
+    });
+    if (connectSourceNodeId) {
+      showMessage(workspace.dataset.labelConnectReady || 'Click the next step on the canvas to create an arrow.', false);
+    }
   }
 
   function setCanvasLoading(isLoading) {
@@ -241,8 +258,17 @@
 
   function showPalette() {
     selectedNodeId = null;
+    setConnectSource(null);
     setActiveTab('modules');
     if (cy) cy.elements().unselect();
+    var noNode = document.querySelector('[data-no-node]');
+    if (noNode) noNode.hidden = false;
+    var status = document.querySelector('[data-node-status]');
+    if (status) status.textContent = status.dataset.emptyText || status.textContent;
+    ['[data-node-id]', '[data-node-title]', '[data-node-duration]', '[data-node-owner]', '[data-node-deliverable]', '[data-node-exit]'].forEach(function (selector) {
+      var field = document.querySelector(selector);
+      if (field) field.value = '';
+    });
     updateViewportHooks();
   }
 
@@ -314,7 +340,17 @@
 
   function bindCyEvents() {
     cy.on('tap', 'node', function (event) {
-      selectNode(event.target.data('db_id'));
+      var targetId = normalizeNodeId(event.target.data('db_id'));
+      if (connectSourceNodeId && canEdit) {
+        if (connectSourceNodeId === targetId) {
+          setConnectSource(null);
+          selectNode(targetId);
+          return;
+        }
+        createEdge(connectSourceNodeId, targetId, {selectTarget: true});
+        return;
+      }
+      selectNode(targetId);
     });
     cy.on('tap', 'edge', function (event) {
       if (cy) {
@@ -477,7 +513,7 @@
   }
 
   function selectNode(dbId) {
-    selectedNodeId = dbId;
+    selectedNodeId = normalizeNodeId(dbId);
     var node = findNode(dbId);
     if (!node) {
       showPalette();
@@ -495,6 +531,13 @@
     set('[data-node-owner]', data.owner_role);
     set('[data-node-deliverable]', data.deliverable);
     set('[data-node-exit]', data.exit_criteria);
+    var noNode = document.querySelector('[data-no-node]');
+    if (noNode) noNode.hidden = true;
+    var status = document.querySelector('[data-node-status]');
+    if (status) {
+      if (!status.dataset.emptyText) status.dataset.emptyText = status.textContent;
+      status.textContent = data.display_label || data.label || status.dataset.emptyText;
+    }
     populateDependencyPanel(data);
     if (cy) {
       cy.elements().unselect();
@@ -506,16 +549,55 @@
 
   function addModule(moduleKey, position) {
     if (!canEdit || !moduleKey) return;
+    var sourceNodeId = selectedNodeId ? normalizeNodeId(selectedNodeId) : null;
     postForm(endpoint('/nodes/add'), {
       module_key: moduleKey,
       x_position: position && position.x !== undefined ? position.x : 120,
       y_position: position && position.y !== undefined ? position.y : 120
     }).then(function (json) {
+      // SB-Rescue-03 lock: Add Module must leave the panel on the Modules
+      // tab. The new node is NOT auto-selected; the user explicitly clicks
+      // it on the canvas if they want to edit. Auto-connect from a pre-Add
+      // source node is preserved as a one-shot, then selection clears.
+      var createdNodeId = json.created_node_id ? normalizeNodeId(json.created_node_id) : null;
+      if (sourceNodeId && createdNodeId && sourceNodeId !== createdNodeId) {
+        return postForm(endpoint('/edges'), {
+          from_node_id: sourceNodeId,
+          to_node_id: createdNodeId
+        }).then(function (edgeJson) {
+          selectedNodeId = null;
+          refreshFromPayload(edgeJson.sandbox_payload, {fit: false});
+          setActiveTab('modules');
+          return edgeJson;
+        });
+      }
       selectedNodeId = null;
       refreshFromPayload(json.sandbox_payload, {fit: false});
       setActiveTab('modules');
+      return json;
     }).catch(function (err) {
       showMessage(workspace.dataset.labelNodeError || err.message, true);
+    });
+  }
+
+  function createEdge(fromNodeId, toNodeId, options) {
+    options = options || {};
+    if (!canEdit || !fromNodeId || !toNodeId) return;
+    postForm(endpoint('/edges'), {
+      from_node_id: normalizeNodeId(fromNodeId),
+      to_node_id: normalizeNodeId(toNodeId)
+    }).then(function (json) {
+      setConnectSource(null);
+      selectedNodeId = options.selectTarget ? normalizeNodeId(toNodeId) : selectedNodeId;
+      refreshFromPayload(json.sandbox_payload, {fit: false});
+      if (options.selectTarget) selectNode(toNodeId);
+      showMessage(workspace.dataset.labelConnectSaved || 'Connection created.', false);
+    }).catch(function (err) {
+      setConnectSource(null);
+      var message = err.message === 'circular_dependency'
+        ? (workspace.dataset.labelCycleError || 'That dependency would create a cycle.')
+        : (workspace.dataset.labelConnectError || err.message);
+      showMessage(message, true);
     });
   }
 
@@ -638,13 +720,21 @@
     });
   });
 
-  document.querySelectorAll('[data-sandbox-template-trigger], [data-sandbox-save-template-trigger]').forEach(function (trigger) {
-    trigger.addEventListener('click', function () {
-      var details = trigger.closest('details');
-      window.setTimeout(function () {
-        if (details) details.open = true;
-      }, 0);
+  document.addEventListener('click', function (event) {
+    document.querySelectorAll('.sandbox-action-menu[open]').forEach(function (menu) {
+      if (!menu.contains(event.target)) {
+        menu.open = false;
+      }
     });
+  });
+
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') {
+      document.querySelectorAll('.sandbox-action-menu[open]').forEach(function (menu) {
+        menu.open = false;
+      });
+      setConnectSource(null);
+    }
   });
 
   var backToModules = document.querySelector('[data-sandbox-back-to-modules]');
@@ -691,6 +781,18 @@
   var tidyButton = document.querySelector('[data-tidy-canvas]');
   if (tidyButton && canEdit) {
     tidyButton.addEventListener('click', tidyCanvas);
+  }
+
+  var connectButton = document.querySelector('[data-sandbox-connect-from]');
+  if (connectButton && canEdit) {
+    connectButton.addEventListener('click', function () {
+      if (!selectedNodeId) return;
+      if (connectSourceNodeId === normalizeNodeId(selectedNodeId)) {
+        setConnectSource(null);
+      } else {
+        setConnectSource(selectedNodeId);
+      }
+    });
   }
 
   if (canEdit) {
@@ -795,6 +897,29 @@
       if (!first || !first.data) return null;
       selectNode(first.data.db_id);
       return first.data.db_id;
+    },
+    selectNodeByIndex: function (index) {
+      var node = nodeElements()[Number(index || 0)];
+      if (!node || !node.data) return null;
+      selectNode(node.data.db_id);
+      return node.data.db_id;
+    },
+    connectSelectedToIndex: function (index) {
+      var node = nodeElements()[Number(index || 0)];
+      if (!node || !node.data || !selectedNodeId) return null;
+      createEdge(selectedNodeId, node.data.db_id, {selectTarget: true});
+      return node.data.db_id;
+    },
+    nodeCount: function () {
+      return nodeElements().length;
+    },
+    edgeCount: function () {
+      return edgeElements().length;
+    },
+    nodeLabels: function () {
+      return nodeElements().map(function (node) {
+        return node && node.data ? node.data.label : '';
+      });
     },
     viewport: function () {
       return {

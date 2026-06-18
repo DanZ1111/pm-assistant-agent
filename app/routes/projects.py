@@ -1074,11 +1074,12 @@ def create_planning_sandbox(
                 template_key,
                 current_user.id,
                 current_user.role,
+                replace_existing=True,
             )
         except ValueError:
             return RedirectResponse(url=f"/projects/{project_id}/sandbox?error=template_not_found", status_code=303)
     else:
-        crud.create_sandbox_blank(db, project_id, current_user.id)
+        crud.create_sandbox_blank(db, project_id, current_user.id, replace_existing=True)
 
     return RedirectResponse(url=f"/projects/{project_id}/sandbox", status_code=303)
 
@@ -1212,12 +1213,16 @@ def add_planning_sandbox_node(
     if guard:
         return guard
     try:
-        crud.create_sandbox_node_from_module(
+        node = crud.create_sandbox_node_from_module(
             db, project_id, sandbox_id, module_key, x_position, y_position
         )
     except ValueError as exc:
         return _sandbox_mutation_error(exc)
-    return JSONResponse({"ok": True, "sandbox_payload": _sandbox_json_payload(db, sandbox_id, get_locale(request, current_user))})
+    return JSONResponse({
+        "ok": True,
+        "created_node_id": node.id,
+        "sandbox_payload": _sandbox_json_payload(db, sandbox_id, get_locale(request, current_user)),
+    })
 
 
 @router.post("/projects/{project_id}/sandbox/{sandbox_id}/nodes/{node_id}/update")

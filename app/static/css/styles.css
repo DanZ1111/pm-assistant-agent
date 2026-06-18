@@ -5391,8 +5391,15 @@ body.has-bottom-chat.assistant-dock-collapsed .main-content { padding-bottom: 76
 }
 .sandbox-property-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 12px;
+}
+.sandbox-property-actions .is-connecting {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
 }
 .sandbox-form-hint {
   margin: -3px 0 10px;
