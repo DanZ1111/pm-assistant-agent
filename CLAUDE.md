@@ -113,3 +113,16 @@ When modifying AI tools, permission rules, allowlists, schemas, or database writ
 5. `current_stage` is derived from phases, never manually maintained as a separate truth
 6. Product Thesis is the first section on the project detail page, not a buried field
 7. AI never writes directly to the database without user confirmation
+
+---
+
+## Spec Drift Gate (added 2026-06-18)
+
+Three discipline rules. Apply when writing or modifying code against an approved plan.
+
+1. **Every approved Q14 lock ships with the Q15 automated lock in the same commit.** No prose lock without a regex/behavior test. Lock + enforcement land together or not at all.
+2. **URL-driven tests are setup/teardown only.** Any assertion path for a feature reachable by clicking must include the click (generalizes Rule 6 to keyboard / drag / modal flows).
+3. **When a test fails after a code change, first hypothesis is plan drift, not stale test.** Re-read the plan section the test encodes before updating the test. If the code drifted, fix the code; only update the test if the plan should change.
+
+**Worked example — SB-Rescue-03 stay-on-Modules (the canonical case).**
+The plan said `addModule()` must end on the Modules tab after Add. A later session rewrote `addModule()` to call `selectNode(createdNodeId)` because that made a QA-12 scenario shorter. `ui_sandbox_add_module` went red. The wrong fix is "update the test." The right fix is: re-read SB-Rescue-03 §3 → restore `setActiveTab('modules')` → add a regex lock (`test_sb_rescue_03_stay_on_modules_lock` in `test_v14_sandbox_ui_rescue.py`: required `setActiveTab('modules')` in `addModule` body, forbidden `selectNode(createdNodeId)` in same body). That regex lock is the Q15 enforcement for the SB-Rescue-03 Q14 prose lock. See `~/.claude/plans/can-you-still-find-nested-cook.md` for full reasoning.

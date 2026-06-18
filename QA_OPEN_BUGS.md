@@ -49,6 +49,42 @@ add an entry here. If it's a scenario bug, fix the scenario.
 
 ## Recently fixed
 
+### ✅ SB-Rescue-03 stay-on-Modules lock restored after silent drift
+
+**Discovered:** 2026-06-18, via the full QA suite. `test_qa_build07`
+and `release_gate scenarios` both went RED on the same root cause —
+`ui_sandbox_add_module` failed because `.sandbox-add-module-btn` was
+no longer visible after clicking Add. Investigation revealed
+`addModule()` had been silently rewritten in a later session to call
+`selectNode(createdNodeId)` instead of `setActiveTab('modules')`,
+which contradicted SB-Rescue-03 §3 "Add-module behavior" but matched
+the QA-12 scenario's shorter loop. Plan vs. implementation drift
+across a session boundary.
+
+**Fixed:** 2026-06-18, commit `fa74c1a`. `addModule()` in
+[app/static/js/planning_sandbox.js](app/static/js/planning_sandbox.js)
+now always ends on the Modules tab and clears `selectedNodeId`. The
+one-shot auto-connect from a pre-Add source node is preserved.
+
+**Automated lock added** (`test_sb_rescue_03_stay_on_modules_lock` in
+[test_v14_sandbox_ui_rescue.py](test_v14_sandbox_ui_rescue.py)): the
+addModule body must contain `setActiveTab('modules')` and must NOT
+contain `selectNode(createdNodeId)`. This prevents the same drift
+from happening silently in a future session.
+
+**Larger lesson** (driving the QA-v2 Spec Drift Gate work in flight):
+prose locks inside long plans decay across sessions. Every approved
+UX/data/permission lock should ship with an automated assertion in
+the same commit. See the approved plan
+`~/.claude/plans/can-you-still-find-nested-cook.md` and the
+forthcoming Spec Drift Gate addition to CLAUDE.md.
+
+**Verification:**
+```bash
+python3 test_v14_sandbox_ui_rescue.py   # 10/10 PASS (with new lock)
+bash run_qa_suite.sh                    # PASS: 15 / FAIL: 0
+```
+
 ### ✅ Planning Sandbox is reachable via UI navigation
 
 **Discovered:** 2026-06-13, via blind QA suite run + targeted

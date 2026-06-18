@@ -186,6 +186,48 @@ def main():
     contains_all("each gap proposes a minimal patch + names the risk", gaps,
                  ["Proposed patch", "Risk without the patch"])
 
+    print("\n── 8b. QA-11 vetoes lock + Rule 6 enforcer scenario ──")
+    # QA-11 user-locked rules: no coverage matrix tooling, no live-LLM
+    # scenario generation. Both were re-proposed in QA_AI_WORKFLOW_PRD
+    # v1 and rejected on Claude review (2026-06-16). This lock prevents
+    # a future session from silently re-introducing them without
+    # explicit pushback. See ~/.claude/plans/can-you-still-find-nested-cook.md
+    # → Spec Drift Gate, decision #6 (back-port high-risk locks).
+    plan11 = read("QA_BUILD11_EXECUTION_PLAN.md")
+    contains_all(
+        "QA-11 plan continues to lock the vetoes (no coverage matrix / no auto-LLM)",
+        plan11,
+        ["coverage matrix", "auto-LLM"])
+
+    # Rule 6 enforcer: the discoverability scenario must continue to
+    # exist AND use a click-based assertion path (clicking a link
+    # then asserting URL) rather than just calling actions.open_url.
+    # Removing or weakening this scenario silently disables navigation
+    # discoverability enforcement across the entire QA system.
+    discoverability_path = (
+        ROOT / "scenario_contracts/acceptance/sandbox_is_discoverable_from_project.py"
+    )
+    if discoverability_path.exists():
+        ok("Rule 6 enforcer scenario sandbox_is_discoverable_from_project.py present")
+        disc_src = discoverability_path.read_text(encoding="utf-8")
+        # Must include the click-path test, not just URL navigation:
+        # we look for an explicit anchor click + assert_url_path AFTER it.
+        if (".click()" in disc_src and "assert_url_path" in disc_src
+                and "sandbox_link" in disc_src.lower()):
+            ok("Rule 6 enforcer uses click-based navigation assertion (not URL-only)")
+        else:
+            fail(
+                "Rule 6 enforcer click-path",
+                "scenario no longer asserts via clicking a sandbox link; "
+                "navigation discoverability would no longer be tested",
+            )
+    else:
+        fail(
+            "Rule 6 enforcer scenario",
+            "sandbox_is_discoverable_from_project.py missing — Rule 6 "
+            "would no longer have any automated enforcement",
+        )
+
     print("\n── 9. STABLE_CREDIBILITY references the acceptance tier ──")
     sc = read("STABLE_CREDIBILITY.md")
     contains_all("STABLE_CREDIBILITY adds the acceptance tier", sc,
