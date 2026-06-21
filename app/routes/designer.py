@@ -36,6 +36,19 @@ def designer_dashboard(request: Request, db: Session = Depends(get_db)):
     })
 
 
+@router.get("/designer/tutorial", response_class=HTMLResponse)
+def designer_tutorial(request: Request, db: Session = Depends(get_db)):
+    current_user = get_current_user(request, db)
+    try:
+        require_designer_portal_user(current_user)
+    except _RedirectException as e:
+        return e.response
+    return templates.TemplateResponse(request, "designer/tutorial.html", {
+        "current_user": current_user,
+        **i18n_context(request, current_user),
+    })
+
+
 @router.get("/designer/manager", response_class=HTMLResponse)
 def designer_manager_dashboard(request: Request, db: Session = Depends(get_db)):
     current_user = get_current_user(request, db)

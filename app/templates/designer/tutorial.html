@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}设计师经理教程 — PM Tracker{% endblock %}
+
+{% block content %}
+<div class="designer-shell">
+
+  <section class="designer-portal-header">
+    <div>
+      <div class="designer-eyebrow">设计师经理 · 入门教程</div>
+      <h1 class="page-title"><i class="bi bi-mortarboard me-2"></i>欢迎使用 PM Tracker</h1>
+      <p class="page-subtitle">这是一份简短的中文教程，告诉你这套系统怎么用、你的工作台能做什么。</p>
+    </div>
+  </section>
+
+  <article class="designer-manager-card">
+    <div class="designer-section-head">
+      <h2>1. 系统准备好了</h2>
+    </div>
+    <p>
+      系统和工具都已经为你配置完毕。你的账号是<strong>设计师经理</strong>角色，
+      可以创建设计任务、分配设计师、审核提交、把最终稿交付给 PM。
+      这一页帮你快速理解整个流程，看完之后点最下面的按钮就能开始工作。
+    </p>
+  </article>
+
+  <article class="designer-manager-card">
+    <div class="designer-section-head">
+      <h2>2. 三种角色</h2>
+    </div>
+    <ul>
+      <li><strong>PM（产品经理）</strong>：发起项目，定方向，写产品立意（Product Thesis），决定要做什么产品。</li>
+      <li><strong>Designer（设计师）</strong>：接到设计任务后提交设计稿，根据反馈改稿。</li>
+      <li><strong>Designer Manager（你）</strong>：连接 PM 和设计师。负责发布设计任务、分配设计师、监督提交质量、必要时重新打开被拒绝的提交。</li>
+    </ul>
+  </article>
+
+  <article class="designer-manager-card">
+    <div class="designer-section-head">
+      <h2>3. 完整流程（一个项目从开始到设计完成）</h2>
+    </div>
+    <ol>
+      <li><strong>PM 创建项目</strong>：在 <code>/projects</code> 里建好项目骨架，写产品立意。</li>
+      <li><strong>发布设计任务（Design Quest）</strong>：PM 或你（DM）在项目下创建一份设计任务，写清楚需求（标题、简介、必须保留、必须避免、截止日期）。</li>
+      <li><strong>分配设计师</strong>：你在工作台把任务指给一个或多个设计师；他们会在自己的工作台看到任务。</li>
+      <li><strong>设计师提交</strong>：设计师上传设计稿；你和 PM 可以在任务详情里看到所有版本。</li>
+      <li><strong>审核 → 选定或重做</strong>：你（或 PM）选定最终稿，或者把不合格的提交退回让设计师重做。最终稿会自动同步到项目时间线。</li>
+    </ol>
+  </article>
+
+  <article class="designer-manager-card">
+    <div class="designer-section-head">
+      <h2>4. 你的工作台 <code>/designer/manager</code> 能做什么</h2>
+    </div>
+    <ul>
+      <li><strong>创建任务草稿</strong>：在「Publish Quest」卡片里填写任务详情，先存为草稿。</li>
+      <li><strong>发布草稿</strong>：草稿确认无误后点「发布」，设计师就能在他们的工作台看到。</li>
+      <li><strong>分配设计师</strong>：在「Designer Roster」里把任务指给具体的人。</li>
+      <li><strong>重新打开被拒绝的提交</strong>：如果一份提交被错误地拒绝了，可以在「Rejected Submissions」里恢复它。</li>
+    </ul>
+    <p class="text-muted">
+      <i class="bi bi-info-circle me-1"></i>
+      如果你想新建任务但下拉框里找不到对应项目，说明这个项目已经有一份正在进行中的设计任务了 —
+      等当前任务结束，或者联系 PM 确认要不要先关闭旧的。
+    </p>
+  </article>
+
+  <article class="designer-manager-card">
+    <div class="designer-section-head">
+      <h2>5. 现在开始</h2>
+    </div>
+    <p>读完了？直接去工作台开干吧：</p>
+    <p>
+      <a class="btn btn-primary btn-lg" href="/designer/manager">
+        <i class="bi bi-arrow-right-circle me-1"></i>打开我的工作台
+      </a>
+    </p>
+    <p class="text-muted small mt-3">
+      <i class="bi bi-bookmark-star me-1"></i>
+      把这个页面收藏起来 — 任何时候都可以回来复习。
+    </p>
+  </article>
+
+</div>
+{% endblock %}
