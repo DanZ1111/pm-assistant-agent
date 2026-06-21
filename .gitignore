@@ -21,3 +21,4 @@ node_modules/
 package-lock.json
 test_artifacts/
 scenario_contracts/reports/
+.claude/*.lock
