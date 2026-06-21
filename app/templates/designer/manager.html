@@ -22,6 +22,86 @@
   {% endif %}
 
   <section class="designer-manager-grid" data-designer-manager-dashboard>
+    <article class="designer-manager-card" data-manager-quest-publishing>
+      <div class="designer-section-head">
+        <div>
+          <h2>{{ t('designer.manager.publish_quest_title') }}</h2>
+          <p>{{ t('designer.manager.publish_quest_body') }}</p>
+        </div>
+      </div>
+
+      {% if operations.available_projects %}
+      <form method="post" action="/designer/manager/quests/create" class="designer-manager-quest-form">
+        <div>
+          <label class="form-label">{{ t('designer.manager.project_label') }}</label>
+          <select name="project_id" class="form-select" required>
+            {% for project in operations.available_projects %}
+            <option value="{{ project.id }}">{{ project.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="form-label">{{ t('design_quest.title_label') }}</label>
+          <input name="title" class="form-control" required>
+        </div>
+        <div>
+          <label class="form-label">{{ t('design_quest.soft_deadline_label') }}</label>
+          <input name="soft_deadline" type="date" class="form-control">
+        </div>
+        <div>
+          <label class="form-label">{{ t('design_quest.visibility_label') }}</label>
+          <select name="visibility" class="form-select">
+            <option value="all_active_designers">{{ t('design_quest.visibility_all_active_designers') }}</option>
+            <option value="assigned_designers_only">{{ t('design_quest.visibility_assigned_designers_only') }}</option>
+          </select>
+        </div>
+        <div class="designer-manager-form-wide">
+          <label class="form-label">{{ t('design_quest.brief_label') }}</label>
+          <textarea name="brief" class="form-control" rows="3" required></textarea>
+        </div>
+        <div>
+          <label class="form-label">{{ t('design_quest.must_keep_label') }}</label>
+          <textarea name="must_keep" class="form-control" rows="2"></textarea>
+        </div>
+        <div>
+          <label class="form-label">{{ t('design_quest.must_avoid_label') }}</label>
+          <textarea name="must_avoid" class="form-control" rows="2"></textarea>
+        </div>
+        <div class="designer-manager-form-wide designer-manager-form-actions">
+          <label class="form-check mb-0">
+            <input type="checkbox" name="is_timeline_blocking" value="true" class="form-check-input">
+            <span class="form-check-label">{{ t('design_quest.timeline_blocking_label') }}</span>
+          </label>
+          <button class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>{{ t('designer.manager.create_draft_button') }}
+          </button>
+        </div>
+      </form>
+      {% else %}
+      <p class="text-muted">{{ t('designer.manager.no_available_projects') }}</p>
+      {% endif %}
+
+      {% if operations.draft_quests %}
+      <div class="designer-manager-drafts">
+        <h3>{{ t('designer.manager.drafts_title') }}</h3>
+        {% for quest in operations.draft_quests %}
+        <div class="designer-manager-row">
+          <div>
+            <strong>{{ quest.title }}</strong>
+            <span>{{ quest.project_name }}</span>
+            {% if quest.soft_deadline %}<small>{{ quest.soft_deadline }}</small>{% endif %}
+          </div>
+          <form method="post" action="/designer/manager/quests/{{ quest.id }}/publish">
+            <button class="btn btn-sm btn-primary">
+              <i class="bi bi-send me-1"></i>{{ t('design_quest.publish_button') }}
+            </button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </article>
+
     <article class="designer-manager-card" data-designer-roster>
       <div class="designer-section-head">
         <div>

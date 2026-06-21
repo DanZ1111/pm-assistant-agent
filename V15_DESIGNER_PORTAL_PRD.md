@@ -78,6 +78,20 @@ PMs remain inside the PM Workspace. They can:
 - promote selected submissions to project renderings,
 - explicitly mark design complete.
 
+### Designer Manager
+
+Designer Managers remain inside the restricted Designer Portal. They can:
+
+- create a Design Quest draft for an active project using the same brief fields
+  as a PM,
+- publish that draft to designers,
+- assign designers to assigned-only quests,
+- reopen an accidentally rejected submission,
+- see only the project name and Design Quest data needed for these operations.
+
+Designer Managers still cannot open PM project pages or edit project, cost,
+factory, timeline, journal, quotation, or AI Workspace data.
+
 ### Designer
 
 Designers use only the Designer Portal. They can:

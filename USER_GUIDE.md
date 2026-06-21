@@ -4,6 +4,9 @@
 
 This is a structured product project tracker for knife and product development. It manages projects from concept through mass production, with timeline tracking, delay warnings, file uploads, and AI-assisted intake.
 
+Designer Manager registration, task publishing, assignment, and recovery
+instructions are available in [DM_USER_GUIDE_ZH.md](DM_USER_GUIDE_ZH.md).
+
 ---
 
 ## What's new in v1.4.0

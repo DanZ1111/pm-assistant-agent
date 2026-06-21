@@ -148,5 +148,6 @@ Required assertions:
 5. Assigned designer can then see the quest.
 6. Manager can reopen a rejected submission back to PM review.
 7. Reopen writes a design quest event and does not mutate phases.
-8. Manager still cannot access `/projects/:id`.
+8. Manager can create and publish quests from `/designer/manager` while still
+   being unable to access `/projects/:id`.
 9. i18n parity is exact.

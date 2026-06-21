@@ -1,4 +1,5 @@
 import os
+from datetime import date
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
@@ -17,6 +18,16 @@ from app.i18n import i18n_context
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
+
+
+def _parse_optional_date(value: str) -> date | None:
+    value = (value or "").strip()
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError("invalid_soft_deadline") from exc
 
 
 @router.get("/designer", response_class=HTMLResponse)
@@ -85,6 +96,64 @@ def designer_manager_assign(
     except (PermissionError, ValueError) as exc:
         return RedirectResponse(url=f"/designer/manager?manager_error={str(exc)}", status_code=303)
     return RedirectResponse(url="/designer/manager?manager_result=assigned", status_code=303)
+
+
+@router.post("/designer/manager/quests/create")
+def designer_manager_create_quest(
+    request: Request,
+    project_id: int = Form(...),
+    title: str = Form(...),
+    brief: str = Form(...),
+    must_keep: str = Form(""),
+    must_avoid: str = Form(""),
+    soft_deadline: str = Form(""),
+    visibility: str = Form("all_active_designers"),
+    is_timeline_blocking: bool = Form(False),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_designer_portal_user(current_user)
+        crud.create_design_quest_draft(
+            db,
+            project_id=project_id,
+            user_id=current_user.id,
+            title=title,
+            brief=brief,
+            must_keep=must_keep,
+            must_avoid=must_avoid,
+            soft_deadline=_parse_optional_date(soft_deadline),
+            visibility=visibility,
+            is_timeline_blocking=is_timeline_blocking,
+            allow_designer_manager=True,
+        )
+    except (PermissionError, ValueError) as exc:
+        return RedirectResponse(url=f"/designer/manager?manager_error={str(exc)}", status_code=303)
+    except _RedirectException as exc:
+        return exc.response
+    return RedirectResponse(url="/designer/manager?manager_result=quest_created", status_code=303)
+
+
+@router.post("/designer/manager/quests/{quest_id}/publish")
+def designer_manager_publish_quest(
+    request: Request,
+    quest_id: int,
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_designer_portal_user(current_user)
+        crud.publish_design_quest(
+            db,
+            quest_id,
+            current_user.id,
+            allow_designer_manager=True,
+        )
+    except (PermissionError, ValueError) as exc:
+        return RedirectResponse(url=f"/designer/manager?manager_error={str(exc)}", status_code=303)
+    except _RedirectException as exc:
+        return exc.response
+    return RedirectResponse(url="/designer/manager?manager_result=quest_published", status_code=303)
 
 
 @router.post("/designer/manager/submissions/{submission_id}/reopen")

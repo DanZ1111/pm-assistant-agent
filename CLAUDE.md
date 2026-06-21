@@ -28,6 +28,10 @@ If a request conflicts with these files, explain the conflict before proceeding.
 - Implement only the approved build. Do not jump ahead.
 - After finishing, stop and report (see Report Format below).
 - If a build is large, ask to confirm scope before starting.
+- When work spans multiple Claude/Codex handoffs or the user says they are
+  losing track, update `HUMAN_JOURNAL.md` in plain natural language: why the
+  work exists, the small-project plan, what landed, what is postponed, and who
+  picked up where. Keep it short; do not turn it into a full changelog.
 
 **Current build order:** see the Build List table in `MASTERPLAN.md` and the per-build detail sections below it. Each shipped build's H3 header carries a `✓ SHIPPED vX.Y.Z` marker. To find the next build, take the first build *without* such a marker. Cross-check against `git log -5 --oneline` and `app/version.py` for the authoritative current state.
 

@@ -366,8 +366,16 @@ def _can_edit_project_for_design_quest(user: User | None, project: Project | Non
     return False
 
 
-def _require_design_quest_editor(db: Session, project: Project | None, user_id: int | None) -> User:
+def _require_design_quest_editor(
+    db: Session,
+    project: Project | None,
+    user_id: int | None,
+    *,
+    allow_designer_manager: bool = False,
+) -> User:
     user = db.query(User).filter(User.id == user_id).first() if user_id else None
+    if allow_designer_manager and user and user.role == "designer_manager" and project:
+        return user
     if not _can_edit_project_for_design_quest(user, project):
         raise PermissionError("user_cannot_edit_design_quest_project")
     return user
@@ -417,9 +425,15 @@ def create_design_quest_draft(
     visibility: str = "all_active_designers",
     is_timeline_blocking: bool = False,
     linked_phase_id: int | None = None,
+    allow_designer_manager: bool = False,
 ) -> DesignQuest:
     project = get_project(db, project_id)
-    editor = _require_design_quest_editor(db, project, user_id)
+    editor = _require_design_quest_editor(
+        db,
+        project,
+        user_id,
+        allow_designer_manager=allow_designer_manager,
+    )
     if not title or not title.strip():
         raise ValueError("title_required")
     if not brief or not brief.strip():
@@ -467,11 +481,22 @@ def create_design_quest_draft(
     return quest
 
 
-def publish_design_quest(db: Session, quest_id: int, user_id: int) -> DesignQuest:
+def publish_design_quest(
+    db: Session,
+    quest_id: int,
+    user_id: int,
+    *,
+    allow_designer_manager: bool = False,
+) -> DesignQuest:
     quest = db.query(DesignQuest).filter(DesignQuest.id == quest_id).first()
     if not quest:
         raise ValueError("design_quest_not_found")
-    editor = _require_design_quest_editor(db, quest.project, user_id)
+    editor = _require_design_quest_editor(
+        db,
+        quest.project,
+        user_id,
+        allow_designer_manager=allow_designer_manager,
+    )
     if quest.status != "draft":
         raise ValueError("only_draft_quest_can_publish")
     now = datetime.utcnow()
@@ -1279,7 +1304,38 @@ def list_designer_manager_operations(db: Session, manager_user_id: int) -> dict:
         .order_by(DesignSubmission.updated_at.desc())
         .all()
     )
+    active_quests = (
+        db.query(DesignQuest)
+        .filter(DesignQuest.status.in_(DESIGN_QUEST_ACTIVE_STATUSES))
+        .order_by(DesignQuest.updated_at.desc())
+        .all()
+    )
+    active_project_ids = {quest.project_id for quest in active_quests}
+    available_projects = (
+        db.query(Project)
+        .filter(
+            Project.status.notin_(("archived", "cancelled")),
+            Project.id.notin_(active_project_ids) if active_project_ids else True,
+        )
+        .order_by(Project.name.asc())
+        .all()
+    )
+    draft_quests = [quest for quest in active_quests if quest.status == "draft"]
     return {
+        "available_projects": [
+            {"id": project.id, "name": project.name}
+            for project in available_projects
+        ],
+        "draft_quests": [
+            {
+                "id": quest.id,
+                "title": quest.title,
+                "project_name": quest.project.name if quest.project else "Project",
+                "soft_deadline": quest.soft_deadline,
+                "visibility": quest.visibility,
+            }
+            for quest in draft_quests
+        ],
         "designers": [
             {
                 "id": designer.id,

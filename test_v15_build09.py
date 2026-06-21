@@ -101,6 +101,7 @@ def setup_fixture():
         db.commit()
 
         project = create_project(db, f"Manager Ops Project {RUN_TAG}", admin.username)
+        publish_project = create_project(db, f"Manager Publish Project {RUN_TAG}", admin.username)
         db.commit()
         quest = crud.create_design_quest_draft(
             db,
@@ -115,6 +116,7 @@ def setup_fixture():
 
         return {
             "project_id": project.id,
+            "publish_project_id": publish_project.id,
             "quest_id": quest.id,
             "user_ids": [admin.id, manager.id, designer.id],
             "designer_id": designer.id,
@@ -147,9 +149,10 @@ def cleanup_fixture(fx):
         filenames = [version.filename for version in versions] + [file.filename for file in files]
         if fx.get("user_ids"):
             db.query(UserSession).filter(UserSession.user_id.in_(fx["user_ids"])).delete(synchronize_session=False)
-        project = db.query(Project).filter(Project.id == fx.get("project_id")).first()
-        if project:
-            db.delete(project)
+        for project_id in (fx.get("project_id"), fx.get("publish_project_id")):
+            project = db.query(Project).filter(Project.id == project_id).first()
+            if project:
+                db.delete(project)
         for user_id in fx.get("user_ids", []):
             user = db.query(User).filter(User.id == user_id).first()
             if user:
@@ -195,6 +198,22 @@ def get_state(project_id):
         db.close()
 
 
+def get_project_quest(project_id):
+    from app.database import SessionLocal
+    from app.models import DesignQuest
+
+    db = SessionLocal()
+    try:
+        return (
+            db.query(DesignQuest)
+            .filter(DesignQuest.project_id == project_id)
+            .order_by(DesignQuest.id.desc())
+            .first()
+        )
+    finally:
+        db.close()
+
+
 def main():
     print("\n── 1. Source locks ──")
     plan = read("V15_BUILD09_DESIGNER_MANAGER_OPERATIONS_PLAN.md")
@@ -204,13 +223,14 @@ def main():
     ai_tools = read("app/ai/tools.py")
 
     contains_all(
-        "Build 09 plan locks manager operations and excludes PM/admin/AI scope",
-        plan,
+        "Build 09 plan locks restricted manager operations and excludes admin/AI scope",
+        plan + read("DM_DESIGN_QUEST_PUBLISHING_PLAN.md"),
         [
             "Designer Manager Operations",
-            "no PM Workspace access",
+            "unable to access `/projects/:id`",
             "no admin invite PIN/user deletion controls",
             "no AI write handlers",
+            "DM can create and publish Design Quests from the manager console",
         ],
     )
     contains_all(
@@ -221,7 +241,10 @@ def main():
             "manager_assign_designer_to_quest",
             "manager_reopen_design_submission",
             "/designer/manager",
+            "/designer/manager/quests/create",
+            "allow_designer_manager=True",
             "data-designer-manager-dashboard",
+            "data-manager-quest-publishing",
             "data-manager-quest-assignments",
         ],
     )
@@ -246,6 +269,7 @@ def main():
             manager_page.status_code == 200
             and "Designer Manager Operations" in manager_page.text
             and "Assigned-only manager quest" in manager_page.text
+            and f"Manager Publish Project {RUN_TAG}" in manager_page.text
             and f"/projects/{fx['project_id']}" not in manager_page.text
             and before_designer_detail.status_code in (302, 303)
             and designer_manager_page.status_code in (302, 303)
@@ -257,6 +281,62 @@ def main():
                 "designer_manager_page": designer_manager_page.status_code,
                 "designer_detail_before": before_designer_detail.status_code,
                 "project_link": f"/projects/{fx['project_id']}" in manager_page.text,
+            })
+
+        designer_create = designer.post(
+            "/designer/manager/quests/create",
+            data={
+                "project_id": str(fx["publish_project_id"]),
+                "title": "Designer must not create this",
+                "brief": "Regular designer should be rejected.",
+            },
+            follow_redirects=False,
+        )
+        quest_after_designer = get_project_quest(fx["publish_project_id"])
+        manager_create = manager.post(
+            "/designer/manager/quests/create",
+            data={
+                "project_id": str(fx["publish_project_id"]),
+                "title": "DM published visual direction",
+                "brief": "Create three visual directions for manager review.",
+                "must_keep": "Compact proportions",
+                "must_avoid": "Fantasy styling",
+                "soft_deadline": "2026-12-15",
+                "visibility": "all_active_designers",
+                "is_timeline_blocking": "true",
+            },
+            follow_redirects=False,
+        )
+        manager_quest = get_project_quest(fx["publish_project_id"])
+        draft_page = manager.get("/designer/manager")
+        manager_publish = manager.post(
+            f"/designer/manager/quests/{manager_quest.id}/publish",
+            follow_redirects=False,
+        )
+        published_quest = get_project_quest(fx["publish_project_id"])
+        published_detail = designer.get(f"/designer/quests/{manager_quest.id}")
+        if (
+            designer_create.status_code in (302, 303)
+            and quest_after_designer is None
+            and manager_create.status_code in (302, 303)
+            and manager_quest
+            and manager_quest.status == "draft"
+            and "DM published visual direction" in draft_page.text
+            and manager_publish.status_code in (302, 303)
+            and published_quest.status == "open"
+            and published_detail.status_code == 200
+        ):
+            ok("Designer manager creates and publishes a quest; regular designer cannot")
+        else:
+            fail("manager quest publishing", {
+                "designer_create": designer_create.status_code,
+                "quest_after_designer": getattr(quest_after_designer, "id", None),
+                "manager_create": manager_create.status_code,
+                "draft_status": getattr(manager_quest, "status", None),
+                "draft_visible": "DM published visual direction" in draft_page.text,
+                "manager_publish": manager_publish.status_code,
+                "published_status": getattr(published_quest, "status", None),
+                "designer_detail": published_detail.status_code,
             })
 
         assign = manager.post(
@@ -337,10 +417,13 @@ def main():
         "designer.manager.assign_button",
         "designer.manager.reopen_button",
         "designer.manager.no_rejected_submissions",
+        "designer.manager.publish_quest_title",
+        "designer.manager.create_draft_button",
+        "designer.manager.drafts_title",
     ]
     missing = [key for key in required if key not in en or key not in zh]
-    if set(en) == set(zh) and not missing and len(en) == 927:
-        ok("i18n parity locked at 927/927 with Build 09 keys")
+    if set(en) == set(zh) and not missing and len(en) >= 935:
+        ok(f"i18n parity preserved with DM publishing keys ({len(en)}/{len(zh)})")
     else:
         fail("i18n parity/count", {"en": len(en), "zh": len(zh), "missing": missing, "diff": sorted(set(en) ^ set(zh))[:8]})
 

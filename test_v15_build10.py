@@ -165,8 +165,8 @@ def main():
 
     en = json.loads(read("app/i18n/en.json"))
     zh = json.loads(read("app/i18n/zh.json"))
-    if set(en) == set(zh) and len(en) == 927:
-        ok("i18n parity locked at 927/927 for v1.5.0")
+    if set(en) == set(zh) and len(en) >= 927:
+        ok(f"i18n parity preserves the v1.5.0 baseline ({len(en)}/{len(zh)})")
     else:
         fail("i18n parity/count", {"en": len(en), "zh": len(zh), "diff": sorted(set(en) ^ set(zh))[:8]})
 
