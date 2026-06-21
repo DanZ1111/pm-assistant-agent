@@ -28,11 +28,14 @@ agent answers Q12 and Q13 in service of producing better Q14/Q15.
 12. **Primary user click-path:** entry point → click sequence → final
     visible state. (Catches the "feature ships unreachable" class —
     e.g. sandbox-not-discoverable bug.)
-13. **Reference scan (optional, novel feature classes only,
-    time-boxed ~30 min):** one open-source analog + one closed-source
-    product with the same UX surface; list 2–3 known failure modes for
-    this feature class. Skip for incremental work the codebase already
-    has examples of.
+13. **Reference scan (required for any feature touching a UI pattern
+    not already in the codebase — canvas editor, intake form, planner,
+    modal flow, etc.):** budget 30–60 minutes. Name 1–2 specific GitHub
+    repos and 1 closed-source product you read; list 3 conventions or
+    failure modes you're adopting from them. Only skip for trivial
+    extensions of an existing pattern in this codebase. The point is
+    to spend real exploration time so the plan inherits other people's
+    hard-earned lessons instead of rediscovering them via QA failures.
 14. **Locked behaviors:** bullet list of UX/data/permission behaviors
     that must NOT drift later. One sentence each. *(User's primary
     review surface.)*
