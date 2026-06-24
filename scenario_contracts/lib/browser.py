@@ -85,12 +85,12 @@ def BrowserContext(role="admin"):
     try:
         # Login as admin.
         username, password = admin_credentials()
-        page.goto(f"{base_url()}/auth/login")
+        page.goto(f"{base_url()}/auth/login", wait_until="domcontentloaded")
         if "/auth/login" in page.url:
             page.fill("input[name='username']", username)
             page.fill("input[name='password']", password)
             page.click("form[action='/auth/login'] button[type='submit']")
-            page.wait_for_load_state("networkidle")
+            page.wait_for_load_state("domcontentloaded")
         yield page
     finally:
         try:

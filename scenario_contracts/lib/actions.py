@@ -302,8 +302,8 @@ def open_url(page, path):
         if not path.startswith("/"):
             path = "/" + path
         target = base_url() + path
-    page.goto(target)
-    page.wait_for_load_state("networkidle")
+    page.goto(target, wait_until="domcontentloaded")
+    page.wait_for_load_state("domcontentloaded")
 
 
 def click(page, selector):

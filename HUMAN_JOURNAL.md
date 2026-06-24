@@ -98,3 +98,24 @@ explicit approval.
 - Tracked working tree is clean. One untracked local file exists:
   `.claude/scheduled_tasks.lock`.
 
+---
+
+## 2026-06-21 - QA Agent 1.x Loop Begins
+
+### Small Project: QA Agent 1.x, Deterministic PM Workflow QA
+
+**Why this exists:** The user wants QA to catch the kind of PM-visible bugs
+they found manually, starting with the Planning Sandbox, before attempting a
+harder live-AI QA agent.
+
+**Simple plan/method:** Build QA Agent 1.x as deterministic acceptance builds:
+write a plan, lock PM-visible behaviors, add automated tests for each lock, run
+the build test plus regressions, then continue to the next QA Agent slice.
+
+**Current slice:** QA Agent 1.1 adds a sandbox usability acceptance scenario
+that checks project-detail navigation, template chooser behavior, template
+replacement, module filtering, selected-node state, connect flow, Back to
+Modules recovery, and readable warnings.
+
+**Postponed:** Live LLM scenario generation, AI screenshot critique, coverage
+matrix tooling, and AI release judging remain QA Agent 2.x work.
