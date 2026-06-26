@@ -109,12 +109,13 @@ def designer_manager_create_quest(
     soft_deadline: str = Form(""),
     visibility: str = Form("all_active_designers"),
     is_timeline_blocking: bool = Form(False),
+    files: list[UploadFile] = File([]),
     db: Session = Depends(get_db),
 ):
     current_user = get_current_user(request, db)
     try:
         require_designer_portal_user(current_user)
-        crud.create_design_quest_draft(
+        quest = crud.create_design_quest_draft(
             db,
             project_id=project_id,
             user_id=current_user.id,
@@ -127,11 +128,43 @@ def designer_manager_create_quest(
             is_timeline_blocking=is_timeline_blocking,
             allow_designer_manager=True,
         )
+        if files:
+            crud.upload_design_quest_reference_files(
+                db,
+                quest_id=quest.id,
+                files=files,
+                uploaded_by_user_id=current_user.id,
+                allow_designer_manager=True,
+            )
     except (PermissionError, ValueError) as exc:
         return RedirectResponse(url=f"/designer/manager?manager_error={str(exc)}", status_code=303)
     except _RedirectException as exc:
         return exc.response
     return RedirectResponse(url="/designer/manager?manager_result=quest_created", status_code=303)
+
+
+@router.post("/designer/manager/quests/{quest_id}/references/upload")
+def designer_manager_upload_quest_references(
+    request: Request,
+    quest_id: int,
+    files: list[UploadFile] = File(...),
+    db: Session = Depends(get_db),
+):
+    current_user = get_current_user(request, db)
+    try:
+        require_designer_portal_user(current_user)
+        crud.upload_design_quest_reference_files(
+            db,
+            quest_id=quest_id,
+            files=files,
+            uploaded_by_user_id=current_user.id,
+            allow_designer_manager=True,
+        )
+    except (PermissionError, ValueError) as exc:
+        return RedirectResponse(url=f"/designer/manager?manager_error={str(exc)}", status_code=303)
+    except _RedirectException as exc:
+        return exc.response
+    return RedirectResponse(url="/designer/manager?manager_result=references_added", status_code=303)
 
 
 @router.post("/designer/manager/quests/{quest_id}/publish")

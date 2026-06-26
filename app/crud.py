@@ -350,6 +350,14 @@ DESIGN_SUBMISSION_ACTIVE_STATUSES = ("submitted", "shortlisted", "revision_reque
 DESIGN_SUBMISSION_ALLOWED_EXTENSIONS = ("jpg", "jpeg", "png", "webp", "pdf")
 DESIGN_SUBMISSION_MAX_BYTES = 20 * 1024 * 1024
 DESIGN_REVISION_OPEN_STATUSES = ("open", "partially_resolved")
+# DM-side design-quest reference uploads accept presentations + common
+# image formats + PDF. SVG intentionally excluded (XSS risk if served
+# inline). Per-file cap is 10 MB so a typical pptx + retina photo fit.
+REFERENCE_ALLOWED_EXTENSIONS = (
+    "pptx", "ppt", "jpg", "jpeg", "png", "webp", "gif", "pdf",
+)
+REFERENCE_MAX_BYTES = 10 * 1024 * 1024
+REFERENCE_IMAGE_EXTENSIONS = ("jpg", "jpeg", "png", "webp", "gif")
 
 
 def _can_edit_project_for_design_quest(user: User | None, project: Project | None) -> bool:
@@ -605,11 +613,17 @@ def link_design_quest_reference(
     label: str | None = None,
     visibility: str = "designer_visible",
     sort_order: int | None = None,
+    allow_designer_manager: bool = False,
 ) -> DesignQuestReference:
     quest = db.query(DesignQuest).filter(DesignQuest.id == quest_id).first()
     if not quest:
         raise ValueError("design_quest_not_found")
-    editor = _require_design_quest_editor(db, quest.project, added_by_user_id)
+    editor = _require_design_quest_editor(
+        db,
+        quest.project,
+        added_by_user_id,
+        allow_designer_manager=allow_designer_manager,
+    )
     project_file = db.query(ProjectFile).filter(ProjectFile.id == project_file_id).first()
     if not project_file or project_file.project_id != quest.project_id:
         raise ValueError("reference_file_not_in_quest_project")
@@ -645,6 +659,122 @@ def link_design_quest_reference(
     db.commit()
     db.refresh(ref)
     return ref
+
+
+def upload_design_quest_reference_files(
+    db: Session,
+    quest_id: int,
+    files: list,
+    uploaded_by_user_id: int,
+    allow_designer_manager: bool = False,
+) -> list[DesignQuestReference]:
+    """Upload one or more files as design-quest references in a single
+    transaction. Validates extension + size up-front; saves files to
+    disk; creates one ProjectFile (file_category='reference') and one
+    DesignQuestReference per file; commits once at the end. On any
+    failure, rolls back the DB transaction and removes any disk files
+    already written.
+
+    Raises ValueError with structured codes:
+    - design_quest_not_found
+    - empty_reference_filename
+    - invalid_reference_extension
+    - reference_too_large
+    """
+    quest = db.query(DesignQuest).filter(DesignQuest.id == quest_id).first()
+    if not quest:
+        raise ValueError("design_quest_not_found")
+    editor = _require_design_quest_editor(
+        db,
+        quest.project,
+        uploaded_by_user_id,
+        allow_designer_manager=allow_designer_manager,
+    )
+
+    # Validate everything up-front before any disk write.
+    validated: list[tuple[str, str, bytes]] = []
+    for upload in files or []:
+        original_name = (getattr(upload, "filename", None) or "").strip()
+        if not original_name:
+            continue  # blank file slot from empty multipart field
+        ext = original_name.rsplit(".", 1)[-1].lower() if "." in original_name else ""
+        if ext not in REFERENCE_ALLOWED_EXTENSIONS:
+            raise ValueError("invalid_reference_extension")
+        # Read one byte past the limit to detect oversize.
+        content = upload.file.read(REFERENCE_MAX_BYTES + 1)
+        if len(content) > REFERENCE_MAX_BYTES:
+            raise ValueError("reference_too_large")
+        validated.append((original_name, ext, content))
+
+    if not validated:
+        return []
+
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    now = datetime.utcnow()
+    written_paths: list[str] = []
+    created_refs: list[DesignQuestReference] = []
+    try:
+        next_sort = (
+            db.query(func.max(DesignQuestReference.sort_order))
+            .filter(DesignQuestReference.quest_id == quest_id)
+            .scalar()
+            or 0
+        ) + 10
+        for original_name, ext, content in validated:
+            unique_name = f"design-reference-{uuid.uuid4().hex}.{ext}"
+            disk_path = os.path.join(UPLOAD_DIR, unique_name)
+            with open(disk_path, "wb") as fh:
+                fh.write(content)
+            written_paths.append(disk_path)
+
+            file_type = "image" if ext in REFERENCE_IMAGE_EXTENSIONS else "document"
+            project_file = ProjectFile(
+                project_id=quest.project_id,
+                filename=unique_name,
+                original_filename=original_name,
+                file_path=f"uploads/{unique_name}",
+                file_type=file_type,
+                file_category="reference",
+                file_size=len(content),
+            )
+            db.add(project_file)
+            db.flush()
+
+            ref = DesignQuestReference(
+                quest_id=quest_id,
+                project_file_id=project_file.id,
+                label=original_name,
+                visibility="designer_visible",
+                sort_order=next_sort,
+                added_by_user_id=editor.id,
+                created_at=now,
+            )
+            db.add(ref)
+            db.flush()
+            created_refs.append(ref)
+            next_sort += 10
+
+        quest.updated_at = now
+        _write_design_quest_event(
+            db,
+            quest,
+            "references_uploaded",
+            editor.id,
+            f"{len(created_refs)} reference(s) uploaded to design quest '{quest.title}'.",
+            {"reference_count": len(created_refs)},
+        )
+        db.commit()
+        for ref in created_refs:
+            db.refresh(ref)
+        return created_refs
+    except Exception:
+        db.rollback()
+        for path in written_paths:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+        raise
 
 
 def can_designer_view_quest(user: User | None, quest: DesignQuest | None) -> bool:
@@ -1333,6 +1463,16 @@ def list_designer_manager_operations(db: Session, manager_user_id: int) -> dict:
                 "project_name": quest.project.name if quest.project else "Project",
                 "soft_deadline": quest.soft_deadline,
                 "visibility": quest.visibility,
+                "reference_count": len(quest.references or []),
+                "references": [
+                    {
+                        "id": ref.id,
+                        "label": ref.label or (
+                            ref.project_file.original_filename if ref.project_file else "reference"
+                        ),
+                    }
+                    for ref in (quest.references or [])
+                ],
             }
             for quest in draft_quests
         ],

@@ -15,7 +15,16 @@
   </section>
 
   {% if manager_error %}
-  <div class="designer-alert warning">{{ t('designer.manager.error_prefix') }} {{ manager_error }}</div>
+  <div class="designer-alert warning">
+    {{ t('designer.manager.error_prefix') }}
+    {% if manager_error == 'invalid_reference_extension' %}
+      {{ t('designer.manager.error_invalid_reference_extension') }}
+    {% elif manager_error == 'reference_too_large' %}
+      {{ t('designer.manager.error_reference_too_large') }}
+    {% else %}
+      {{ manager_error }}
+    {% endif %}
+  </div>
   {% endif %}
   {% if manager_result %}
   <div class="designer-alert success">{{ t('designer.manager.result_' ~ manager_result) }}</div>
@@ -31,7 +40,8 @@
       </div>
 
       {% if operations.available_projects %}
-      <form method="post" action="/designer/manager/quests/create" class="designer-manager-quest-form">
+      <form method="post" action="/designer/manager/quests/create"
+            class="designer-manager-quest-form" enctype="multipart/form-data">
         <div>
           <label class="form-label">{{ t('designer.manager.project_label') }}</label>
           <select name="project_id" class="form-select" required>
@@ -67,6 +77,14 @@
           <label class="form-label">{{ t('design_quest.must_avoid_label') }}</label>
           <textarea name="must_avoid" class="form-control" rows="2"></textarea>
         </div>
+        <div class="designer-manager-form-wide">
+          <label class="form-label">
+            <i class="bi bi-paperclip me-1"></i>{{ t('designer.manager.references_label') }}
+          </label>
+          <input type="file" name="files" class="form-control" multiple
+                 accept=".pptx,.ppt,.jpg,.jpeg,.png,.webp,.gif,.pdf">
+          <small class="text-muted">{{ t('designer.manager.references_hint') }}</small>
+        </div>
         <div class="designer-manager-form-wide designer-manager-form-actions">
           <label class="form-check mb-0">
             <input type="checkbox" name="is_timeline_blocking" value="true" class="form-check-input">
@@ -85,11 +103,33 @@
       <div class="designer-manager-drafts">
         <h3>{{ t('designer.manager.drafts_title') }}</h3>
         {% for quest in operations.draft_quests %}
-        <div class="designer-manager-row">
+        <div class="designer-manager-row" data-draft-quest-id="{{ quest.id }}">
           <div>
             <strong>{{ quest.title }}</strong>
             <span>{{ quest.project_name }}</span>
             {% if quest.soft_deadline %}<small>{{ quest.soft_deadline }}</small>{% endif %}
+            <div class="designer-manager-draft-refs">
+              {% if quest.references %}
+                {% for ref in quest.references %}
+                <span class="badge bg-light text-dark border" title="{{ ref.label }}">
+                  <i class="bi bi-paperclip"></i> {{ ref.label }}
+                </span>
+                {% endfor %}
+              {% else %}
+                <span class="text-muted small">{{ t('designer.manager.no_references_yet') }}</span>
+              {% endif %}
+            </div>
+            <form method="post"
+                  action="/designer/manager/quests/{{ quest.id }}/references/upload"
+                  class="designer-manager-add-refs-form"
+                  enctype="multipart/form-data">
+              <input type="file" name="files" multiple required
+                     class="form-control form-control-sm"
+                     accept=".pptx,.ppt,.jpg,.jpeg,.png,.webp,.gif,.pdf">
+              <button class="btn btn-sm btn-outline-primary" type="submit">
+                <i class="bi bi-plus-lg me-1"></i>{{ t('designer.manager.add_references_button') }}
+              </button>
+            </form>
           </div>
           <form method="post" action="/designer/manager/quests/{{ quest.id }}/publish">
             <button class="btn btn-sm btn-primary">
